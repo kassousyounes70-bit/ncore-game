@@ -27,7 +27,6 @@
             image-rendering: crisp-edges;
         }
 
-        /* شاشة التحميل لإخفاء استيقاظ السيرفر */
         #loading-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -108,7 +107,7 @@
 
     <div id="loading-screen">
         <h1 id="loading-title">جاري الاتصال بعالم N-CORE...</h1>
-        <p id="loading-text">يتم إيقاظ الخوادم، قد يستغرق الأمر 50 ثانية كحد أقصى</p>
+        <p id="loading-text">تهيئة الاتصال بالخادم المركزي...</p>
         <div class="spinner"></div>
     </div>
 
@@ -261,7 +260,6 @@
             currentFrame: playerFrame1
         };
 
-        // متغيرات الاتصال بالخادم
         const HTTP_SERVER_URL = "https://ncore-mmo-server.onrender.com";
         const WS_SERVER_URL = "wss://ncore-mmo-server.onrender.com";
         let gameRoom = null;
@@ -387,7 +385,6 @@
                 ctx.fillRect(paddingX + (st.x * scaleX), paddingY + (st.y * scaleY), 3, 3);
             });
 
-            // رسم اللاعبين الآخرين على الخريطة
             ctx.fillStyle = '#FFFFFF';
             Object.values(otherPlayers).forEach(p => {
                 ctx.beginPath();
@@ -445,7 +442,6 @@
             if (camera.x > WORLD_WIDTH - canvas.width) camera.x = WORLD_WIDTH - canvas.width;
             if (camera.y > WORLD_HEIGHT - canvas.height) camera.y = WORLD_HEIGHT - canvas.height;
 
-            // إرسال البيانات للسيرفر فقط عند حدوث تغيير فعلي في الحركة (توفير للبيانات)
             if (gameRoom && (player.x !== oldX || player.y !== oldY || player.isMoving !== oldMoving || player.facingRight !== oldFacing)) {
                 gameRoom.send("move", { x: player.x, y: player.y, facingRight: player.facingRight, isMoving: player.isMoving });
             }
@@ -492,9 +488,7 @@
                 }
             });
 
-            // رسم اللاعبين الآخرين
             Object.values(otherPlayers).forEach(p => {
-                // أنيميشن حركة بسيط للاعبين الآخرين
                 let frame = playerFrame1;
                 if (p.isMoving && Math.floor(Date.now() / 150) % 2 === 0) {
                     frame = playerFrame2;
@@ -512,7 +506,6 @@
                 ctx.restore();
             });
 
-            // رسم اللاعب المحلي
             const pWidth = player.currentFrame[0].length * PIXEL_SIZE;
             ctx.save();
             if (!player.facingRight) {
@@ -533,42 +526,55 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // دالة الاتصال بالخادم الرئيسية
         async function connectToServer() {
             const loadingText = document.getElementById('loading-text');
-            try {
-                // الخطوة 1: إرسال نبضة لإيقاظ الخادم
-                loadingText.innerText = "جاري الاتصال بالعالم الموازي... (إيقاظ الخادم)";
-                await fetch(HTTP_SERVER_URL + "/wakeup");
-                
-                // الخطوة 2: فتح اتصال WebSockets اللحظي
-                loadingText.innerText = "يتم الآن تهيئة القاعة الكبرى والاتصال باللاعبين...";
-                const client = new Colyseus.Client(WS_SERVER_URL);
-                gameRoom = await client.joinOrCreate("world");
-
-                // الخطوة 3: الاستماع لدخول وخروج اللاعبين الآخرين
-                gameRoom.state.players.onAdd((playerState, sessionId) => {
-                    // لا تضف نفسك إلى قائمة "اللاعبين الآخرين"
-                    if (sessionId !== gameRoom.sessionId) {
-                        otherPlayers[sessionId] = playerState;
+            const loadingTitle = document.getElementById('loading-title');
+            
+            let retries = 5;
+            
+            while (retries > 0) {
+                try {
+                    loadingText.innerText = `جاري إيقاظ الخادم... (محاولة ${6 - retries} من 5)`;
+                    
+                    const res = await fetch(HTTP_SERVER_URL + "/wakeup");
+                    if (!res.ok) {
+                        throw new Error("استجابة الخادم غير صالحة حالياً: " + res.status);
                     }
-                });
+                    
+                    loadingText.innerText = "الخادم مستيقظ! جاري المزامنة مع القاعة الكبرى...";
+                    const client = new Colyseus.Client(WS_SERVER_URL);
+                    gameRoom = await client.joinOrCreate("world");
 
-                gameRoom.state.players.onRemove((playerState, sessionId) => {
-                    delete otherPlayers[sessionId];
-                });
+                    gameRoom.state.players.onAdd((playerState, sessionId) => {
+                        if (sessionId !== gameRoom.sessionId) {
+                            otherPlayers[sessionId] = playerState;
+                        }
+                    });
 
-                // إخفاء شاشة التحميل بمجرد نجاح الاتصال وبدء اللعبة
-                document.getElementById('loading-screen').style.display = 'none';
-                gameLoop();
+                    gameRoom.state.players.onRemove((playerState, sessionId) => {
+                        delete otherPlayers[sessionId];
+                    });
 
-            } catch (error) {
-                loadingText.innerText = "فشل الاتصال بالخادم! يرجى تحديث الصفحة.";
-                console.error("Connection error:", error);
+                    document.getElementById('loading-screen').style.display = 'none';
+                    gameLoop();
+                    return; 
+
+                } catch (error) {
+                    retries--;
+                    console.error("Connection attempt failed:", error);
+                    
+                    if (retries === 0) {
+                        loadingTitle.innerText = "فشل الاتصال بشكل قاطع!";
+                        loadingText.innerText = `السبب الفني: ${error.message}`;
+                        document.querySelector('.spinner').style.display = 'none';
+                    } else {
+                        loadingText.innerText = `الخادم لا يزال في وضع الاستعداد، ننتظر 5 ثوانٍ للمحاولة التالية...`;
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                    }
+                }
             }
         }
 
-        // بدء عملية الاتصال بدلاً من تشغيل اللعبة مباشرة
         connectToServer();
     </script>
 </body>
