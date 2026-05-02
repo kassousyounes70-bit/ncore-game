@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>N-CORE MMO World - The Giant Hall</title>
+    <script src="https://unpkg.com/colyseus.js@^0.15.0/dist/colyseus.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0b0c10;
+            overflow: hidden;
+            touch-action: none;
+            font-family: monospace;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        canvas {
+            display: block;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* شاشة التحميل لإخفاء استيقاظ السيرفر */
+        #loading-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #0b0c10;
+            z-index: 100000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #66fcf1;
+            text-align: center;
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid rgba(102, 252, 241, 0.2);
+            border-top-color: #66fcf1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-top: 20px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        #landscape-warning {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #0b0c10;
+            color: #66fcf1;
+            z-index: 99999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        @media screen and (orientation: portrait) {
+            #landscape-warning { display: flex; }
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            color: #66fcf1;
+            text-shadow: 2px 2px 0px #000;
+            pointer-events: none;
+            z-index: 100;
+        }
+        h1 { margin: 0; font-size: 20px; letter-spacing: 2px; }
+        p { margin: 5px 0 0 0; font-size: 10px; color: #c5c6c7; }
+
+        #joystick-zone {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-color: rgba(102, 252, 241, 0.1);
+            border: 2px solid rgba(102, 252, 241, 0.3);
+            z-index: 100;
+            touch-action: none;
+        }
+        #joystick-stick {
+            position: absolute;
+            top: 50px; 
+            left: 50px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(102, 252, 241, 0.8);
+            box-shadow: 0 0 15px #66fcf1;
+            pointer-events: none;
+            transition: transform 0.05s linear;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <h1 id="loading-title">جاري الاتصال بعالم N-CORE...</h1>
+        <p id="loading-text">يتم إيقاظ الخوادم، قد يستغرق الأمر 50 ثانية كحد أقصى</p>
+        <div class="spinner"></div>
+    </div>
+
+    <div id="landscape-warning">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="#66fcf1"><path d="M16 1H8C6.34 1 5 2.34 5 4V20C5 21.66 6.34 23 8 23H16C17.66 23 19 21.66 19 20V4C19 2.34 17.66 1 16 1ZM17 19H7V5H17V19Z"/><path d="M12 21H12.01" stroke="#66fcf1" stroke-width="2" stroke-linecap="round"/></svg>
+        <h2 style="margin-top: 20px;">الرجاء تدوير الهاتف!</h2>
+        <p>عالم N-CORE مصمم للعب بالوضع الأفقي فقط.</p>
+    </div>
+
+    <div id="ui-layer">
+        <h1>N-CORE MMO</h1>
+        <p>الموقع: القاعة الكبرى</p>
+    </div>
+
+    <div id="joystick-zone">
+        <div id="joystick-stick"></div>
+    </div>
+
+    <canvas id="worldCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('worldCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const WORLD_WIDTH = 5000;
+        const WORLD_HEIGHT = 5000;
+        const WALL_HEIGHT = 250;
+        const PIXEL_SIZE = 5; 
+
+        const camera = { x: WORLD_WIDTH / 2 - canvas.width / 2, y: WORLD_HEIGHT / 2 - canvas.height / 2 };
+
+        const colors = { 1: '#000000', 2: '#FFE082', 3: '#FFFFFF', 4: '#D32F2F', 5: '#1976D2', 6: '#5D4037' };
+        
+        const setupColors = {
+            1: '#000000', 2: '#212121', 3: '#424242', 4: '#9E9E9E', 5: '#01579B', 6: '#00B0FF', 
+            8: '#F44336', 10: '#5D4037', 12: '#E0E0E0', 13: '#00E676', 14: '#757575'
+        };
+
+        const playerFrame1 = [
+            [0,0,0,1,1,1,1,1,0,0,0],
+            [0,0,1,4,4,4,4,4,1,1,0],
+            [0,0,1,2,2,2,2,2,2,1,0],
+            [0,1,2,1,2,2,1,2,2,1,0],
+            [0,1,2,2,2,2,2,2,2,1,0],
+            [0,0,1,4,4,4,4,4,1,0,0],
+            [0,1,3,1,5,5,5,1,3,1,0],
+            [1,3,3,1,5,5,5,1,3,3,1],
+            [0,1,1,5,5,5,5,5,1,1,0],
+            [0,0,1,5,1,1,1,5,1,0,0],
+            [0,1,6,6,1,0,1,6,6,1,0]
+        ];
+
+        const playerFrame2 = [
+            [0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,1,1,1,1,1,0,0,0],
+            [0,0,1,4,4,4,4,4,1,1,0],
+            [0,0,1,2,2,2,2,2,2,1,0],
+            [0,1,2,1,2,2,1,2,2,1,0],
+            [0,1,2,2,2,2,2,2,2,1,0],
+            [0,0,1,4,4,4,4,4,1,0,0],
+            [1,3,1,1,5,5,5,1,1,3,1],
+            [1,3,3,1,5,5,5,1,3,3,1],
+            [0,1,1,5,5,5,5,5,1,1,0],
+            [0,1,6,6,1,1,6,6,1,0,0]
+        ];
+
+        const bigSetupSprite = [
+            [0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,0,0,0,0,0,0],
+            [0,0,0,0,0,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,0,0,0,0,0],
+            [0,0,0,0,1,3,1,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,3,1,0,0,0,0],
+            [0,0,0,1,3,1,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,3,1,0,0,0],
+            [0,0,0,1,3,1,5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,5,5,5,1,3,1,0,0,0],
+            [0,0,0,1,3,1,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,5,1,3,1,0,0,0],
+            [0,0,0,1,3,1,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,5,1,3,1,8,1,0],
+            [0,0,0,1,3,1,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,5,1,3,1,2,1,0],
+            [0,0,0,1,3,1,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5,5,1,3,1,2,1,0],
+            [0,0,0,1,3,1,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,3,1,1,0,0],
+            [0,0,0,0,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,0,0,0,0],
+            [0,0,0,0,0,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,1],
+            [1,2,2,2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,1],
+            [1,2,2,2,2,2,2,1,12,12,12,12,12,12,12,12,12,12,12,1,2,2,2,2,2,2,1],
+            [1,2,2,2,2,2,2,1,12,13,12,12,12,12,12,12,12,12,12,1,1,1,2,2,2,2,1],
+            [1,2,2,2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,14,1,2,2,2,2,1],
+            [1,10,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,10,1]
+        ];
+
+        const posterColors = { 1: '#000000', 2: '#FFFF00', 3: '#00FF00', 4: '#FF0000', 5: '#FFFFFF' };
+        
+        const posterPacman = [
+            [0,0,1,1,1,1,0,0],
+            [0,1,2,2,2,2,1,0],
+            [1,2,2,2,1,2,2,1],
+            [1,2,2,2,2,2,2,1],
+            [1,2,2,1,1,1,1,0],
+            [1,2,2,2,2,2,2,1],
+            [0,1,2,2,2,2,1,0],
+            [0,0,1,1,1,1,0,0]
+        ];
+
+        const posterInvader = [
+            [0,0,1,0,0,0,1,0,0],
+            [0,0,0,1,0,1,0,0,0],
+            [0,0,1,1,1,1,1,0,0],
+            [0,1,1,0,1,0,1,1,0],
+            [1,1,1,1,1,1,1,1,1],
+            [1,0,1,1,1,1,1,0,1],
+            [1,0,1,0,0,0,1,0,1],
+            [0,0,0,1,1,1,0,0,0]
+        ];
+
+        const posterMushroom = [
+            [0,0,1,1,1,1,0,0],
+            [0,1,4,4,5,4,1,0],
+            [1,4,5,4,4,4,4,1],
+            [1,4,4,4,5,4,4,1],
+            [1,1,1,1,1,1,1,1],
+            [0,1,2,1,1,2,1,0],
+            [0,1,2,2,2,2,1,0],
+            [0,0,1,1,1,1,0,0]
+        ];
+
+        const wallsPosters = [];
+        for (let i = 200; i < WORLD_WIDTH - 200; i += 600) {
+            wallsPosters.push({ x: i, sprite: posterPacman });
+            wallsPosters.push({ x: i + 200, sprite: posterInvader });
+            wallsPosters.push({ x: i + 400, sprite: posterMushroom });
+        }
+
+        const player = {
+            x: 2500,
+            y: 2500,
+            vx: 0,
+            vy: 0,
+            speed: 8, 
+            facingRight: false, 
+            isMoving: false,
+            frameTick: 0,
+            currentFrame: playerFrame1
+        };
+
+        // متغيرات الاتصال بالخادم
+        const HTTP_SERVER_URL = "https://ncore-mmo-server.onrender.com";
+        const WS_SERVER_URL = "wss://ncore-mmo-server.onrender.com";
+        let gameRoom = null;
+        let otherPlayers = {};
+
+        let joyActive = false;
+        let joyBaseX = 0; let joyBaseY = 0;
+        const joyMaxDist = 50; 
+        const joyZone = document.getElementById('joystick-zone');
+        const joyStick = document.getElementById('joystick-stick');
+
+        joyZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            joyActive = true;
+            const touch = e.changedTouches[0];
+            const rect = joyZone.getBoundingClientRect();
+            joyBaseX = rect.left + rect.width / 2;
+            joyBaseY = rect.top + rect.height / 2;
+            updateJoystick(touch.clientX, touch.clientY);
+        });
+
+        joyZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if(!joyActive) return;
+            const touch = e.changedTouches[0];
+            updateJoystick(touch.clientX, touch.clientY);
+        });
+
+        const endJoystick = (e) => {
+            e.preventDefault();
+            joyActive = false;
+            player.vx = 0;
+            player.vy = 0;
+            joyStick.style.transform = `translate(0px, 0px)`;
+        };
+
+        joyZone.addEventListener('touchend', endJoystick);
+        joyZone.addEventListener('touchcancel', endJoystick);
+
+        function updateJoystick(clientX, clientY) {
+            let dx = clientX - joyBaseX;
+            let dy = clientY - joyBaseY;
+            let distance = Math.sqrt(dx*dx + dy*dy);
+            
+            if (distance > joyMaxDist) {
+                dx = (dx / distance) * joyMaxDist;
+                dy = (dy / distance) * joyMaxDist;
+                distance = joyMaxDist;
+            }
+            
+            joyStick.style.transform = `translate(${dx}px, ${dy}px)`;
+            
+            const normalizedSpeed = (distance / joyMaxDist) * player.speed;
+            player.vx = (dx / distance) * normalizedSpeed;
+            player.vy = (dy / distance) * normalizedSpeed;
+        }
+
+        const gameStations = [];
+        const startMapX = 1000;
+        const startMapY = 1000;
+
+        for(let r = 0; r < 3; r++) {
+            for (let i = 0; i < 5; i++) {
+                gameStations.push({ x: startMapX + (i * 500), y: startMapY + (r * 1000), flip: false, flickerTick: Math.random()*10 });
+                gameStations.push({ x: startMapX + (i * 500), y: startMapY + 400 + (r * 1000), flip: false, flickerTick: Math.random()*10 });
+            }
+        }
+
+        function drawSprite(matrix, colorPalette, startX, startY, scale, screenFlicker, flip = false) {
+            for (let row = 0; row < matrix.length; row++) {
+                for (let col = 0; col < matrix[row].length; col++) {
+                    const colorCode = matrix[row][col];
+                    if (colorCode !== 0) {
+                        if (screenFlicker && colorCode === 6) {
+                            ctx.globalAlpha = 0.85 + Math.random() * 0.15;
+                            ctx.shadowColor = '#00B0FF';
+                            ctx.shadowBlur = 15;
+                        } else {
+                            ctx.globalAlpha = 1.0;
+                            ctx.shadowBlur = 0;
+                        }
+
+                        if (colorPalette === posterColors) {
+                            if (colorCode === 3) ctx.fillStyle = '#00FF00';
+                            else ctx.fillStyle = colorPalette[colorCode];
+                        } else {
+                            ctx.fillStyle = colorPalette[colorCode];
+                        }
+
+                        let drawX = startX + (col * scale);
+                        if (flip) {
+                            drawX = startX + ((matrix[0].length - 1 - col) * scale);
+                        }
+                        ctx.fillRect(drawX, startY + (row * scale), scale, scale);
+                        
+                        ctx.globalAlpha = 1.0;
+                        ctx.shadowBlur = 0;
+                    }
+                }
+            }
+        }
+
+        function drawMiniMap() {
+            const mapW = 100;
+            const mapH = 100;
+            const paddingX = 20;
+            const paddingY = 20;
+            
+            const scaleX = mapW / WORLD_WIDTH;
+            const scaleY = mapH / WORLD_HEIGHT;
+
+            ctx.fillStyle = 'rgba(11, 12, 16, 0.8)';
+            ctx.fillRect(paddingX, paddingY, mapW, mapH);
+            ctx.strokeStyle = '#66fcf1';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(paddingX, paddingY, mapW, mapH);
+
+            ctx.fillStyle = '#2c2c38';
+            ctx.fillRect(paddingX, paddingY, mapW, WALL_HEIGHT * scaleY);
+
+            ctx.fillStyle = '#00E5FF';
+            gameStations.forEach(st => {
+                ctx.fillRect(paddingX + (st.x * scaleX), paddingY + (st.y * scaleY), 3, 3);
+            });
+
+            // رسم اللاعبين الآخرين على الخريطة
+            ctx.fillStyle = '#FFFFFF';
+            Object.values(otherPlayers).forEach(p => {
+                ctx.beginPath();
+                ctx.arc(paddingX + (p.x * scaleX), paddingY + (p.y * scaleY), 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.fillStyle = (Math.floor(Date.now() / 200) % 2 === 0) ? '#FF0000' : '#FF5252';
+            ctx.beginPath();
+            ctx.arc(paddingX + (player.x * scaleX), paddingY + (player.y * scaleY), 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function update() {
+            let oldX = player.x;
+            let oldY = player.y;
+            let oldMoving = player.isMoving;
+            let oldFacing = player.facingRight;
+
+            player.isMoving = (Math.abs(player.vx) > 0.1 || Math.abs(player.vy) > 0.1);
+
+            if (player.isMoving) {
+                player.x += player.vx;
+                player.y += player.vy;
+                
+                if (player.vx > 0) player.facingRight = true;
+                if (player.vx < 0) player.facingRight = false;
+
+                player.frameTick++;
+                if (player.frameTick > 6) { 
+                    player.currentFrame = (player.currentFrame === playerFrame1) ? playerFrame2 : playerFrame1;
+                    player.frameTick = 0;
+                }
+            } else {
+                player.currentFrame = playerFrame1;
+                player.frameTick = 0;
+            }
+
+            const pWidth = playerFrame1[0].length * PIXEL_SIZE;
+            const pHeight = playerFrame1.length * PIXEL_SIZE;
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + pWidth > WORLD_WIDTH) player.x = WORLD_WIDTH - pWidth;
+            
+            if (player.y < WALL_HEIGHT) player.y = WALL_HEIGHT;
+            if (player.y + pHeight > WORLD_HEIGHT) player.y = WORLD_HEIGHT - pHeight;
+
+            const targetCamX = player.x - canvas.width / 2;
+            const targetCamY = player.y - canvas.height / 2;
+            camera.x += (targetCamX - camera.x) * 0.1;
+            camera.y += (targetCamY - camera.y) * 0.1;
+
+            if (camera.x < 0) camera.x = 0;
+            if (camera.y < 0) camera.y = 0;
+            if (camera.x > WORLD_WIDTH - canvas.width) camera.x = WORLD_WIDTH - canvas.width;
+            if (camera.y > WORLD_HEIGHT - canvas.height) camera.y = WORLD_HEIGHT - canvas.height;
+
+            // إرسال البيانات للسيرفر فقط عند حدوث تغيير فعلي في الحركة (توفير للبيانات)
+            if (gameRoom && (player.x !== oldX || player.y !== oldY || player.isMoving !== oldMoving || player.facingRight !== oldFacing)) {
+                gameRoom.send("move", { x: player.x, y: player.y, facingRight: player.facingRight, isMoving: player.isMoving });
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#0b0c10'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const startCol = Math.floor(camera.x / 60);
+            const endCol = startCol + (canvas.width / 60) + 1;
+            const startRow = Math.floor(camera.y / 60);
+            const endRow = startRow + (canvas.height / 60) + 1;
+
+            for (let i = startCol; i < endCol; i++) {
+                for (let j = startRow; j < endRow; j++) {
+                    ctx.fillStyle = ((i + j) % 2 === 0) ? '#1f1b2e' : '#161324';
+                    ctx.fillRect((i * 60) - camera.x, (j * 60) - camera.y, 60, 60);
+                }
+            }
+
+            if (camera.y < WALL_HEIGHT) {
+                ctx.fillStyle = '#1c1c24';
+                ctx.fillRect(0, 0 - camera.y, WORLD_WIDTH, WALL_HEIGHT);
+                ctx.fillStyle = '#0b0c10';
+                ctx.fillRect(0, WALL_HEIGHT - camera.y - 10, WORLD_WIDTH, 10);
+
+                wallsPosters.forEach(poster => {
+                    if (poster.x - camera.x > -200 && poster.x - camera.x < canvas.width + 200) {
+                        ctx.fillStyle = '#424242';
+                        ctx.fillRect(poster.x - camera.x - 10, 80 - camera.y - 10, 60, 60);
+                        ctx.fillStyle = '#212121';
+                        ctx.fillRect(poster.x - camera.x - 5, 80 - camera.y - 5, 50, 50);
+                        drawSprite(poster.sprite, posterColors, poster.x - camera.x + 5, 80 - camera.y + 5, 5, false);
+                    }
+                });
+            }
+
+            const setupScale = 6;
+            gameStations.forEach(station => {
+                if (station.x - camera.x > -300 && station.x - camera.x < canvas.width + 300 &&
+                    station.y - camera.y > -300 && station.y - camera.y < canvas.height + 300) {
+                    drawSprite(bigSetupSprite, setupColors, station.x - camera.x, station.y - camera.y, setupScale, true, station.flip);
+                }
+            });
+
+            // رسم اللاعبين الآخرين
+            Object.values(otherPlayers).forEach(p => {
+                // أنيميشن حركة بسيط للاعبين الآخرين
+                let frame = playerFrame1;
+                if (p.isMoving && Math.floor(Date.now() / 150) % 2 === 0) {
+                    frame = playerFrame2;
+                }
+                
+                const pWidth = frame[0].length * PIXEL_SIZE;
+                ctx.save();
+                if (!p.facingRight) {
+                    ctx.translate((p.x - camera.x) + pWidth, p.y - camera.y);
+                    ctx.scale(-1, 1);
+                    drawSprite(frame, colors, 0, 0, PIXEL_SIZE, false);
+                } else {
+                    drawSprite(frame, colors, p.x - camera.x, p.y - camera.y, PIXEL_SIZE, false);
+                }
+                ctx.restore();
+            });
+
+            // رسم اللاعب المحلي
+            const pWidth = player.currentFrame[0].length * PIXEL_SIZE;
+            ctx.save();
+            if (!player.facingRight) {
+                ctx.translate((player.x - camera.x) + pWidth, player.y - camera.y);
+                ctx.scale(-1, 1);
+                drawSprite(player.currentFrame, colors, 0, 0, PIXEL_SIZE, false);
+            } else {
+                drawSprite(player.currentFrame, colors, player.x - camera.x, player.y - camera.y, PIXEL_SIZE, false);
+            }
+            ctx.restore();
+
+            drawMiniMap();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // دالة الاتصال بالخادم الرئيسية
+        async function connectToServer() {
+            const loadingText = document.getElementById('loading-text');
+            try {
+                // الخطوة 1: إرسال نبضة لإيقاظ الخادم
+                loadingText.innerText = "جاري الاتصال بالعالم الموازي... (إيقاظ الخادم)";
+                await fetch(HTTP_SERVER_URL + "/wakeup");
+                
+                // الخطوة 2: فتح اتصال WebSockets اللحظي
+                loadingText.innerText = "يتم الآن تهيئة القاعة الكبرى والاتصال باللاعبين...";
+                const client = new Colyseus.Client(WS_SERVER_URL);
+                gameRoom = await client.joinOrCreate("world");
+
+                // الخطوة 3: الاستماع لدخول وخروج اللاعبين الآخرين
+                gameRoom.state.players.onAdd((playerState, sessionId) => {
+                    // لا تضف نفسك إلى قائمة "اللاعبين الآخرين"
+                    if (sessionId !== gameRoom.sessionId) {
+                        otherPlayers[sessionId] = playerState;
+                    }
+                });
+
+                gameRoom.state.players.onRemove((playerState, sessionId) => {
+                    delete otherPlayers[sessionId];
+                });
+
+                // إخفاء شاشة التحميل بمجرد نجاح الاتصال وبدء اللعبة
+                document.getElementById('loading-screen').style.display = 'none';
+                gameLoop();
+
+            } catch (error) {
+                loadingText.innerText = "فشل الاتصال بالخادم! يرجى تحديث الصفحة.";
+                console.error("Connection error:", error);
+            }
+        }
+
+        // بدء عملية الاتصال بدلاً من تشغيل اللعبة مباشرة
+        connectToServer();
+    </script>
+</body>
+</html>
