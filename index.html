@@ -543,7 +543,6 @@
                     
                     loadingText.innerText = "الخادم مستيقظ! جاري المزامنة مع القاعة الكبرى...";
                     
-                    // استخراج الـ Constructor بطريقة آمنة تقبل مختلف أنظمة التغليف (UMD/ESM)
                     const ColyseusClient = Colyseus.Client || (Colyseus.default && Colyseus.default.Client);
                     if (!ColyseusClient) {
                         throw new Error("بنية المكتبة المحملة غير مدعومة أو تالفة.");
@@ -552,14 +551,23 @@
                     const client = new ColyseusClient(WS_SERVER_URL);
                     gameRoom = await client.joinOrCreate("world");
 
-                    gameRoom.state.players.onAdd((playerState, sessionId) => {
-                        if (sessionId !== gameRoom.sessionId) {
-                            otherPlayers[sessionId] = playerState;
-                        }
-                    });
-
-                    gameRoom.state.players.onRemove((playerState, sessionId) => {
-                        delete otherPlayers[sessionId];
+                    // الاستماع الشامل لحالة العالم (تجاوز مشاكل البروكسي في متصفحات الهواتف)
+                    gameRoom.onStateChange((state) => {
+                        const updatedPlayers = {};
+                        
+                        state.players.forEach((playerState, sessionId) => {
+                            if (sessionId !== gameRoom.sessionId) {
+                                // استخراج القيم الرقمية صراحةً لمنع تسرب الـ undefined
+                                updatedPlayers[sessionId] = {
+                                    x: playerState.x !== undefined ? playerState.x : 2500,
+                                    y: playerState.y !== undefined ? playerState.y : 2500,
+                                    facingRight: playerState.facingRight || false,
+                                    isMoving: playerState.isMoving || false
+                                };
+                            }
+                        });
+                        
+                        otherPlayers = updatedPlayers;
                     });
 
                     document.getElementById('loading-screen').style.display = 'none';
