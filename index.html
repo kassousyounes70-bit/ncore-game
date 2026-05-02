@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
     <title>N-CORE MMO World - The Giant Hall</title>
-    <script src="https://unpkg.com/colyseus.js@^0.15.0/dist/colyseus.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/colyseus.js@0.15.0/dist/colyseus.js"></script>
     <style>
         body, html {
             margin: 0;
@@ -542,7 +542,14 @@
                     }
                     
                     loadingText.innerText = "الخادم مستيقظ! جاري المزامنة مع القاعة الكبرى...";
-                    const client = new Colyseus.Client(WS_SERVER_URL);
+                    
+                    // استخراج الـ Constructor بطريقة آمنة تقبل مختلف أنظمة التغليف (UMD/ESM)
+                    const ColyseusClient = Colyseus.Client || (Colyseus.default && Colyseus.default.Client);
+                    if (!ColyseusClient) {
+                        throw new Error("بنية المكتبة المحملة غير مدعومة أو تالفة.");
+                    }
+
+                    const client = new ColyseusClient(WS_SERVER_URL);
                     gameRoom = await client.joinOrCreate("world");
 
                     gameRoom.state.players.onAdd((playerState, sessionId) => {
