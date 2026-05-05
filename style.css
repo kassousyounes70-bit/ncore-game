@@ -1,0 +1,118 @@
+body, html {
+    margin: 0; 
+    padding: 0; 
+    width: 100%; 
+    height: 100%;
+    background-color: #0b0c10; 
+    overflow: hidden;
+    touch-action: none; 
+    font-family: monospace;
+    user-select: none; 
+    -webkit-user-select: none;
+}
+
+canvas {
+    display: block;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+#loading-screen {
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    background-color: #0b0c10; 
+    z-index: 100000;
+    display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+    align-items: center;
+    color: #66fcf1; 
+    text-align: center;
+}
+
+.spinner {
+    width: 50px; 
+    height: 50px;
+    border: 5px solid rgba(102,252,241,0.2);
+    border-top-color: #66fcf1; 
+    border-radius: 50%;
+    animation: spin 1s linear infinite; 
+    margin-top: 20px;
+}
+
+@keyframes spin { 
+    100% { transform: rotate(360deg); } 
+}
+
+#landscape-warning {
+    display: none; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    background-color: #0b0c10; 
+    color: #66fcf1; 
+    z-index: 99999;
+    flex-direction: column; 
+    justify-content: center; 
+    align-items: center; 
+    text-align: center;
+}
+
+@media screen and (orientation: portrait) {
+    #landscape-warning { display: flex; }
+}
+
+#ui-layer {
+    position: absolute; 
+    top: 15px; 
+    right: 20px;
+    color: #66fcf1; 
+    text-shadow: 2px 2px 0px #000;
+    pointer-events: none; 
+    z-index: 100;
+}
+
+h1 { 
+    margin: 0; 
+    font-size: 20px; 
+    letter-spacing: 2px; 
+}
+
+p { 
+    margin: 5px 0 0 0; 
+    font-size: 10px; 
+    color: #c5c6c7; 
+}
+
+#joystick-zone {
+    position: absolute; 
+    bottom: 20px; 
+    left: 20px;
+    width: 150px; 
+    height: 150px; 
+    border-radius: 50%;
+    background-color: rgba(102,252,241,0.1);
+    border: 2px solid rgba(102,252,241,0.3);
+    z-index: 100; 
+    touch-action: none;
+}
+
+#joystick-stick {
+    position: absolute; 
+    top: 50px; 
+    left: 50px;
+    width: 50px; 
+    height: 50px; 
+    border-radius: 50%;
+    background-color: rgba(102,252,241,0.8);
+    box-shadow: 0 0 15px #66fcf1; 
+    pointer-events: none;
+    transition: transform 0.05s linear;
+}
