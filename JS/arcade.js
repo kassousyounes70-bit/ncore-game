@@ -11,7 +11,7 @@ for (let i = 1; i <= totalArcadeTypes; i++) {
     arcadeImages[i] = img;
 }
 
-// أبعاد جهاز الآركيد (يفضل أن تكون صورك بهذه الأبعاد تقريباً أو يمكنك تعديل هذه القيم لاحقاً لتطابقها)
+// أبعاد جهاز الآركيد
 const ARCADE_WIDTH = 80;
 const ARCADE_HEIGHT = 125;
 
@@ -39,10 +39,15 @@ function buildArcadeSector() {
                 x: ax, 
                 y: ay, 
                 type: 'arcade', 
-                arcadeId: randomType, // حفظ رقم الصورة الخاصة بهذا الجهاز
+                arcadeId: randomType, 
                 flip: flip, 
                 w: ARCADE_WIDTH, 
-                h: ARCADE_HEIGHT 
+                h: ARCADE_HEIGHT,
+                // قيم افتراضية للشاشة قابلة للتعديل من أداة المعايرة
+                screenOffsetX: 15,
+                screenOffsetY: 20,
+                screenW: 50,
+                screenH: 40
             });
             
             addCollider(ax, ay, ARCADE_WIDTH, ARCADE_HEIGHT);
@@ -51,7 +56,7 @@ function buildArcadeSector() {
 }
 buildArcadeSector();
 
-// دالة محاكاة حركة تفصيلية لباك-مان (التي ستظهر خلف الشاشة الشفافة)
+// دالة محاكاة حركة تفصيلية لباك-مان (خلف الشاشة الشفافة)
 function drawAnimatedScreen(x, y, width, height) {
     const time = Date.now() / 1000; 
     
@@ -107,22 +112,20 @@ function drawStations() {
         if (sx < -station.w || sx > canvasWidth + 50 || sy < -station.h || sy > canvasHeight + 50) return;
 
         if (station.type === 'arcade') {
-            // 1. إحداثيات ومقاسات الشاشة الوهمية (هذه الأرقام افتراضية وتعتمد على مكان الفتحة الشفافة في صورك)
-            // سنفترض أن الفتحة تبدأ بعد 15 بكسل أفقياً و 20 بكسل عمودياً من حافة الصورة
-            let screenW = 50;
-            let screenH = 40;
-            let screenX = sx + 15;
-            let screenY = sy + 20;
+            // قراءة قيم المعايرة التي يتم تعديلها من شرائط التمرير في وضع المطور
+            let sOx = station.screenOffsetX ?? 15;
+            let sOy = station.screenOffsetY ?? 20;
+            let sW = station.screenW ?? 50;
+            let sH = station.screenH ?? 40;
             
-            // 2. رسم الرسوم المتحركة (باك-مان) *أولاً* في الخلف
-            drawAnimatedScreen(screenX, screenY, screenW, screenH);
+            // 1. رسم الرسوم المتحركة (باك-مان) *أولاً* في الخلف بالإحداثيات المخصصة
+            drawAnimatedScreen(sx + sOx, sy + sOy, sW, sH);
 
-            // 3. رسم صورة الجهاز (PNG الشفاف) *ثانياً* فوقها
+            // 2. رسم صورة الجهاز (PNG الشفاف) *ثانياً* فوقها
             const img = arcadeImages[station.arcadeId];
             if (img && img.complete && img.naturalWidth !== 0) {
                 ctx.drawImage(img, sx, sy, station.w, station.h);
             } else {
-                // صندوق رمادي بديل في حال لم تحمل الصورة بعد لتجنب الأخطاء
                 ctx.fillStyle = 'rgba(80, 80, 80, 0.5)';
                 ctx.fillRect(sx, sy, station.w, station.h);
             }
