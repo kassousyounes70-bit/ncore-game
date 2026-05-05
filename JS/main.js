@@ -8,28 +8,122 @@ let otherPlayers = {};
 // --- نظام وضع المطور (Dev Mode) ---
 let devMode = false;
 let selectedStation = null;
-let devScale = 1;
+let carriedStation = null;
+
+// بناء واجهة المعايرة ونافذة التصدير ديناميكياً
+function setupDevToolsUI() {
+    if (!document.getElementById('calib-ui')) {
+        const ui = document.createElement('div');
+        ui.id = 'calib-ui';
+        ui.style.cssText = 'position:absolute; top:80px; left:20px; background:rgba(11, 12, 16, 0.9); color:#66fcf1; padding:15px; border:2px solid #66fcf1; border-radius:10px; display:none; z-index:1000; direction:ltr; font-family:monospace; box-shadow: 0 0 15px #66fcf1;';
+        ui.innerHTML = `
+            <h3 style="margin-top:0; text-align:center; color:#fff;">Arcade Calibrator</h3>
+            <label>X Offset: <input type="range" id="calib-x" min="-50" max="150" value="15"></label> <span id="val-x">15</span><br>
+            <label>Y Offset: <input type="range" id="calib-y" min="-50" max="150" value="20"></label> <span id="val-y">20</span><br>
+            <label>Width: &nbsp;&nbsp;<input type="range" id="calib-w" min="10" max="150" value="50"></label> <span id="val-w">50</span><br>
+            <label>Height: &nbsp;<input type="range" id="calib-h" min="10" max="150" value="40"></label> <span id="val-h">40</span><br>
+            <div style="margin-top:15px; display:flex; gap:10px; justify-content:center;">
+                <button id="carry-btn" style="background:#00B0FF; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:5px;" onclick="toggleCarry()">حمل الجهاز</button>
+                <button style="background:#F44336; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:5px;" onclick="closeCalibration()">إغلاق</button>
+            </div>
+        `;
+        document.body.appendChild(ui);
+
+        ['x', 'y', 'w', 'h'].forEach(param => {
+            const slider = document.getElementById(`calib-${param}`);
+            const valDisplay = document.getElementById(`val-${param}`);
+            slider.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value);
+                valDisplay.innerText = val;
+                if (!selectedStation) return;
+                if (param === 'x') selectedStation.screenOffsetX = val;
+                if (param === 'y') selectedStation.screenOffsetY = val;
+                if (param === 'w') selectedStation.screenW = val;
+                if (param === 'h') selectedStation.screenH = val;
+            });
+        });
+    }
+
+    if (!document.getElementById('export-modal')) {
+        const modal = document.createElement('div');
+        modal.id = 'export-modal';
+        modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#0b0c10; border:2px solid #66fcf1; padding:20px; z-index:20000; color:#fff; width:85%; max-width:600px; max-height:80%; overflow-y:auto; display:none; border-radius:10px; box-shadow: 0 0 30px #66fcf1; text-align:right;';
+        modal.innerHTML = `
+            <h2 style="color:#66fcf1; margin-top:0;">كود الإحداثيات والمعايرة</h2>
+            <p style="font-size:12px; color:#c5c6c7;">انسخ هذا الكود واستبدله في ملف arcade.js:</p>
+            <textarea id="export-text" style="width:100%; height:200px; background:#000; color:#0f0; direction:ltr; font-family:monospace; padding:10px; box-sizing:border-box; border:1px solid #444;"></textarea>
+            <div style="margin-top:15px; display:flex; gap:10px; justify-content:center;">
+                <button style="background:#4CAF50; color:#fff; border:none; padding:10px 20px; cursor:pointer; font-weight:bold; border-radius:5px; font-size:16px;" onclick="copyExport()">نسخ الكود</button>
+                <button style="background:#F44336; color:#fff; border:none; padding:10px 20px; cursor:pointer; font-weight:bold; border-radius:5px; font-size:16px;" onclick="document.getElementById('export-modal').style.display='none'">إغلاق</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+}
+
+window.copyExport = function() {
+    const text = document.getElementById('export-text');
+    text.select();
+    document.execCommand('copy');
+    alert('تم النسخ بنجاح!');
+};
 
 window.toggleDevMode = function() {
     devMode = !devMode;
     const btn = document.getElementById('dev-mode-btn');
     const exportBtn = document.getElementById('export-btn');
     
+    setupDevToolsUI();
+
     if (devMode) {
-        if (btn) btn.innerText = "إغلاق وضع المطور";
-        if (btn) btn.style.backgroundColor = "#F44336";
+        if (btn) { btn.innerText = "إغلاق وضع المطور"; btn.style.backgroundColor = "#F44336"; }
         if (exportBtn) exportBtn.style.display = "block";
-        
-        // حساب نسبة التصغير لاحتواء العالم بأكمله داخل شاشة الهاتف
-        const scaleX = canvasWidth / WORLD_WIDTH;
-        const scaleY = canvasHeight / WORLD_HEIGHT;
-        devScale = Math.min(scaleX, scaleY); 
     } else {
-        if (btn) btn.innerText = "تفعيل وضع المطور";
-        if (btn) btn.style.backgroundColor = "#0b0c10";
+        if (btn) { btn.innerText = "تفعيل وضع المطور"; btn.style.backgroundColor = "#0b0c10"; }
         if (exportBtn) exportBtn.style.display = "none";
-        devScale = 1;
+        closeCalibration();
+        if (carriedStation) toggleCarry();
     }
+};
+
+window.toggleCarry = function() {
+    const btn = document.getElementById('carry-btn');
+    if (!carriedStation && selectedStation) {
+        carriedStation = selectedStation;
+        if(btn) btn.innerText = "إفلات وتثبيت الجهاز";
+    } else if (carriedStation) {
+        carriedStation = null;
+        if(btn) btn.innerText = "حمل الجهاز";
+        rebuildColliders(); // تحديث التصادم بعد وضع الجهاز
+    }
+};
+
+function openCalibration(station) {
+    const ui = document.getElementById('calib-ui');
+    if (!ui) return;
+    ui.style.display = 'block';
+    
+    // جلب القيم الحالية أو وضع قيم افتراضية مبدئية
+    const sx = station.screenOffsetX ?? 15;
+    const sy = station.screenOffsetY ?? 20;
+    const sw = station.screenW ?? 50;
+    const sh = station.screenH ?? 40;
+
+    document.getElementById('calib-x').value = sx; document.getElementById('val-x').innerText = sx;
+    document.getElementById('calib-y').value = sy; document.getElementById('val-y').innerText = sy;
+    document.getElementById('calib-w').value = sw; document.getElementById('val-w').innerText = sw;
+    document.getElementById('calib-h').value = sh; document.getElementById('val-h').innerText = sh;
+
+    station.screenOffsetX = sx;
+    station.screenOffsetY = sy;
+    station.screenW = sw;
+    station.screenH = sh;
+}
+
+window.closeCalibration = function() {
+    const ui = document.getElementById('calib-ui');
+    if (ui) ui.style.display = 'none';
+    selectedStation = null;
 };
 
 window.exportLayout = function() {
@@ -37,52 +131,46 @@ window.exportLayout = function() {
     output += "function buildArcadeSector() {\n";
     output += "    gameStations.length = 0;\n";
     gameStations.forEach(s => {
-        output += `    gameStations.push({ x: ${Math.round(s.x)}, y: ${Math.round(s.y)}, type: '${s.type}', flip: ${s.flip}, scale: ${s.scale}, w: ${s.w}, h: ${s.h} });\n`;
+        let sOx = s.screenOffsetX ?? 15;
+        let sOy = s.screenOffsetY ?? 20;
+        let sW = s.screenW ?? 50;
+        let sH = s.screenH ?? 40;
+        output += `    gameStations.push({ x: ${Math.round(s.x)}, y: ${Math.round(s.y)}, type: '${s.type}', arcadeId: ${s.arcadeId || 1}, flip: ${s.flip}, w: ${s.w}, h: ${s.h}, screenOffsetX: ${sOx}, screenOffsetY: ${sOy}, screenW: ${sW}, screenH: ${sH} });\n`;
         output += `    addCollider(${Math.round(s.x)}, ${Math.round(s.y)}, ${s.w}, ${s.h});\n`;
     });
     output += "}\nbuildArcadeSector();";
     
-    // طباعة الكود وتنبيه المستخدم
-    console.log(output);
-    alert("تم تصدير الإحداثيات بنجاح! سيتم إضافة نافذة لنسخها في ملف HTML قريباً.");
+    const modal = document.getElementById('export-modal');
+    const text = document.getElementById('export-text');
+    if(modal && text) {
+        text.value = output;
+        modal.style.display = 'block';
+    }
 };
 
-// التحكم عبر اللمس المخصص للهواتف في وضع المطور
-canvas.addEventListener('touchstart', (e) => {
+// التفاعل مع الأجهزة (نقر/لمس)
+canvas.addEventListener('pointerdown', (e) => {
     if (!devMode) return;
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    
-    // تحويل إحداثيات اللمس بناءً على نسبة التصغير (Zoom)
-    const touchX = (touch.clientX - rect.left) / devScale;
-    const touchY = (touch.clientY - rect.top) / devScale;
+    // منع التفاعل مع الكانفاس إذا نقرنا بالخطأ على واجهة الـ UI
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
 
+    const rect = canvas.getBoundingClientRect();
+    const clickX = (e.clientX - rect.left) + camera.x;
+    const clickY = (e.clientY - rect.top) + camera.y;
+
+    let found = false;
     for (let i = gameStations.length - 1; i >= 0; i--) {
         let s = gameStations[i];
-        if (touchX >= s.x && touchX <= s.x + s.w && touchY >= s.y && touchY <= s.y + s.h) {
+        if (clickX >= s.x && clickX <= s.x + s.w && clickY >= s.y && clickY <= s.y + s.h) {
             selectedStation = s;
+            openCalibration(s);
+            found = true;
             break;
         }
     }
-}, { passive: false });
-
-canvas.addEventListener('touchmove', (e) => {
-    if (!devMode || !selectedStation) return;
-    e.preventDefault(); // منع تمرير الشاشة
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
     
-    const moveX = (touch.clientX - rect.left) / devScale;
-    const moveY = (touch.clientY - rect.top) / devScale;
-
-    selectedStation.x = moveX - (selectedStation.w / 2);
-    selectedStation.y = moveY - (selectedStation.h / 2);
-}, { passive: false });
-
-canvas.addEventListener('touchend', () => {
-    if (selectedStation) {
-        rebuildColliders(); 
-        selectedStation = null;
+    if (!found && !carriedStation) {
+        closeCalibration();
     }
 });
 
@@ -96,7 +184,6 @@ function rebuildColliders() {
 }
 
 function drawMiniMap() {
-    if(devMode) return; // إخفاء الخريطة المصغرة أثناء التصغير الكامل
     const mapW = 150; 
     const mapH = Math.round(mapW * (WORLD_HEIGHT / WORLD_WIDTH)); 
     const padX = 20; 
@@ -137,6 +224,12 @@ function drawMiniMap() {
 function gameLoop() {
     const states = updatePlayerLogic();
     
+    // إذا كان اللاعب يحمل جهازاً، يتبع الجهاز الشخصية (فوق رأسها)
+    if (carriedStation) {
+        carriedStation.x = player.x - (carriedStation.w / 2) + 20; 
+        carriedStation.y = player.y - carriedStation.h - 10;
+    }
+
     if (gameRoom && (player.x !== states.oldX || player.y !== states.oldY || player.isMoving !== states.oldMoving || player.facingRight !== states.oldFacing)) {
         gameRoom.send("move", { 
             x: player.x, 
@@ -146,30 +239,22 @@ function gameLoop() {
         });
     }
 
-    if (devMode) {
+    drawWorldBackground();
+    drawStations();
+    
+    Object.values(otherPlayers).forEach(p => { drawPlayer(p, false); });
+    drawPlayer(player, true);
+    
+    // إحاطة الجهاز المختار بإطار أصفر لامع لتمييزه
+    if (devMode && selectedStation) {
         ctx.save();
-        ctx.scale(devScale, devScale);
-        
-        ctx.fillStyle = '#0b0c10';
-        ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-        
-        ctx.strokeStyle = '#66fcf1';
-        ctx.lineWidth = 10;
-        ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-
-        gameStations.forEach(station => {
-            ctx.fillStyle = selectedStation === station ? '#FFFFFF' : '#00B0FF';
-            ctx.fillRect(station.x, station.y, station.w, station.h);
-        });
-        
+        ctx.strokeStyle = '#FFeb3b';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(selectedStation.x - camera.x, selectedStation.y - camera.y, selectedStation.w, selectedStation.h);
         ctx.restore();
-    } else {
-        drawWorldBackground();
-        drawStations();
-        Object.values(otherPlayers).forEach(p => { drawPlayer(p, false); });
-        drawPlayer(player, true);
-        drawMiniMap();
     }
+
+    drawMiniMap();
 
     requestAnimationFrame(gameLoop);
 }
@@ -223,4 +308,5 @@ async function connectToServer() {
     }
 }
 
+// بدء دورة الحياة
 connectToServer();
