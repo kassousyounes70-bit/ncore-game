@@ -116,3 +116,40 @@ p {
     pointer-events: none;
     transition: transform 0.05s linear;
 }
+
+/* --- واجهة وضع المطور --- */
+#dev-ui-layer {
+    position: absolute;
+    top: 15px;
+    left: 20px;
+    z-index: 200;
+    display: flex;
+    gap: 10px;
+    pointer-events: auto; /* السماح بالنقر على الأزرار */
+}
+
+.dev-btn {
+    background-color: #0b0c10;
+    color: #66fcf1;
+    border: 2px solid #66fcf1;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+    transition: all 0.2s ease;
+}
+
+.dev-btn:active {
+    transform: scale(0.95);
+}
+
+#export-btn {
+    display: none; /* مخفي افتراضياً، يظهر عند التفعيل فقط */
+    background-color: #4CAF50;
+    color: #fff;
+    border-color: #4CAF50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
