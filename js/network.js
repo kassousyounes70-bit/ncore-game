@@ -11,7 +11,6 @@ const Network = (() => {
   /* ==============================
      الثوابت
      ============================== */
-  // الرابط فارغ لكي يتصل Socket.io بنفس الرابط الذي تستضيفه اللعبة
   const SERVER_URL     = ''; 
   const SEND_RATE      = 100;
   const INTERP_SPEED   = 0.18;
@@ -82,6 +81,13 @@ const Network = (() => {
       UI.showToast('لاعب جديد دخل الصالة 🎮', 1800);
     });
 
+    /* ---- استقبال رسائل الدردشة ---- */
+    _socket.on('player:chat', ({ id, text }) => {
+      if (typeof Chat !== 'undefined') {
+        Chat.addMessage(id, text);
+      }
+    });
+
     _socket.on('player:moved', ({ id, x, y, dir }) => {
       if (id === _myId) return;
       const p = _players.get(id);
@@ -94,6 +100,7 @@ const Network = (() => {
 
     _socket.on('player:left', (id) => {
       _players.delete(id);
+      if (typeof Chat !== 'undefined') Chat.clear(id);
     });
 
     _socket.on('disconnect', (reason) => {
@@ -136,6 +143,18 @@ const Network = (() => {
     };
   }
 
+  /** إرسال رسالة دردشة **/
+  function sendChatMessage(text) {
+    if (!_connected || !text.trim()) return;
+    
+    _socket.emit('player:chat', text);
+    
+    // إظهار الرسالة محلياً فوق رأسك فوراً
+    if (typeof Chat !== 'undefined') {
+      Chat.addMessage(_myId, text);
+    }
+  }
+
   function sendPosition(cx, cy, rect, dir) {
     if (!_connected) return;
 
@@ -176,7 +195,7 @@ const Network = (() => {
   function drawOtherPlayers(ctx, allChars) {
     _interpolatePlayers();
 
-    for (const p of _players.values()) {
+    for (const [id, p] of _players.entries()) {
       if (!Camera.isVisible({ x: p.x - 20, y: p.y - 20, w: 60, h: 60 })) continue;
 
       const char = allChars[p.charId];
@@ -197,6 +216,11 @@ const Network = (() => {
       );
 
       _drawPlayerName(ctx, p);
+
+      // رسم فقاعة الدردشة فوق اللاعب الآخر إذا وجدت
+      if (typeof Chat !== 'undefined') {
+        Chat.draw(ctx, p.x, p.y - PLAYER_H / 2, id);
+      }
     }
   }
 
@@ -223,6 +247,7 @@ const Network = (() => {
   return {
     connect,
     sendPosition,
+    sendChatMessage, // تصدير الدالة الجديدة
     drawOtherPlayers,
     getPlayerCount,
     isConnected,
@@ -230,4 +255,3 @@ const Network = (() => {
   };
 
 })();
-       
