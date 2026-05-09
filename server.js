@@ -65,7 +65,7 @@ io.on('connection', (socket) => {
       y:      _clamp(data.y || 720,  50, 1390),
       dir:    data.dir    || 'down',
       charId: _clamp(data.charId || 0, 0, 9),
-      name:   _sanitize(data.name || 'لاعب'),
+      name:   _sanitize(data.name || 'لاعب', 16),
       joinedAt: Date.now()
     };
 
@@ -83,6 +83,21 @@ io.on('connection', (socket) => {
     });
 
     _logStats();
+  });
+
+  /* ---- استقبال وبث رسائل الدردشة ---- */
+  socket.on('player:chat', (text) => {
+    if (!players.has(socket.id)) return;
+    
+    // تنظيف الرسالة وتحديد الطول بـ 50 حرفاً
+    const sanitizedText = _sanitize(text, 50);
+    if (!sanitizedText) return;
+
+    // بث الرسالة لجميع اللاعبين الآخرين
+    socket.broadcast.emit('player:chat', {
+      id: socket.id,
+      text: sanitizedText
+    });
   });
 
   socket.on('player:move', (data) => {
@@ -137,8 +152,8 @@ function _clamp(val, min, max) {
   return Math.max(min, Math.min(max, Number(val) || 0));
 }
 
-function _sanitize(str) {
-  return String(str).replace(/[<>"'&]/g, '').trim().slice(0, 16) || 'لاعب';
+function _sanitize(str, maxLength = 16) {
+  return String(str).replace(/[<>"'&]/g, '').trim().slice(0, maxLength);
 }
 
 function _validDir(dir) {
@@ -171,3 +186,4 @@ server.listen(PORT, () => {
   console.log(`🚀 يعمل على البورت: ${PORT}`);
   console.log('================================');
 });
+     
