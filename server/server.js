@@ -24,10 +24,17 @@ const CLIENT_URL  = process.env.CLIENT_URL || 'https://ncore-game.vercel.app';
 const MAX_PLAYERS = 50;
 
 /* ==============================
-   CORS
+   CORS مصفوفة الروابط المسموحة
    ============================== */
+const allowedOrigins = [
+  CLIENT_URL,
+  `${CLIENT_URL}/`, // تغطية مسار Vercel في حال وجود شرطة مائلة
+  'http://localhost:3000',
+  'http://127.0.0.1:5500'
+];
+
 app.use(cors({
-  origin: [CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:5500'],
+  origin: allowedOrigins,
   methods: ['GET', 'POST']
 }));
 
@@ -38,10 +45,10 @@ app.use(express.json());
    ============================== */
 const io = new Server(server, {
   cors: {
-    origin: [CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:5500'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   },
-  transports: ['websocket'],
+  // تم إزالة قيد transports للسماح بالتوافقية العالية والـ Polling المبدئي
   pingInterval: 25000,
   pingTimeout:  60000
 });
