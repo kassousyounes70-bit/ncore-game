@@ -16,6 +16,7 @@ const Devices = (() => {
   let _popupCtx      = null;
   let _closeBtn      = null;
   let _popupEl       = null;
+  let _interactBtn   = null; // ربط الزر الجديد
   let _animTimer     = 0;
 
   const INTERACT_RANGE = 64;
@@ -31,6 +32,7 @@ const Devices = (() => {
     _popupCtx    = _popupCanvas.getContext('2d');
     _popupEl     = Utils.$('device-popup');
     _closeBtn    = Utils.$('device-close-btn');
+    _interactBtn = Utils.$('interact-btn'); // تعريف الزر
 
     _closeBtn.addEventListener('click',     close);
     _closeBtn.addEventListener('touchend',  (e) => { e.preventDefault(); close(); });
@@ -38,6 +40,12 @@ const Devices = (() => {
     _popupEl.addEventListener('click', e => {
       if (e.target === _popupEl) close();
     });
+
+    // ربط الحدث بزر التفاعل (إلغاء السلوك الافتراضي لمنع التداخل)
+    if (_interactBtn) {
+      _interactBtn.addEventListener('click', tryOpen);
+      _interactBtn.addEventListener('touchend', (e) => { e.preventDefault(); tryOpen(); }, { passive: false });
+    }
   }
 
   /* ==============================
@@ -51,11 +59,15 @@ const Devices = (() => {
 
     _nearDevice = Collision.getNearbyDevice(playerRect, devices, INTERACT_RANGE);
 
-    _promptTimer += delta * 3;
+    // إدارة ظهور واختفاء زر التفاعل الديناميكي
     if (_nearDevice && !_activeDevice) {
-      _promptAlpha = 0.6 + Math.sin(_promptTimer) * 0.4;
+      if (_interactBtn && _interactBtn.classList.contains('hidden')) {
+        _interactBtn.classList.remove('hidden');
+      }
     } else {
-      _promptAlpha = 0;
+      if (_interactBtn && !_interactBtn.classList.contains('hidden')) {
+        _interactBtn.classList.add('hidden');
+      }
     }
 
     if (_activeDevice) {
@@ -94,6 +106,7 @@ const Devices = (() => {
     _popupCtx.imageSmoothingEnabled = false;
 
     Utils.show(_popupEl);
+    if (_interactBtn) Utils.hide(_interactBtn); // إخفاء الزر أثناء العرض
     
     try {
       _renderPopup(device);
@@ -362,9 +375,6 @@ const Devices = (() => {
     }
   }
 
-  /* ==============================
-     تشويش متحرك
-     ============================== */
   function _drawAnimatedStatic(ctx, x, y, w, h) {
     ctx.fillStyle = '#050505';
     ctx.fillRect(x, y, w, h);
@@ -377,36 +387,13 @@ const Devices = (() => {
     }
   }
 
-  /* ==============================
-     مؤشر الاقتراب
-     ============================== */
   function drawPrompt(ctx) {
-    if (!_nearDevice || _promptAlpha <= 0 || _activeDevice) return;
-
-    const d  = _nearDevice;
-    const cx = d.x + d.w / 2;
-    const cy = d.y - 14;
-
-    ctx.save();
-    ctx.globalAlpha = _promptAlpha;
-    Utils.drawPixelRect(ctx, cx - 20, cy - 10, 40, 18, 3,
-      'rgba(240,192,64,0.9)', '#f0c040', 2);
-    // تم تغيير النص ليتناسب مع فكرة زر التفاعل الجديد
-    Utils.drawPixelText(ctx, 'ACTION', cx, cy - 6, {
-      font: '6px "Press Start 2P"', color: '#000', align: 'center'
-    });
-    ctx.restore();
+    // تم تفريغ الدالة لأن الاعتماد أصبح على الزر HTML
   }
 
-  /* ==============================
-     Getters
-     ============================== */
   function hasActive() { return _activeDevice !== null; }
   function getNear()   { return _nearDevice; }
 
-  /* ==============================
-     تصدير
-     ============================== */
   return {
     init, update,
     tryOpen, open, close,
