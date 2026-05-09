@@ -1,6 +1,6 @@
 /* ==============================
    NCORE GAME — chat.js
-   إدارة فقاعات المحادثة والتفاعل
+   إدارة فقاعات المحادثة والتفاعل (نسخة الخط الكبير 20px)
    ============================== */
 
 'use strict';
@@ -11,12 +11,12 @@ const Chat = (() => {
   let _inputContainer = null, _inputField = null, _chatBtn = null;
   let _isInputActive = false;
 
-  // إعدادات هندسية جديدة تناسب الخطوط العربية
+  // إعدادات هندسية جديدة للخط الكبير (20px)
   const RANGE       = 80;  
-  const MAX_WIDTH   = 160;  // زيادة أقصى عرض للفقاعة
-  const OFFSET_Y    = 45;   // رفع الفقاعة لتجنب تغطية اللاعب
-  const LINE_HEIGHT = 14;   // مسافة مريحة بين الأسطر
-  const FONT        = '9px "Press Start 2P", Tahoma, Arial, sans-serif'; // دعم اللغة العربية
+  const MAX_WIDTH   = 280;  // زيادة العرض لاستيعاب الخط الكبير
+  const OFFSET_Y    = 65;   // رفع الفقاعة للأعلى أكثر لكي لا تغطي اللاعب
+  const LINE_HEIGHT = 28;   // مسافة كافية بين الأسطر (Font 20px + 8px spacing)
+  const FONT        = 'bold 20px Arial, Tahoma, sans-serif'; // خط عريض وواضح جداً للعربية
 
   function init() {
     _inputContainer = Utils.$('chat-input-container');
@@ -37,13 +37,11 @@ const Chat = (() => {
   }
 
   function update(delta, myX, myY) {
-    // 1. تحديث مؤقتات الفقاعات
     for (const [id, b] of _bubbles.entries()) {
       b.timer += delta;
       if (b.timer >= b.duration) _bubbles.delete(id);
     }
 
-    // 2. اكتشاف القرب من لاعبين آخرين لظهور زر TALK
     const isNear = _checkNearbyPlayers(myX, myY);
     if (_chatBtn) {
       if (isNear && !_isInputActive) _chatBtn.classList.remove('hidden');
@@ -55,7 +53,6 @@ const Chat = (() => {
     const players = Network.getPlayers();
     if (!players) return false;
 
-    // استثناء اللاعب نفسه والبحث عن الآخرين
     for (const [id, p] of players.entries()) {
       const d = Utils.distance(myX, myY, p.x, p.y);
       if (d < RANGE) return true;
@@ -67,7 +64,7 @@ const Chat = (() => {
     _isInputActive = true;
     Utils.show(_inputContainer);
     _inputField.focus();
-    Joystick.hide(); // إيقاف الحركة أثناء الكتابة
+    Joystick.hide();
   }
 
   function _hideInput() {
@@ -85,8 +82,8 @@ const Chat = (() => {
   }
 
   function addMessage(id, text) {
-    // حساب المدة الزمنية للقراءة بشكل أفضل
-    const duration = Math.min(Math.max(4, text.length * 0.3), 15);
+    // زيادة وقت الظهور قليلاً لأن النص الكبير يأخذ مساحة أكبر في القراءة
+    const duration = Math.min(Math.max(5, text.length * 0.35), 18);
     _bubbles.set(id, { text, timer: 0, duration });
   }
 
@@ -94,56 +91,54 @@ const Chat = (() => {
     const b = _bubbles.get(id);
     if (!b) return;
 
-    // تجهيز الخط أولاً لضمان دقة قياس العرض
     ctx.font = FONT;
-    
     const lines = _wrapText(ctx, b.text, MAX_WIDTH);
     
-    // حساب أقصى عرض للسطر ديناميكياً
     let maxLineWidth = 0;
     lines.forEach(line => {
       const w = ctx.measureText(line).width;
       if (w > maxLineWidth) maxLineWidth = w;
     });
 
-    const bw = Math.min(MAX_WIDTH, maxLineWidth + 16); // هوامش جانبية
-    const bh = lines.length * LINE_HEIGHT + 10;        // هوامش علوية وسفلية
+    // حساب أبعاد الفقاعة بناءً على النص الضخم الجديد
+    const bw = maxLineWidth + 24; // زيادة الهوامش الجانبية
+    const bh = lines.length * LINE_HEIGHT + 16;
     const bx = x - bw / 2;
     const by = y - OFFSET_Y - bh;
 
     ctx.save();
 
-    // 1. رسم ظل الفقاعة
+    // 1. ظل الفقاعة
     ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.fillRect(bx + 2, by + 2, bw, bh);
+    ctx.fillRect(bx + 3, by + 3, bw, bh);
 
-    // 2. رسم خلفية الفقاعة
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    // 2. خلفية الفقاعة
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
     ctx.fillRect(bx, by, bw, bh);
     
-    // 3. رسم الإطار
+    // 3. الإطار
     ctx.strokeStyle = '#000'; 
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2; // إطار أسمك ليناسب الخط الكبير
     ctx.strokeRect(bx, by, bw, bh);
 
-    // 4. رسم مثلث الإشارة (الذيل)
+    // 4. الذيل
     ctx.beginPath();
-    ctx.moveTo(x - 4, by + bh);
-    ctx.lineTo(x + 4, by + bh);
-    ctx.lineTo(x, by + bh + 5);
+    ctx.moveTo(x - 8, by + bh);
+    ctx.lineTo(x + 8, by + bh);
+    ctx.lineTo(x, by + bh + 8);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.fillStyle = '#fff';
     ctx.fill();
     ctx.stroke();
 
-    // 5. رسم النص
+    // 5. النص (fillText لضمان أعلى جودة للحروف العربية)
     ctx.fillStyle = '#000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // استخدام fillText مباشرة بدلاً من دالة drawPixelText لحماية اللغة العربية من التشويه
     lines.forEach((line, i) => {
-      ctx.fillText(line, x, by + 10 + (i * LINE_HEIGHT));
+      // تعديل موضع النص ليكون في منتصف الأسطر تماماً
+      ctx.fillText(line, x, by + (LINE_HEIGHT / 2) + 10 + (i * LINE_HEIGHT));
     });
 
     ctx.restore();
@@ -153,7 +148,8 @@ const Chat = (() => {
     const words = text.split(' '), lines = [];
     let curLine = words[0];
     for (let i = 1; i < words.length; i++) {
-      if (ctx.measureText(curLine + " " + words[i]).width < maxWidth - 16) {
+      // قياس العرض باستخدام maxWidth مخصوم منه الهوامش
+      if (ctx.measureText(curLine + " " + words[i]).width < maxWidth - 30) {
         curLine += " " + words[i];
       } else { 
         lines.push(curLine); 
