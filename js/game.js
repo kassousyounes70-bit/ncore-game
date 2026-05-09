@@ -7,9 +7,6 @@
 
 const Game = (() => {
 
-  /* ==============================
-     الحالات
-     ============================== */
   const STATE = {
     LOADING : 'loading',
     SELECT  : 'select',
@@ -42,30 +39,22 @@ const Game = (() => {
     });
   }
 
-  /* ---- تهيئة الأنظمة ---- */
   function _initSystems() {
     GameMap.init();
-    Camera.init(
-      _canvas.width, _canvas.height,
-      1920, 1440,
-      0.12
-    );
+    Camera.init(_canvas.width, _canvas.height, 1920, 1440, 0.12);
     Devices.init();
     Joystick.init();
   }
 
-  /* ---- عند اختيار الشخصية ---- */
   function _onCharSelected(charId) {
     UI.stopPreviewAnimation();
     UI.showGame();
-
     Player.init(charId);
     NPC.init();
     UI.showHUD(Player.getCharName());
     Joystick.show();
     _registerInteraction();
 
-    // الاتصال بالسيرفر
     Network.connect(charId, () => {
       UI.showToast('مرحباً بك في صالة الألعاب! 🎮', 2500);
     });
@@ -94,20 +83,23 @@ const Game = (() => {
      التحديث
      ============================== */
   function _update(delta) {
+    // *** الإصلاح: لا تحرّك اللاعب إذا كان الـ popup مفتوحاً ***
+    const deviceOpen = Devices.hasActive();
+
     Joystick.update();
-    Player.update(delta);
+
+    if (!deviceOpen) {
+      Player.update(delta);
+      Network.sendPosition(
+        Player.getCenterX(),
+        Player.getCenterY(),
+        Player.getRect(),
+        Joystick.getDirection()
+      );
+    }
+
     NPC.update(delta);
     Devices.update(delta);
-
-    // إرسال موضع اللاعب للسيرفر (مُقيَّد بـ Throttle داخل Network)
-    Network.sendPosition(
-      Player.getCenterX(),
-      Player.getCenterY(),
-      Player.getRect(),
-      Joystick.getDirection()
-    );
-
-    // تحديث عداد اللاعبين في HUD
     _updatePlayersHUD();
   }
 
@@ -128,24 +120,12 @@ const Game = (() => {
     ctx.fillRect(0, 0, cw, ch);
 
     Camera.beginDraw(ctx);
-
-      // الخريطة
       GameMap.draw(ctx);
-
-      // مؤشر الاقتراب من الأجهزة
       Devices.drawPrompt(ctx);
-
-      // NPCs
       NPC.draw(ctx);
-
-      // اللاعبون الآخرون (من الشبكة)
       Network.drawOtherPlayers(ctx, Player.getAllChars());
-
-      // اللاعب الحالي (يُرسم فوق الجميع)
       Player.draw(ctx);
-
       if (_debug) Collision.debugDraw(ctx, Camera.getOffset());
-
     Camera.endDraw(ctx);
 
     _drawVignette(ctx, cw, ch);
@@ -223,7 +203,6 @@ const Game = (() => {
     else                 resume();
   });
 
-  /* Debug — F2 */
   window.addEventListener('keydown', (e) => {
     if (e.code === 'F2') {
       e.preventDefault();
@@ -232,9 +211,6 @@ const Game = (() => {
     }
   });
 
-  /* ==============================
-     تصدير
-     ============================== */
   return { init, pause, resume };
 
 })();

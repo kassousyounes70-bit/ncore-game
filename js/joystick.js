@@ -10,22 +10,21 @@ const Joystick = (() => {
   /* ==============================
      الحالة الداخلية
      ============================== */
-  let _base      = null;   // عنصر القاعدة  #joystick-base
-  let _thumb     = null;   // عنصر الإبهام  #joystick-thumb
-  let _zone      = null;   // منطقة اللمس   #joystick-zone
+  let _base      = null;
+  let _thumb     = null;
+  let _zone      = null;
 
-  let _active    = false;  // هل العصا مضغوطة الآن
-  let _touchId   = null;   // معرّف نقطة اللمس (متعدد الأصابع)
+  let _active    = false;
+  let _touchId   = null;
 
-  let _baseX     = 0;      // مركز القاعدة (بالبكسل على الشاشة)
+  let _baseX     = 0;
   let _baseY     = 0;
-  let _radius    = 0;      // نصف قطر القاعدة
+  let _radius    = 0;
 
-  let _dx        = 0;      // اتجاه (-1 → 1) أفقي
-  let _dy        = 0;      // اتجاه (-1 → 1) عمودي
-  let _magnitude = 0;      // قوة الضغط (0 → 1)
+  let _dx        = 0;
+  let _dy        = 0;
+  let _magnitude = 0;
 
-  // دعم لوحة المفاتيح (للاختبار على سطح المكتب)
   const _keys = { up: false, down: false, left: false, right: false };
 
   /* ==============================
@@ -43,22 +42,18 @@ const Joystick = (() => {
 
     _updateBaseCenter();
 
-    // --- أحداث اللمس ---
-    _zone.addEventListener('touchstart',  _onTouchStart,  { passive: false });
-    window.addEventListener('touchmove',  _onTouchMove,   { passive: false });
-    window.addEventListener('touchend',   _onTouchEnd,    { passive: false });
-    window.addEventListener('touchcancel',_onTouchEnd,    { passive: false });
+    _zone.addEventListener('touchstart',   _onTouchStart,  { passive: false });
+    window.addEventListener('touchmove',   _onTouchMove,   { passive: false });
+    window.addEventListener('touchend',    _onTouchEnd,    { passive: false });
+    window.addEventListener('touchcancel', _onTouchEnd,    { passive: false });
 
-    // --- أحداث الماوس (للاختبار على PC) ---
     _zone.addEventListener('mousedown',  _onMouseDown);
     window.addEventListener('mousemove', _onMouseMove);
     window.addEventListener('mouseup',   _onMouseUp);
 
-    // --- لوحة المفاتيح (للاختبار) ---
     window.addEventListener('keydown', _onKeyDown);
     window.addEventListener('keyup',   _onKeyUp);
 
-    // تحديث مركز القاعدة عند تغيير حجم الشاشة
     window.addEventListener('resize', _updateBaseCenter);
   }
 
@@ -76,7 +71,6 @@ const Joystick = (() => {
   function _onTouchStart(e) {
     e.preventDefault();
     if (_active) return;
-
     const touch = e.changedTouches[0];
     _touchId = touch.identifier;
     _active  = true;
@@ -87,7 +81,6 @@ const Joystick = (() => {
   function _onTouchMove(e) {
     e.preventDefault();
     if (!_active) return;
-
     for (const touch of e.changedTouches) {
       if (touch.identifier === _touchId) {
         _processInput(touch.clientX, touch.clientY);
@@ -152,18 +145,15 @@ const Joystick = (() => {
     const rawDy = clientY - _baseY;
     const dist  = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
 
-    // تقييد حركة الإبهام داخل نصف القطر
     const clampedDist = Math.min(dist, _radius);
     const angle       = Math.atan2(rawDy, rawDx);
 
     const thumbX = Math.cos(angle) * clampedDist;
     const thumbY = Math.sin(angle) * clampedDist;
 
-    // تحريك عنصر الإبهام بصرياً
     _thumb.style.transform =
       `translate(calc(-50% + ${thumbX}px), calc(-50% + ${thumbY}px))`;
 
-    // حساب القيم المعيارية
     _magnitude = Utils.clamp(dist / _radius, 0, 1);
     _dx        = Math.cos(angle) * _magnitude;
     _dy        = Math.sin(angle) * _magnitude;
@@ -183,10 +173,8 @@ const Joystick = (() => {
 
   /* ==============================
      التحديث كل إطار
-     يدمج اللمس + لوحة المفاتيح
      ============================== */
   function update() {
-    // إذا كانت لوحة المفاتيح مستخدمة وليس اللمس
     if (!_active) {
       let kx = 0, ky = 0;
       if (_keys.left)  kx -= 1;
@@ -195,8 +183,7 @@ const Joystick = (() => {
       if (_keys.down)  ky += 1;
 
       if (kx !== 0 || ky !== 0) {
-        // تطبيع الاتجاه القطري
-        const len = Math.sqrt(kx * kx + ky * ky);
+        const len  = Math.sqrt(kx * kx + ky * ky);
         _dx        = kx / len;
         _dy        = ky / len;
         _magnitude = 1;
@@ -209,7 +196,7 @@ const Joystick = (() => {
   }
 
   /* ==============================
-     إظهار / إخفاء العصا
+     إظهار / إخفاء / إعادة ضبط
      ============================== */
   function show() {
     if (_zone) Utils.show(_zone);
@@ -219,23 +206,23 @@ const Joystick = (() => {
     if (_zone) Utils.hide(_zone);
   }
 
+  /** إعادة ضبط كاملة — تصفير الحركة فوراً */
+  function reset() {
+    _reset();
+    _keys.up    = false;
+    _keys.down  = false;
+    _keys.left  = false;
+    _keys.right = false;
+  }
+
   /* ==============================
      Getters
      ============================== */
-
-  /** الاتجاه الأفقي (-1 → 1) */
-  function getDx() { return _dx; }
-
-  /** الاتجاه العمودي (-1 → 1) */
-  function getDy() { return _dy; }
-
-  /** قوة الضغط (0 → 1) */
+  function getDx()        { return _dx; }
+  function getDy()        { return _dy; }
   function getMagnitude() { return _magnitude; }
+  function isMoving()     { return _magnitude > 0.05; }
 
-  /** هل العصا تتحرك؟ */
-  function isMoving() { return _magnitude > 0.05; }
-
-  /** الاتجاه الغالب كنص: 'up' | 'down' | 'left' | 'right' | 'idle' */
   function getDirection() {
     if (!isMoving()) return 'idle';
     if (Math.abs(_dx) >= Math.abs(_dy)) {
@@ -253,6 +240,7 @@ const Joystick = (() => {
     update,
     show,
     hide,
+    reset,
     getDx,
     getDy,
     getMagnitude,
