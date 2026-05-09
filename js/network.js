@@ -39,10 +39,11 @@ const Network = (() => {
     _onConnectCb = onConnect;
 
     _socket = io(SERVER_URL, {
-      transports:       ['websocket'],
-      reconnection:     true,
-      reconnectionDelay: 1500,
-      timeout:          10000
+      // تم إزالة transports للسماح بالـ Polling كاحتياطي لتفادي فشل الاتصال المبدئي
+      reconnection:         true,
+      reconnectionDelay:    1500,
+      reconnectionDelayMax: 5000, // تجنب إغراق الخادم بالطلبات أثناء استيقاظه
+      timeout:              60000 // رفع المهلة لـ 60 ثانية لانتظار استيقاظ Render
     });
 
     _registerEvents();
