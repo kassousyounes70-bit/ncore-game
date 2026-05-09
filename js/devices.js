@@ -59,7 +59,12 @@ const Devices = (() => {
     }
 
     if (_activeDevice) {
-      _renderPopup(_activeDevice);
+      // محاصرة أي خطأ أثناء الرسم لمنع انهيار الـ Game Loop
+      try {
+        _renderPopup(_activeDevice);
+      } catch (err) {
+        console.error('[Devices] خطأ حرج أثناء رسم الجهاز:', err);
+      }
     }
   }
 
@@ -89,9 +94,13 @@ const Devices = (() => {
     _popupCtx.imageSmoothingEnabled = false;
 
     Utils.show(_popupEl);
-    _renderPopup(device);
+    
+    try {
+      _renderPopup(device);
+    } catch (err) {
+      console.error('[Devices] خطأ أثناء الفتح:', err);
+    }
 
-    // *** الإصلاح: إخفاء العصا + تصفير حركتها فوراً ***
     Joystick.hide();
     Joystick.reset();
   }
@@ -100,11 +109,17 @@ const Devices = (() => {
     _activeDevice = null;
     Utils.hide(_popupEl);
 
-    // *** الإصلاح: تصفير العصا قبل إظهارها ***
     Joystick.reset();
     Joystick.show();
 
-    MiniGames.stop();
+    // عزل الإيقاف الدفاعي
+    try {
+      if (typeof MiniGames !== 'undefined' && MiniGames.stop) {
+        MiniGames.stop();
+      }
+    } catch (err) {
+      console.error('[Devices] خطأ أثناء إيقاف اللعبة المصغرة:', err);
+    }
   }
 
   /* ==============================
@@ -162,7 +177,20 @@ const Devices = (() => {
       font: '7px "Press Start 2P"', color: '#3060c0', align: 'center'
     });
 
-    MiniGames.drawPS(ctx, sx + 4, sy + 4, sw - 8, sh - 8, 'ps1', _animTimer);
+    // استدعاء دفاعي للـ MiniGames
+    try {
+      if (typeof MiniGames !== 'undefined' && MiniGames.drawPS) {
+        MiniGames.drawPS(ctx, sx + 4, sy + 4, sw - 8, sh - 8, 'ps1', _animTimer);
+      } else {
+        Utils.drawPixelText(ctx, 'NO DISC', sx + sw / 2, sy + sh / 2, {
+          font: '8px "Press Start 2P"', color: '#ff4040', align: 'center'
+        });
+      }
+    } catch (err) {
+      Utils.drawPixelText(ctx, 'ERROR', sx + sw / 2, sy + sh / 2, {
+        font: '8px "Press Start 2P"', color: '#ff0000', align: 'center'
+      });
+    }
   }
 
   /* ==============================
@@ -196,7 +224,20 @@ const Devices = (() => {
       font: '7px "Press Start 2P"', color: '#0070d0', align: 'center'
     });
 
-    MiniGames.drawPS(ctx, sx + 4, sy + 4, sw - 8, sh - 8, 'ps2', _animTimer);
+    // استدعاء دفاعي للـ MiniGames
+    try {
+      if (typeof MiniGames !== 'undefined' && MiniGames.drawPS) {
+        MiniGames.drawPS(ctx, sx + 4, sy + 4, sw - 8, sh - 8, 'ps2', _animTimer);
+      } else {
+        Utils.drawPixelText(ctx, 'NO DISC', sx + sw / 2, sy + sh / 2, {
+          font: '8px "Press Start 2P"', color: '#ff4040', align: 'center'
+        });
+      }
+    } catch (err) {
+      Utils.drawPixelText(ctx, 'ERROR', sx + sw / 2, sy + sh / 2, {
+        font: '8px "Press Start 2P"', color: '#ff0000', align: 'center'
+      });
+    }
   }
 
   /* ==============================
@@ -309,7 +350,16 @@ const Devices = (() => {
       font: '6px "Press Start 2P"', color: '#40f080', align: 'center'
     });
 
-    MiniGames.drawPC(ctx, sx, sy, sw, sh - 14, _animTimer);
+    // استدعاء دفاعي للـ MiniGames
+    try {
+      if (typeof MiniGames !== 'undefined' && MiniGames.drawPC) {
+        MiniGames.drawPC(ctx, sx, sy, sw, sh - 14, _animTimer);
+      }
+    } catch (err) {
+      Utils.drawPixelText(ctx, 'SYSTEM ERROR', sx + sw / 2, sy + sh / 2, {
+        font: '8px "Press Start 2P"', color: '#ff0000', align: 'center'
+      });
+    }
   }
 
   /* ==============================
@@ -341,7 +391,8 @@ const Devices = (() => {
     ctx.globalAlpha = _promptAlpha;
     Utils.drawPixelRect(ctx, cx - 20, cy - 10, 40, 18, 3,
       'rgba(240,192,64,0.9)', '#f0c040', 2);
-    Utils.drawPixelText(ctx, '▶ TAP', cx, cy - 6, {
+    // تم تغيير النص ليتناسب مع فكرة زر التفاعل الجديد
+    Utils.drawPixelText(ctx, 'ACTION', cx, cy - 6, {
       font: '6px "Press Start 2P"', color: '#000', align: 'center'
     });
     ctx.restore();
