@@ -1,7 +1,7 @@
 /* ==============================
    NCORE GAME — network.js
    إدارة الاتصال المتعدد اللاعبين
-   عبر Socket.io (Monolithic)
+   (Monolithic Setup)
    ============================== */
 
 'use strict';
@@ -11,10 +11,10 @@ const Network = (() => {
   /* ==============================
      الثوابت
      ============================== */
-  // تم ترك الرابط فارغاً ليتصل بنفس الخادم المضيف للعبة تلقائياً
+  // الرابط فارغ لكي يتصل Socket.io بنفس الرابط الذي تستضيفه اللعبة
   const SERVER_URL     = ''; 
-  const SEND_RATE      = 100;   // ms بين كل إرسال (10 مرات/ثانية)
-  const INTERP_SPEED   = 0.18;  // سرعة الـ Interpolation (0-1)
+  const SEND_RATE      = 100;
+  const INTERP_SPEED   = 0.18;
   const PLAYER_W       = 24;
   const PLAYER_H       = 28;
 
@@ -28,7 +28,6 @@ const Network = (() => {
   let _lastSendTime  = 0;
   let _onConnectCb   = null;
 
-  // خريطة اللاعبين الآخرين
   const _players = new Map();
 
   /* ==============================
@@ -48,16 +47,10 @@ const Network = (() => {
     _registerEvents();
   }
 
-  /* ==============================
-     تسجيل أحداث Socket.io
-     ============================== */
   function _registerEvents() {
-
-    /* ---- اتصال ناجح ---- */
     _socket.on('connect', () => {
       _connected = true;
       _myId      = _socket.id;
-
       console.log('[Network] متصل ✅ ID:', _myId);
 
       const spawn = GameMap.getSpawnPoint();
@@ -75,7 +68,6 @@ const Network = (() => {
       }
     });
 
-    /* ---- قائمة اللاعبين الحاليين عند الدخول ---- */
     _socket.on('players:list', (players) => {
       _players.clear();
       for (const [id, data] of Object.entries(players)) {
@@ -84,14 +76,12 @@ const Network = (() => {
       }
     });
 
-    /* ---- لاعب جديد دخل ---- */
     _socket.on('player:joined', ({ id, data }) => {
       if (id === _myId) return;
       _players.set(id, _createPlayerState(data));
       UI.showToast('لاعب جديد دخل الصالة 🎮', 1800);
     });
 
-    /* ---- تحديث موضع لاعب ---- */
     _socket.on('player:moved', ({ id, x, y, dir }) => {
       if (id === _myId) return;
       const p = _players.get(id);
@@ -102,19 +92,16 @@ const Network = (() => {
       p.moving  = (dir !== 'idle');
     });
 
-    /* ---- لاعب غادر ---- */
     _socket.on('player:left', (id) => {
       _players.delete(id);
     });
 
-    /* ---- انقطاع الاتصال ---- */
     _socket.on('disconnect', (reason) => {
       _connected = false;
       console.warn('[Network] انقطع الاتصال:', reason);
       UI.showToast('⚠️ انقطع الاتصال: ' + reason, 3000);
     });
 
-    /* ---- إعادة اتصال ناجحة ---- */
     _socket.on('reconnect', () => {
       _connected = true;
       const spawn = GameMap.getSpawnPoint();
@@ -128,16 +115,12 @@ const Network = (() => {
       UI.showToast('تمّت إعادة الاتصال ✅', 1500);
     });
 
-    /* ---- خطأ صريح ---- */
     _socket.on('connect_error', (err) => {
       console.error('[Network] خطأ في الاتصال:', err.message);
       UI.showToast('❌ خطأ في الخادم: ' + err.message, 5000);
     });
   }
 
-  /* ==============================
-     إنشاء حالة لاعب جديد
-     ============================== */
   function _createPlayerState(data) {
     return {
       x:          data.x,
@@ -153,9 +136,6 @@ const Network = (() => {
     };
   }
 
-  /* ==============================
-     إرسال الموضع
-     ============================== */
   function sendPosition(cx, cy, rect, dir) {
     if (!_connected) return;
 
@@ -170,9 +150,6 @@ const Network = (() => {
     });
   }
 
-  /* ==============================
-     تحديث الـ Interpolation
-     ============================== */
   function _interpolatePlayers(delta) {
     const FRAME_TIME = 0.16;
 
@@ -196,9 +173,6 @@ const Network = (() => {
     }
   }
 
-  /* ==============================
-     رسم اللاعبين الآخرين
-     ============================== */
   function drawOtherPlayers(ctx, allChars) {
     _interpolatePlayers();
 
@@ -208,7 +182,6 @@ const Network = (() => {
       const char = allChars[p.charId];
       if (!char) continue;
 
-      // ظل
       ctx.fillStyle = 'rgba(0,0,0,0.25)';
       ctx.beginPath();
       ctx.ellipse(p.x, p.y + PLAYER_H / 2 + 4, 10, 4, 0, 0, Math.PI * 2);
@@ -243,9 +216,6 @@ const Network = (() => {
     });
   }
 
-  /* ==============================
-     Getters
-     ============================== */
   function getPlayerCount() { return _players.size; }
   function isConnected()    { return _connected; }
   function getMyId()        { return _myId; }
@@ -260,3 +230,4 @@ const Network = (() => {
   };
 
 })();
+       
