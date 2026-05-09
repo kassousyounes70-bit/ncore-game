@@ -11,7 +11,7 @@ const Network = (() => {
   /* ==============================
      الثوابت
      ============================== */
-  const SERVER_URL     = 'https://ncore-game-server.onrender.com';
+  const SERVER_URL     = 'https://ncore-mmo-server.onrender.com';
   const SEND_RATE      = 100;   // ms بين كل إرسال (10 مرات/ثانية)
   const INTERP_SPEED   = 0.18;  // سرعة الـ Interpolation (0-1)
   const PLAYER_W       = 24;
@@ -130,7 +130,7 @@ const Network = (() => {
       UI.showToast('تمّت إعادة الاتصال ✅', 1500);
     });
 
-    /* ---- خطأ صريح (تم التعديل لكشف السبب على الشاشة) ---- */
+    /* ---- خطأ صريح ---- */
     _socket.on('connect_error', (err) => {
       console.error('[Network] خطأ في الاتصال:', err.message);
       UI.showToast('❌ خطأ في الخادم: ' + err.message, 5000);
