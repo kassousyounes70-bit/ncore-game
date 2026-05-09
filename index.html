@@ -6,19 +6,16 @@
   <meta name="theme-color" content="#0a0a0a" />
   <meta name="description" content="NCore Game — صالة ألعاب النوستالجيا" />
 
-  <!-- Open Graph -->
   <meta property="og:title" content="NCore Game" />
   <meta property="og:description" content="صالة ألعاب بكسلية كلاسيكية" />
-  <meta property="og:url" content="https://ncore-game.vercel.app/" />
+  <meta property="og:url" content="https://ncore-mmo-server.onrender.com/" />
 
   <title>NCore Game 🎮</title>
 
-  <!-- Styles -->
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
-  <!-- شاشة التحميل -->
   <div id="loading-screen">
     <div class="loading-content">
       <h1 class="pixel-title">NCORE GAME</h1>
@@ -30,46 +27,37 @@
     </div>
   </div>
 
-  <!-- شاشة اختيار الشخصية -->
   <div id="character-select-screen" class="hidden">
     <h2 class="pixel-title">اختر شخصيتك</h2>
     <div id="character-grid"></div>
     <button id="start-btn" class="pixel-btn hidden">ادخل الصالة !</button>
   </div>
 
-  <!-- اللعبة الرئيسية -->
   <div id="game-container" class="hidden">
     <canvas id="game-canvas"></canvas>
 
-    <!-- العصا التناظرية -->
     <div id="joystick-zone">
       <div id="joystick-base">
         <div id="joystick-thumb"></div>
       </div>
     </div>
 
-    <!-- واجهة المعلومات -->
     <div id="hud">
       <span id="hud-character-name"></span>
       <span id="hud-players-count"></span>
     </div>
 
-    <!-- نافذة التفاعل مع الأجهزة -->
     <div id="device-popup" class="hidden">
       <canvas id="device-canvas"></canvas>
       <button id="device-close-btn" class="pixel-btn">✖ إغلاق</button>
     </div>
   </div>
 
-  <!-- ========== Scripts ========== -->
-
-  <!-- Socket.io Client — يُحمَّل من السيرفر مباشرة -->
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
-  <!-- إيقاظ الخادم كل 10 دقائق -->
   <script>
-    const KEEP_ALIVE_URL     = 'https://ncore-game-server.onrender.com/ping';
-    const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000; // 10 دقائق
+    const KEEP_ALIVE_URL     = '/ping'; // تم تحويله لمسار داخلي 
+    const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000; 
 
     function keepAlive() {
       fetch(KEEP_ALIVE_URL, { method: 'GET', cache: 'no-cache' })
@@ -77,12 +65,10 @@
         .catch(() => console.warn('[KeepAlive] السيرفر نائم، جارِ الإيقاظ... ⏰'));
     }
 
-    // تشغيل فوراً عند الدخول ثم كل 10 دقائق
     keepAlive();
     setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
   </script>
 
-  <!-- ترتيب تحميل الملفات مهم جداً -->
   <script src="js/utils.js"></script>
   <script src="js/collision.js"></script>
   <script src="js/camera.js"></script>
