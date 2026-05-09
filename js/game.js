@@ -10,7 +10,7 @@ const Game = (() => {
   const STATE = {
     LOADING    : 'loading',
     SELECT     : 'select',
-    CONNECTING : 'connecting', // حالة جديدة لمنع الدخول المبكر
+    CONNECTING : 'connecting',
     PLAYING    : 'playing',
     PAUSED     : 'paused'
   };
@@ -49,18 +49,11 @@ const Game = (() => {
 
   function _onCharSelected(charId) {
     UI.stopPreviewAnimation();
-    
-    // تغيير الحالة لمنع أي تفاعل قبل الاتصال
     _state = STATE.CONNECTING;
-    
-    // إظهار رسالة انتظار طويلة حتى يستيقظ السيرفر
     UI.showToast('جارِ الاتصال بالخادم... الرجاء الانتظار ⏳', 60000);
 
-    // لن تدخل اللعبة إلا بعد نجاح الاتصال بالخادم (المصافحة)
     Network.connect(charId, () => {
-      // هذا الكود لن يُنفذ إلا إذا رد السيرفر بنجاح الاتصال
       UI.showToast('تم الاتصال بنجاح! مرحباً بك في الصالة 🎮', 2500);
-
       UI.showGame();
       Player.init(charId);
       NPC.init();
@@ -93,9 +86,7 @@ const Game = (() => {
      التحديث
      ============================== */
   function _update(delta) {
-    // عدم تحريك اللاعب إذا كان الـ popup مفتوحاً
     const deviceOpen = Devices.hasActive();
-
     Joystick.update();
 
     if (!deviceOpen) {
@@ -160,21 +151,21 @@ const Game = (() => {
 
     function _onTap(e) {
       const t = e.target;
+      // استثناء زر التفاعل الجديد من إغلاق النوافذ
       if (
         t.closest('#joystick-zone') ||
         t.closest('#device-popup')  ||
-        t.closest('#hud')
+        t.closest('#hud') ||
+        t.closest('#interact-btn') 
       ) return;
 
+      // إغلاق الجهاز فقط عند النقر على منطقة فارغة في الخريطة
       if (Devices.hasActive()) Devices.close();
-      else if (Devices.getNear()) Devices.tryOpen();
     }
 
     gc.addEventListener('click', _onTap);
-    gc.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      _onTap(e);
-    }, { passive: false });
+    // تم إلغاء preventDefault للسماح للأزرار بالتفاعل بشكل طبيعي
+    gc.addEventListener('touchend', _onTap);
   }
 
   /* ==============================
