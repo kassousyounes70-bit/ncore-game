@@ -113,8 +113,9 @@ const UI = (() => {
       card.appendChild(lbl);
       grid.appendChild(card);
 
-      card.addEventListener('click',    () => _selectChar(i));
-      card.addEventListener('touchend', (e) => { e.preventDefault(); _selectChar(i); });
+      // تمت إزالة حدث touchend الذي كان يعيق تمرير الشاشة
+      // متصفحات الهواتف تستجيب لـ click فورياً عند تفعيل user-scalable=no
+      card.addEventListener('click', () => _selectChar(i));
     });
 
     // اختيار أول شخصية افتراضياً
@@ -132,8 +133,9 @@ const UI = (() => {
     // إظهار زر البدء
     Utils.show('start-btn');
     const btn = Utils.$('start-btn');
-    btn.onclick    = () => _onStartCb && _onStartCb(_selectedChar);
-    btn.ontouchend = (e) => { e.preventDefault(); _onStartCb && _onStartCb(_selectedChar); };
+    
+    // إزالة أحداث اللمس المتضاربة والاعتماد على click
+    btn.onclick = () => _onStartCb && _onStartCb(_selectedChar);
   }
 
   /* ---- Animation معاينة الشخصيات ---- */
