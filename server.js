@@ -1,12 +1,9 @@
 /* ==============================
    NCORE GAME — server.js (Monolithic)
-   سيرفر اللعبة المتعددة اللاعبين + واجهة الويب
-   Node.js + Socket.io + Express
+   مستودع واحد للواجهة والسيرفر معاً
    ============================== */
 
 'use strict';
-
-require('dotenv').config();
 
 const express   = require('express');
 const http      = require('http');
@@ -25,22 +22,25 @@ const MAX_PLAYERS = 50;
 /* ==============================
    تسليم ملفات الواجهة (Frontend)
    ============================== */
-// هذه الأسطر تجعل الخادم يعرض مجلد public الذي يحتوي على اللعبة
-app.use(express.static(path.join(__dirname, 'public')));
+app.use('/css', express.static(path.join(__dirname, 'css')));
+app.use('/js', express.static(path.join(__dirname, 'js')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 app.use(express.json());
 
 /* ==============================
    Socket.io
    ============================== */
-// بما أن الواجهة والسيرفر في نفس المكان، لم نعد بحاجة لتعقيدات الـ CORS
 const io = new Server(server, {
   pingInterval: 25000,
   pingTimeout:  60000
 });
 
 /* ==============================
-   بيانات اللاعبين في الذاكرة
-   key: socketId → PlayerData
+   بيانات اللاعبين
    ============================== */
 const players = new Map();
 
@@ -49,7 +49,6 @@ const players = new Map();
    ============================== */
 io.on('connection', (socket) => {
 
-  /* ---- تحقق من الحد الأقصى ---- */
   if (players.size >= MAX_PLAYERS) {
     console.log(`[Server] رُفض اتصال ${socket.id} — الصالة ممتلئة`);
     socket.emit('error:full', { message: 'الصالة ممتلئة، حاول لاحقاً' });
@@ -59,7 +58,6 @@ io.on('connection', (socket) => {
 
   console.log(`[+] لاعب متصل: ${socket.id} | المجموع: ${players.size + 1}`);
 
-  /* ---- انضمام اللاعب ---- */
   socket.on('player:join', (data) => {
     const player = {
       id:     socket.id,
@@ -73,14 +71,12 @@ io.on('connection', (socket) => {
 
     players.set(socket.id, player);
 
-    // أرسل له قائمة اللاعبين الحاليين
     const currentPlayers = {};
     players.forEach((p, id) => {
       if (id !== socket.id) currentPlayers[id] = p;
     });
     socket.emit('players:list', currentPlayers);
 
-    // أخبر الآخرين بدخوله
     socket.broadcast.emit('player:joined', {
       id:   socket.id,
       data: player
@@ -89,23 +85,19 @@ io.on('connection', (socket) => {
     _logStats();
   });
 
-  /* ---- تحديث الموضع ---- */
   socket.on('player:move', (data) => {
     const player = players.get(socket.id);
     if (!player) return;
 
-    // تحقق من صحة البيانات ومنع القفز الغير طبيعي
     const newX = _clamp(data.x || player.x, 50, 1870);
     const newY = _clamp(data.y || player.y, 50, 1390);
     const dist = Math.hypot(newX - player.x, newY - player.y);
 
-    // إذا كانت الحركة منطقية (أقل من 80 بكسل/تحديث)
     if (dist < 80) {
       player.x   = newX;
       player.y   = newY;
       player.dir = _validDir(data.dir);
 
-      // بث للآخرين فقط
       socket.broadcast.emit('player:moved', {
         id:  socket.id,
         x:   player.x,
@@ -115,7 +107,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  /* ---- قطع الاتصال ---- */
   socket.on('disconnect', (reason) => {
     players.delete(socket.id);
     io.emit('player:left', socket.id);
@@ -123,25 +114,18 @@ io.on('connection', (socket) => {
     _logStats();
   });
 
-  /* ---- معالجة الأخطاء ---- */
   socket.on('error', (err) => {
     console.error(`[Error] ${socket.id}:`, err.message);
   });
-
 });
 
 /* ==============================
-   HTTP Routes إضافية
+   HTTP Routes
    ============================== */
-
-/* صحة السيرفر — للـ KeepAlive والمراقبة */
 app.get('/ping', (req, res) => {
   res.json({
     status:  'alive',
     players: players.size,
-    max:     MAX_PLAYERS,
-    uptime:  Math.floor(process.uptime()) + 's',
-    memory:  _getMemoryUsage(),
     time:    new Date().toISOString()
   });
 });
@@ -161,54 +145,29 @@ function _validDir(dir) {
   return ['up','down','left','right','idle'].includes(dir) ? dir : 'idle';
 }
 
-function _getMemoryUsage() {
-  const mem = process.memoryUsage();
-  return Math.round(mem.heapUsed / 1024 / 1024) + 'MB';
-}
-
 function _logStats() {
-  console.log(
-    `[Stats] لاعبون: ${players.size}/${MAX_PLAYERS}` +
-    ` | ذاكرة: ${_getMemoryUsage()}` +
-    ` | وقت التشغيل: ${Math.floor(process.uptime())}s`
-  );
+  const mem = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+  console.log(`[Stats] لاعبون: ${players.size}/${MAX_PLAYERS} | ذاكرة: ${mem}MB`);
 }
 
-/* ==============================
-   تنظيف اللاعبين غير النشطين
-   ============================== */
 setInterval(() => {
   const now     = Date.now();
   const timeout = 10 * 60 * 1000;
-
   players.forEach((player, id) => {
     if (now - player.joinedAt > timeout) {
       const sock = io.sockets.sockets.get(id);
       if (sock) sock.disconnect(true);
       players.delete(id);
-      console.log(`[Cleanup] أُزيل لاعب غير نشط: ${id}`);
     }
   });
 }, 5 * 60 * 1000);
-
-/* ==============================
-   معالجة الأخطاء العامة
-   ============================== */
-process.on('uncaughtException', (err) => {
-  console.error('[FATAL] خطأ غير متوقع:', err.message);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('[FATAL] Promise مرفوض:', reason);
-});
 
 /* ==============================
    تشغيل السيرفر
    ============================== */
 server.listen(PORT, () => {
   console.log('================================');
-  console.log(`🎮 NCore Game Server (Monolithic)`);
+  console.log(`🎮 NCore Game (Monolithic)`);
   console.log(`🚀 يعمل على البورت: ${PORT}`);
-  console.log(`👥 أقصى لاعبين: ${MAX_PLAYERS}`);
   console.log('================================');
 });
