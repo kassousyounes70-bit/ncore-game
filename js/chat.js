@@ -1,119 +1,122 @@
 /* ==============================
    NCORE GAME — chat.js
-   إدارة فقاعات المحادثة ومنطق الظهور
+   إدارة فقاعات المحادثة والتفاعل
    ============================== */
 
 'use strict';
 
 const Chat = (() => {
 
-  // خريطة الرسائل النشطة (key: playerId -> { text, timer, duration })
   const _bubbles = new Map();
+  let _inputContainer = null, _inputField = null, _chatBtn = null;
+  let _isInputActive = false;
 
-  // إعدادات الفقاعة
-  const PADDING      = 6;
-  const LINE_HEIGHT  = 9;
-  const MAX_WIDTH    = 120;
-  const OFFSET_Y     = 45; // الارتفاع فوق رأس اللاعب
+  const RANGE      = 80;  // المدى لظهور زر TALK
+  const MAX_WIDTH  = 130;
+  const OFFSET_Y   = 40;
 
-  /** إضافة رسالة جديدة للاعب **/
-  function addMessage(playerId, text) {
-    // حساب المدة: ثانية واحدة لكل 5 حروف، بحد أدنى 3 ثوانٍ وحد أقصى 12 ثانية
-    const duration = Math.min(Math.max(3, text.length * 0.2), 12);
+  function init() {
+    _inputContainer = Utils.$('chat-input-container');
+    _inputField     = Utils.$('chat-input');
+    _chatBtn        = Utils.$('chat-btn');
 
-    _bubbles.set(playerId, {
-      text: text,
-      timer: 0,
-      duration: duration
-    });
-  }
+    if (_chatBtn) {
+      _chatBtn.addEventListener('click', _showInput);
+      _chatBtn.addEventListener('touchend', (e) => { e.preventDefault(); _showInput(); });
+    }
 
-  /** تحديث المؤقتات في كل إطار **/
-  function update(delta) {
-    for (const [id, bubble] of _bubbles.entries()) {
-      bubble.timer += delta;
-      if (bubble.timer >= bubble.duration) {
-        _bubbles.delete(id);
-      }
+    if (_inputField) {
+      _inputField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') _sendMessage();
+        if (e.key === 'Escape') _hideInput();
+      });
     }
   }
 
-  /** رسم الفقاعات فوق اللاعبين **/
-  function draw(ctx, playerX, playerY, playerId) {
-    const bubble = _bubbles.get(playerId);
-    if (!bubble) return;
+  function update(delta, myX, myY) {
+    // 1. تحديث مؤقتات الفقاعات
+    for (const [id, b] of _bubbles.entries()) {
+      b.timer += delta;
+      if (b.timer >= b.duration) _bubbles.delete(id);
+    }
 
-    ctx.save();
-    
-    const text  = bubble.text;
-    const lines = _wrapText(ctx, text, MAX_WIDTH);
-    
-    // حساب أبعاد الفقاعة
-    const bw = Math.min(MAX_WIDTH, ctx.measureText(text).width + PADDING * 2);
-    const bh = lines.length * LINE_HEIGHT + PADDING;
-    
-    const bx = playerX - bw / 2;
-    const by = playerY - OFFSET_Y - bh;
+    // 2. اكتشاف القرب من لاعبين آخرين لظهور زر TALK
+    const isNear = _checkNearbyPlayers(myX, myY);
+    if (_chatBtn) {
+      if (isNear && !_isInputActive) _chatBtn.classList.remove('hidden');
+      else _chatBtn.classList.add('hidden');
+    }
+  }
 
-    // 1. رسم ظل الفقاعة
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.fillRect(bx + 2, by + 2, bw, bh);
+  function _checkNearbyPlayers(myX, myY) {
+    // جلب جميع اللاعبين من Network والتحقق من المسافة
+    const players = Network.getPlayers(); // تأكد من وجود دالة getPlayers في Network ترجع Map اللاعبين
+    if (!players) return false;
 
-    // 2. رسم خلفية الفقاعة (نمط بكسلي)
-    ctx.fillStyle = '#ffffff';
+    for (const p of players.values()) {
+      const d = Utils.distance(myX, myY, p.x, p.y);
+      if (d < RANGE) return true;
+    }
+    return false;
+  }
+
+  function _showInput() {
+    _isInputActive = true;
+    Utils.show(_inputContainer);
+    _inputField.focus();
+    Joystick.hide(); // إيقاف الحركة أثناء الكتابة
+  }
+
+  function _hideInput() {
+    _isInputActive = false;
+    Utils.hide(_inputContainer);
+    _inputField.value = '';
+    _inputField.blur();
+    Joystick.show();
+  }
+
+  function _sendMessage() {
+    const text = _inputField.value.trim();
+    if (text) Network.sendChatMessage(text);
+    _hideInput();
+  }
+
+  function addMessage(id, text) {
+    const duration = Math.min(Math.max(3, text.length * 0.25), 15);
+    _bubbles.set(id, { text, timer: 0, duration });
+  }
+
+  function draw(ctx, x, y, id) {
+    const b = _bubbles.get(id);
+    if (!b) return;
+
+    const lines = _wrapText(ctx, b.text, MAX_WIDTH);
+    const bw = Math.min(MAX_WIDTH, ctx.measureText(b.text).width + 12);
+    const bh = lines.length * 10 + 6;
+    const bx = x - bw / 2, by = y - OFFSET_Y - bh;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
     ctx.fillRect(bx, by, bw, bh);
-    
-    // 3. رسم الإطار
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
     ctx.strokeRect(bx, by, bw, bh);
 
-    // 4. رسم مثلث الإشارة (الذيل)
-    ctx.beginPath();
-    ctx.moveTo(playerX - 4, by + bh);
-    ctx.lineTo(playerX + 4, by + bh);
-    ctx.lineTo(playerX, by + bh + 6);
-    ctx.closePath();
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.stroke();
-
-    // 5. رسم النص
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = '#000';
     lines.forEach((line, i) => {
-      Utils.drawPixelText(ctx, line, playerX, by + PADDING + (i * LINE_HEIGHT), {
-        font: '5px "Press Start 2P"',
-        align: 'center',
-        color: '#000'
+      Utils.drawPixelText(ctx, line, x, by + 8 + (i * 10), {
+        font: '5px "Press Start 2P"', align: 'center'
       });
     });
-
-    ctx.restore();
   }
 
-  /** تقسيم النص الطويل لأسطر **/
   function _wrapText(ctx, text, maxWidth) {
-    const words = text.split(' ');
-    const lines = [];
-    let currentLine = words[0];
-
+    const words = text.split(' '), lines = [];
+    let curLine = words[0];
     for (let i = 1; i < words.length; i++) {
-      const word = words[i];
-      const width = ctx.measureText(currentLine + " " + word).width;
-      if (width < maxWidth - PADDING * 2) {
-        currentLine += " " + word;
-      } else {
-        lines.push(currentLine);
-        currentLine = word;
-      }
+      if (ctx.measureText(curLine + " " + words[i]).width < maxWidth - 10) curLine += " " + words[i];
+      else { lines.push(curLine); curLine = words[i]; }
     }
-    lines.push(currentLine);
-    return lines;
+    lines.push(curLine); return lines;
   }
 
-  function clear(id) { _bubbles.delete(id); }
-
-  return { init: () => {}, update, draw, addMessage, clear };
-
+  return { init, update, draw, addMessage, clear: (id) => _bubbles.delete(id) };
 })();
-                          
