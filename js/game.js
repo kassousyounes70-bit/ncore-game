@@ -8,10 +8,11 @@
 const Game = (() => {
 
   const STATE = {
-    LOADING : 'loading',
-    SELECT  : 'select',
-    PLAYING : 'playing',
-    PAUSED  : 'paused'
+    LOADING    : 'loading',
+    SELECT     : 'select',
+    CONNECTING : 'connecting', // حالة جديدة لمنع الدخول المبكر
+    PLAYING    : 'playing',
+    PAUSED     : 'paused'
   };
 
   let _state    = STATE.LOADING;
@@ -48,20 +49,29 @@ const Game = (() => {
 
   function _onCharSelected(charId) {
     UI.stopPreviewAnimation();
-    UI.showGame();
-    Player.init(charId);
-    NPC.init();
-    UI.showHUD(Player.getCharName());
-    Joystick.show();
-    _registerInteraction();
+    
+    // تغيير الحالة لمنع أي تفاعل قبل الاتصال
+    _state = STATE.CONNECTING;
+    
+    // إظهار رسالة انتظار طويلة حتى يستيقظ السيرفر
+    UI.showToast('جارِ الاتصال بالخادم... الرجاء الانتظار ⏳', 60000);
 
+    // لن تدخل اللعبة إلا بعد نجاح الاتصال بالخادم (المصافحة)
     Network.connect(charId, () => {
-      UI.showToast('مرحباً بك في صالة الألعاب! 🎮', 2500);
-    });
+      // هذا الكود لن يُنفذ إلا إذا رد السيرفر بنجاح الاتصال
+      UI.showToast('تم الاتصال بنجاح! مرحباً بك في الصالة 🎮', 2500);
 
-    _state    = STATE.PLAYING;
-    _lastTime = performance.now();
-    _rafId    = requestAnimationFrame(_loop);
+      UI.showGame();
+      Player.init(charId);
+      NPC.init();
+      UI.showHUD(Player.getCharName());
+      Joystick.show();
+      _registerInteraction();
+
+      _state    = STATE.PLAYING;
+      _lastTime = performance.now();
+      _rafId    = requestAnimationFrame(_loop);
+    });
   }
 
   /* ==============================
@@ -83,7 +93,7 @@ const Game = (() => {
      التحديث
      ============================== */
   function _update(delta) {
-    // *** الإصلاح: لا تحرّك اللاعب إذا كان الـ popup مفتوحاً ***
+    // عدم تحريك اللاعب إذا كان الـ popup مفتوحاً
     const deviceOpen = Devices.hasActive();
 
     Joystick.update();
