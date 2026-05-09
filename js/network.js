@@ -81,7 +81,6 @@ const Network = (() => {
       UI.showToast('لاعب جديد دخل الصالة 🎮', 1800);
     });
 
-    /* ---- استقبال رسائل الدردشة ---- */
     _socket.on('player:chat', ({ id, text }) => {
       if (typeof Chat !== 'undefined') {
         Chat.addMessage(id, text);
@@ -143,13 +142,11 @@ const Network = (() => {
     };
   }
 
-  /** إرسال رسالة دردشة **/
   function sendChatMessage(text) {
     if (!_connected || !text.trim()) return;
     
     _socket.emit('player:chat', text);
     
-    // إظهار الرسالة محلياً فوق رأسك فوراً
     if (typeof Chat !== 'undefined') {
       Chat.addMessage(_myId, text);
     }
@@ -217,7 +214,6 @@ const Network = (() => {
 
       _drawPlayerName(ctx, p);
 
-      // رسم فقاعة الدردشة فوق اللاعب الآخر إذا وجدت
       if (typeof Chat !== 'undefined') {
         Chat.draw(ctx, p.x, p.y - PLAYER_H / 2, id);
       }
@@ -241,15 +237,18 @@ const Network = (() => {
   }
 
   function getPlayerCount() { return _players.size; }
+  // هذه هي الدالة المنقذة التي تسببت في انهيار الخريطة
+  function getPlayers()     { return _players; }
   function isConnected()    { return _connected; }
   function getMyId()        { return _myId; }
 
   return {
     connect,
     sendPosition,
-    sendChatMessage, // تصدير الدالة الجديدة
+    sendChatMessage,
     drawOtherPlayers,
     getPlayerCount,
+    getPlayers,
     isConnected,
     getMyId
   };
