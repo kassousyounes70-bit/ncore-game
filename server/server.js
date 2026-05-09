@@ -1,7 +1,7 @@
 /* ==============================
-   NCORE GAME — server.js
-   سيرفر اللعبة المتعددة اللاعبين
-   Node.js + Socket.io
+   NCORE GAME — server.js (Monolithic)
+   سيرفر اللعبة المتعددة اللاعبين + واجهة الويب
+   Node.js + Socket.io + Express
    ============================== */
 
 'use strict';
@@ -10,8 +10,8 @@ require('dotenv').config();
 
 const express   = require('express');
 const http      = require('http');
+const path      = require('path');
 const { Server }= require('socket.io');
-const cors      = require('cors');
 
 /* ==============================
    الإعداد
@@ -20,35 +20,20 @@ const app    = express();
 const server = http.createServer(app);
 
 const PORT        = process.env.PORT || 3000;
-const CLIENT_URL  = process.env.CLIENT_URL || 'https://ncore-game.vercel.app';
 const MAX_PLAYERS = 50;
 
 /* ==============================
-   CORS مصفوفة الروابط المسموحة
+   تسليم ملفات الواجهة (Frontend)
    ============================== */
-const allowedOrigins = [
-  CLIENT_URL,
-  `${CLIENT_URL}/`, // تغطية مسار Vercel في حال وجود شرطة مائلة
-  'http://localhost:3000',
-  'http://127.0.0.1:5500'
-];
-
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ['GET', 'POST']
-}));
-
+// هذه الأسطر تجعل الخادم يعرض مجلد public الذي يحتوي على اللعبة
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 /* ==============================
    Socket.io
    ============================== */
+// بما أن الواجهة والسيرفر في نفس المكان، لم نعد بحاجة لتعقيدات الـ CORS
 const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST']
-  },
-  // تم إزالة قيد transports للسماح بالتوافقية العالية والـ Polling المبدئي
   pingInterval: 25000,
   pingTimeout:  60000
 });
@@ -146,7 +131,7 @@ io.on('connection', (socket) => {
 });
 
 /* ==============================
-   HTTP Routes
+   HTTP Routes إضافية
    ============================== */
 
 /* صحة السيرفر — للـ KeepAlive والمراقبة */
@@ -158,16 +143,6 @@ app.get('/ping', (req, res) => {
     uptime:  Math.floor(process.uptime()) + 's',
     memory:  _getMemoryUsage(),
     time:    new Date().toISOString()
-  });
-});
-
-/* معلومات عامة */
-app.get('/', (req, res) => {
-  res.json({
-    game:    'NCore Game Server',
-    version: '1.0.0',
-    players: `${players.size}/${MAX_PLAYERS}`,
-    status:  'running'
   });
 });
 
@@ -201,11 +176,10 @@ function _logStats() {
 
 /* ==============================
    تنظيف اللاعبين غير النشطين
-   كل 5 دقائق
    ============================== */
 setInterval(() => {
   const now     = Date.now();
-  const timeout = 10 * 60 * 1000; // 10 دقائق بدون نشاط
+  const timeout = 10 * 60 * 1000;
 
   players.forEach((player, id) => {
     if (now - player.joinedAt > timeout) {
@@ -233,9 +207,8 @@ process.on('unhandledRejection', (reason) => {
    ============================== */
 server.listen(PORT, () => {
   console.log('================================');
-  console.log(`🎮 NCore Game Server`);
+  console.log(`🎮 NCore Game Server (Monolithic)`);
   console.log(`🚀 يعمل على البورت: ${PORT}`);
-  console.log(`🌐 العميل المسموح: ${CLIENT_URL}`);
   console.log(`👥 أقصى لاعبين: ${MAX_PLAYERS}`);
   console.log('================================');
 });
