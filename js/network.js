@@ -39,11 +39,10 @@ const Network = (() => {
     _onConnectCb = onConnect;
 
     _socket = io(SERVER_URL, {
-      // تم إزالة transports للسماح بالـ Polling كاحتياطي لتفادي فشل الاتصال المبدئي
       reconnection:         true,
       reconnectionDelay:    1500,
-      reconnectionDelayMax: 5000, // تجنب إغراق الخادم بالطلبات أثناء استيقاظه
-      timeout:              60000 // رفع المهلة لـ 60 ثانية لانتظار استيقاظ Render
+      reconnectionDelayMax: 5000,
+      timeout:              60000
     });
 
     _registerEvents();
@@ -71,7 +70,10 @@ const Network = (() => {
         name:   'لاعب'
       });
 
-      _onConnectCb && _onConnectCb();
+      if (_onConnectCb) {
+        _onConnectCb();
+        _onConnectCb = null; // تفريغ الـ Callback لمنع التكرار
+      }
     });
 
     /* ---- قائمة اللاعبين الحاليين عند الدخول ---- */
@@ -111,7 +113,7 @@ const Network = (() => {
     _socket.on('disconnect', (reason) => {
       _connected = false;
       console.warn('[Network] انقطع الاتصال:', reason);
-      UI.showToast('انقطع الاتصال... جارِ إعادة الاتصال ⏳', 2000);
+      UI.showToast('⚠️ انقطع الاتصال: ' + reason, 3000);
     });
 
     /* ---- إعادة اتصال ناجحة ---- */
@@ -128,9 +130,10 @@ const Network = (() => {
       UI.showToast('تمّت إعادة الاتصال ✅', 1500);
     });
 
-    /* ---- خطأ ---- */
+    /* ---- خطأ صريح (تم التعديل لكشف السبب على الشاشة) ---- */
     _socket.on('connect_error', (err) => {
       console.error('[Network] خطأ في الاتصال:', err.message);
+      UI.showToast('❌ خطأ في الخادم: ' + err.message, 5000);
     });
   }
 
