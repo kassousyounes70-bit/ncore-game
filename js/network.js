@@ -1,7 +1,7 @@
 /* ==============================
    NCORE GAME — network.js
    إدارة الاتصال المتعدد اللاعبين
-   عبر Socket.io
+   عبر Socket.io (Monolithic)
    ============================== */
 
 'use strict';
@@ -11,7 +11,8 @@ const Network = (() => {
   /* ==============================
      الثوابت
      ============================== */
-  const SERVER_URL     = 'https://ncore-mmo-server.onrender.com';
+  // تم ترك الرابط فارغاً ليتصل بنفس الخادم المضيف للعبة تلقائياً
+  const SERVER_URL     = ''; 
   const SEND_RATE      = 100;   // ms بين كل إرسال (10 مرات/ثانية)
   const INTERP_SPEED   = 0.18;  // سرعة الـ Interpolation (0-1)
   const PLAYER_W       = 24;
@@ -28,7 +29,6 @@ const Network = (() => {
   let _onConnectCb   = null;
 
   // خريطة اللاعبين الآخرين
-  // key: socketId → { x, y, targetX, targetY, charId, dir, frame, frameTimer, name }
   const _players = new Map();
 
   /* ==============================
@@ -60,7 +60,6 @@ const Network = (() => {
 
       console.log('[Network] متصل ✅ ID:', _myId);
 
-      // إرسال بيانات اللاعب للسيرفر
       const spawn = GameMap.getSpawnPoint();
       _socket.emit('player:join', {
         charId: _myCharId,
@@ -72,7 +71,7 @@ const Network = (() => {
 
       if (_onConnectCb) {
         _onConnectCb();
-        _onConnectCb = null; // تفريغ الـ Callback لمنع التكرار
+        _onConnectCb = null;
       }
     });
 
@@ -100,7 +99,6 @@ const Network = (() => {
       p.targetX = x;
       p.targetY = y;
       p.dir     = dir;
-      // تحريك animation
       p.moving  = (dir !== 'idle');
     });
 
@@ -156,7 +154,7 @@ const Network = (() => {
   }
 
   /* ==============================
-     إرسال الموضع (مُقيَّد بـ Throttle)
+     إرسال الموضع
      ============================== */
   function sendPosition(cx, cy, rect, dir) {
     if (!_connected) return;
@@ -173,18 +171,15 @@ const Network = (() => {
   }
 
   /* ==============================
-     تحديث الـ Interpolation كل إطار
-     (يُستدعى ضمنياً من drawOtherPlayers)
+     تحديث الـ Interpolation
      ============================== */
   function _interpolatePlayers(delta) {
     const FRAME_TIME = 0.16;
 
     for (const p of _players.values()) {
-      // انتقال سلس نحو الموضع المستهدف
       p.x = Utils.lerp(p.x, p.targetX, INTERP_SPEED);
       p.y = Utils.lerp(p.y, p.targetY, INTERP_SPEED);
 
-      // animation
       const dist = Utils.distance(p.x, p.y, p.targetX, p.targetY);
       p.moving   = dist > 2;
 
@@ -219,7 +214,6 @@ const Network = (() => {
       ctx.ellipse(p.x, p.y + PLAYER_H / 2 + 4, 10, 4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // رسم الشخصية
       char.draw(
         ctx,
         p.x - PLAYER_W / 2,
@@ -229,22 +223,18 @@ const Network = (() => {
         p.moving
       );
 
-      // اسم اللاعب فوق رأسه
       _drawPlayerName(ctx, p);
     }
   }
 
-  /* ---- اسم اللاعب ---- */
   function _drawPlayerName(ctx, p) {
     const nameX = p.x;
     const nameY = p.y - PLAYER_H / 2 - 14;
 
-    // خلفية الاسم
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     const tw = (p.name.length * 6) + 8;
     ctx.fillRect(nameX - tw / 2, nameY - 8, tw, 10);
 
-    // النص
     Utils.drawPixelText(ctx, p.name, nameX, nameY - 7, {
       font:    '5px "Press Start 2P"',
       color:   '#f0c040',
@@ -260,9 +250,6 @@ const Network = (() => {
   function isConnected()    { return _connected; }
   function getMyId()        { return _myId; }
 
-  /* ==============================
-     تصدير
-     ============================== */
   return {
     connect,
     sendPosition,
