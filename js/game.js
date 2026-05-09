@@ -45,6 +45,11 @@ const Game = (() => {
     Camera.init(_canvas.width, _canvas.height, 1920, 1440, 0.12);
     Devices.init();
     Joystick.init();
+    
+    // تشغيل نظام المحادثة لكي لا ينهار المحرك عند استدعائه
+    if (typeof Chat !== 'undefined') {
+      Chat.init();
+    }
   }
 
   function _onCharSelected(charId) {
@@ -151,20 +156,20 @@ const Game = (() => {
 
     function _onTap(e) {
       const t = e.target;
-      // استثناء زر التفاعل الجديد من إغلاق النوافذ
+      // حماية جميع أزرار الواجهة الجديدة من النقر العشوائي
       if (
         t.closest('#joystick-zone') ||
         t.closest('#device-popup')  ||
         t.closest('#hud') ||
-        t.closest('#interact-btn') 
+        t.closest('#interact-btn') ||
+        t.closest('#chat-btn') ||
+        t.closest('#chat-input-container')
       ) return;
 
-      // إغلاق الجهاز فقط عند النقر على منطقة فارغة في الخريطة
       if (Devices.hasActive()) Devices.close();
     }
 
     gc.addEventListener('click', _onTap);
-    // تم إلغاء preventDefault للسماح للأزرار بالتفاعل بشكل طبيعي
     gc.addEventListener('touchend', _onTap);
   }
 
