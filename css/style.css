@@ -1,0 +1,374 @@
+/* ==============================
+   NCORE GAME — style.css
+   ============================== */
+
+/* خط بكسل من Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* ==============================
+   Reset & Base
+   ============================== */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+:root {
+  --color-bg:        #0a0a0f;
+  --color-primary:   #f0c040;
+  --color-secondary: #40c0f0;
+  --color-accent:    #f04060;
+  --color-green:     #40f080;
+  --color-panel:     #1a1a2e;
+  --color-border:    #2a2a4e;
+  --pixel-font:      'Press Start 2P', monospace;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-bg);
+  color: #ffffff;
+  font-family: var(--pixel-font);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ==============================
+   Utility
+   ============================== */
+.hidden {
+  display: none !important;
+}
+
+.pixel-title {
+  font-family: var(--pixel-font);
+  font-size: clamp(16px, 4vw, 32px);
+  color: var(--color-primary);
+  text-shadow:
+    3px 3px 0 #a07000,
+    0 0 20px rgba(240, 192, 64, 0.6);
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+.pixel-subtitle {
+  font-family: var(--pixel-font);
+  font-size: clamp(8px, 2vw, 13px);
+  color: var(--color-secondary);
+  text-align: center;
+  margin-top: 12px;
+  animation: blink 1.2s step-end infinite;
+}
+
+.pixel-btn {
+  font-family: var(--pixel-font);
+  font-size: clamp(9px, 1.8vw, 13px);
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border: none;
+  padding: 12px 24px;
+  cursor: pointer;
+  image-rendering: pixelated;
+  box-shadow:
+    4px 4px 0 #a07000,
+    inset -2px -2px 0 rgba(0,0,0,0.3);
+  transition: transform 0.08s, box-shadow 0.08s;
+  clip-path: polygon(
+    0 4px, 4px 0,
+    calc(100% - 4px) 0, 100% 4px,
+    100% calc(100% - 4px), calc(100% - 4px) 100%,
+    4px 100%, 0 calc(100% - 4px)
+  );
+}
+
+.pixel-btn:hover {
+  background: #ffe070;
+}
+
+.pixel-btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 #a07000;
+}
+
+/* ==============================
+   Loading Screen
+   ============================== */
+#loading-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+}
+
+.loading-bar-wrapper {
+  width: clamp(200px, 60vw, 400px);
+  height: 20px;
+  background: var(--color-panel);
+  border: 3px solid var(--color-border);
+  box-shadow: 0 0 10px rgba(64, 192, 240, 0.3);
+  image-rendering: pixelated;
+}
+
+.loading-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--color-secondary), var(--color-green));
+  box-shadow: 0 0 8px var(--color-secondary);
+  transition: width 0.1s linear;
+}
+
+.loading-percent {
+  font-family: var(--pixel-font);
+  font-size: 12px;
+  color: var(--color-green);
+}
+
+/* ==============================
+   Character Select Screen
+   ============================== */
+#character-select-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 30px 16px 20px;
+  gap: 24px;
+  overflow-y: auto;
+  z-index: 90;
+}
+
+#character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.char-card {
+  background: var(--color-panel);
+  border: 3px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 8px;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  clip-path: polygon(
+    0 6px, 6px 0,
+    calc(100% - 6px) 0, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 6px) 100%,
+    6px 100%, 0 calc(100% - 6px)
+  );
+}
+
+.char-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-3px);
+}
+
+.char-card.selected {
+  border-color: var(--color-green);
+  box-shadow: 0 0 16px rgba(64, 240, 128, 0.5);
+}
+
+.char-card canvas {
+  image-rendering: pixelated;
+}
+
+.char-name {
+  font-family: var(--pixel-font);
+  font-size: 8px;
+  color: var(--color-primary);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ==============================
+   Game Container & Canvas
+   ============================== */
+#game-container {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  z-index: 10;
+}
+
+#game-canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ==============================
+   HUD
+   ============================== */
+#hud {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  background: rgba(10, 10, 15, 0.8);
+  border: 2px solid var(--color-border);
+  padding: 6px 14px;
+  pointer-events: none;
+}
+
+#hud-character-name {
+  font-family: var(--pixel-font);
+  font-size: 10px;
+  color: var(--color-primary);
+}
+
+/* ==============================
+   Virtual Joystick
+   ============================== */
+#joystick-zone {
+  position: fixed;
+  bottom: 30px;
+  left: 30px;
+  width: 130px;
+  height: 130px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#joystick-base {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 3px solid rgba(240, 192, 64, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 0 16px rgba(240, 192, 64, 0.2);
+}
+
+#joystick-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe070, #f0c040);
+  border: 3px solid #a07000;
+  position: absolute;
+  box-shadow:
+    0 3px 8px rgba(0,0,0,0.5),
+    0 0 10px rgba(240, 192, 64, 0.4);
+  transition: box-shadow 0.1s;
+  cursor: grab;
+}
+
+#joystick-thumb:active {
+  cursor: grabbing;
+}
+
+/* ==============================
+   Device Popup
+   ============================== */
+#device-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-panel);
+  border: 4px solid var(--color-primary);
+  box-shadow:
+    0 0 30px rgba(240, 192, 64, 0.4),
+    inset 0 0 20px rgba(0,0,0,0.5);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  clip-path: polygon(
+    0 8px, 8px 0,
+    calc(100% - 8px) 0, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 8px) 100%,
+    8px 100%, 0 calc(100% - 8px)
+  );
+}
+
+#device-canvas {
+  image-rendering: pixelated;
+  border: 2px solid var(--color-border);
+}
+
+#device-close-btn {
+  font-size: 9px;
+  padding: 8px 18px;
+}
+
+/* ==============================
+   Animations
+   ============================== */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+/* تأثير خطوط المسح على شاشة التلفاز القديم */
+.scanline-effect::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ==============================
+   Scrollbar (للشاشات الصغيرة)
+   ============================== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
