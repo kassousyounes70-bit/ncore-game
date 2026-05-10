@@ -42,11 +42,11 @@ const Game = (() => {
 
   function _initSystems() {
     GameMap.init();
+    // إعطاء أبعاد وهمية في البداية، سيتم تعديلها فوراً في resizeCanvas
     Camera.init(_canvas.width, _canvas.height, 1920, 1440, 0.12);
     Devices.init();
     Joystick.init();
     
-    // تشغيل نظام المحادثة لكي لا ينهار المحرك عند استدعائه
     if (typeof Chat !== 'undefined') {
       Chat.init();
     }
@@ -149,14 +149,13 @@ const Game = (() => {
   }
 
   /* ==============================
-     التفاعل مع الأجهزة
+     التفاعل
      ============================== */
   function _registerInteraction() {
     const gc = Utils.$('game-container');
 
     function _onTap(e) {
       const t = e.target;
-      // حماية جميع أزرار الواجهة الجديدة من النقر العشوائي
       if (
         t.closest('#joystick-zone') ||
         t.closest('#device-popup')  ||
@@ -174,13 +173,24 @@ const Game = (() => {
   }
 
   /* ==============================
-     تغيير الحجم
+     تغيير الحجم - معدلة لتعكس دوران CSS
      ============================== */
   function _resizeCanvas() {
     if (!_canvas) return;
-    _canvas.width  = window.innerWidth;
-    _canvas.height = window.innerHeight;
+    
+    // إذا كان الهاتف عمودياً، قم بعكس العرض والطول للـ Canvas الداخلي
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    if (isPortrait) {
+      _canvas.width  = window.innerHeight;
+      _canvas.height = window.innerWidth;
+    } else {
+      _canvas.width  = window.innerWidth;
+      _canvas.height = window.innerHeight;
+    }
+    
     _ctx.imageSmoothingEnabled = false;
+    
     if (_state === STATE.PLAYING) {
       Camera.resize(_canvas.width, _canvas.height);
     }
