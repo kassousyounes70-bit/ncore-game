@@ -71,9 +71,21 @@
   });
 
   /* ==============================
-     بدء اللعبة
+     تحديث شريط التحميل
      ============================== */
-  function _start() {
+  function _updateLoadingUI(percent) {
+    const loadingBar = document.getElementById('loading-bar');
+    const loadingPercent = document.getElementById('loading-percent');
+    if (loadingBar && loadingPercent) {
+      loadingBar.style.width = `${percent}%`;
+      loadingPercent.innerText = `${Math.floor(percent)}%`;
+    }
+  }
+
+  /* ==============================
+     بدء اللعبة (متزامن مع الموارد)
+     ============================== */
+  async function _start() {
     const issues = _checkSupport();
     if (issues.length > 0) {
       _showError('متصفحك لا يدعم هذه اللعبة:<br>' + issues.join('<br>'));
@@ -81,14 +93,20 @@
     }
 
     try {
-      // تحميل Sprites قبل بدء اللعبة
-      Player.preload();
+      // إجبار واجهة التحميل على البقاء حتى يكتمل الـ Promise المرتجع من Player.preload
+      await Player.preload(_updateLoadingUI);
+
+      // إخفاء الشاشة بعد الاكتمال
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.classList.add('hidden');
+      }
 
       Game.init();
       console.log('%c🎮 NCORE GAME — تم التشغيل بنجاح', 'color:#f0c040; font-size:14px;');
       console.log('%c🕹️ ncore-game.vercel.app', 'color:#40c0f0; font-size:11px;');
     } catch (err) {
-      console.error('[NCORE] فشل في التشغيل:', err);
+      console.error('[NCORE] فشل في التشغيل أو التحميل:', err);
       _showError('فشل تشغيل اللعبة.<br>افتح الـ Console للتفاصيل.');
     }
   }
