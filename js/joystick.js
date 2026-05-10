@@ -138,21 +138,36 @@ const Joystick = (() => {
   }
 
   /* ==============================
-     حساب الاتجاه
+     حساب الاتجاه مع معالجة الدوران (Portrait)
      ============================== */
   function _processInput(clientX, clientY) {
-    const rawDx = clientX - _baseX;
-    const rawDy = clientY - _baseY;
-    const dist  = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
+    let rawDx = clientX - _baseX;
+    let rawDy = clientY - _baseY;
+    
+    // اكتشاف إذا كان الهاتف في وضع عمودي (حيث قمنا بتدوير CSS)
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    if (isPortrait) {
+        // بسبب transform: rotate(90deg)، المحاور اللمسية تنعكس:
+        // السحب للأعلى باللمس (Dy سالب) يصبح سحباً لليسار على الشاشة المدورة
+        const tempX = rawDx;
+        rawDx = rawDy;
+        rawDy = -tempX;
+    }
 
+    const dist  = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
     const clampedDist = Math.min(dist, _radius);
     const angle       = Math.atan2(rawDy, rawDx);
 
-    const thumbX = Math.cos(angle) * clampedDist;
-    const thumbY = Math.sin(angle) * clampedDist;
+    // حساب موقع الزر (Thumb) بصرياً
+    // هنا نستخدم الإحداثيات الأصلية قبل العكس لكي يتحرك الزر تحت إصبع اللاعب بدقة
+    const visualDx = clientX - _baseX;
+    const visualDy = clientY - _baseY;
+    const visualAngle = Math.atan2(visualDy, visualDx);
+    const thumbX = Math.cos(visualAngle) * clampedDist;
+    const thumbY = Math.sin(visualAngle) * clampedDist;
 
-    _thumb.style.transform =
-      `translate(calc(-50% + ${thumbX}px), calc(-50% + ${thumbY}px))`;
+    _thumb.style.transform = `translate(calc(-50% + ${thumbX}px), calc(-50% + ${thumbY}px))`;
 
     _magnitude = Utils.clamp(dist / _radius, 0, 1);
     _dx        = Math.cos(angle) * _magnitude;
@@ -206,7 +221,6 @@ const Joystick = (() => {
     if (_zone) Utils.hide(_zone);
   }
 
-  /** إعادة ضبط كاملة — تصفير الحركة فوراً */
   function reset() {
     _reset();
     _keys.up    = false;
