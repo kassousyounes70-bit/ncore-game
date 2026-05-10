@@ -18,7 +18,6 @@ const Player = (() => {
   const SPRITE_ROWS  = 6;
   const TOTAL_FRAMES = SPRITE_COLS * SPRITE_ROWS; // 36
 
-  // ثوابت جديدة للرسم المرئي فقط (تغيير الحجم إلى 64x64 كما طلبت)
   const SPRITE_DRAW_W = 64;
   const SPRITE_DRAW_H = 64;
 
@@ -35,7 +34,6 @@ const Player = (() => {
 
   /* ==============================
      نظام Sprite Sheets
-     { charId: { down:[], up:[], left:[], right:[], loaded:bool } }
      ============================== */
   const _sprites = {};
 
@@ -43,12 +41,11 @@ const Player = (() => {
      تحميل Sprites مسبقاً
      ============================== */
   function preload() {
-    // Troll Man فقط يستخدم Sprite Sheets (index 0)
     _loadCharSprites(0, 'assets/sprites/characters/heads/troll.png');
   }
 
   function _loadCharSprites(charId, headPath) {
-    const entry = { down: [], up: [], left: [], right: [], loaded: false, headImg: null };
+    const entry = { down: null, up: null, left: null, right: null, loaded: false, hasError: false, headImg: null };
     _sprites[charId] = entry;
 
     const headImg = new Image();
@@ -70,22 +67,16 @@ const Player = (() => {
 
       img.onload = () => {
         entry[dir] = _processSheet(img, entry.headImg);
-        if (++loaded === dirs.length) {
-          entry.loaded = true;
-          console.log(`[Sprites] Troll Man محمّل ✅`);
-        }
+        if (++loaded === dirs.length) entry.loaded = true;
       };
       img.onerror = () => {
         console.warn(`[Sprites] char_${charId}_${dir}.png غير موجود`);
-        if (++loaded === dirs.length) entry.loaded = false;
+        entry.hasError = true;
+        if (++loaded === dirs.length) entry.loaded = true; // السماح برسم الاتجاهات الناجحة
       };
     });
   }
 
-  /* ==============================
-     معالجة Sprite Sheet
-     استخراج 36 فريم + Chroma Key
-     ============================== */
   function _processSheet(sheetImg, headImg) {
     const fw     = Math.floor(sheetImg.width  / SPRITE_COLS);
     const fh     = Math.floor(sheetImg.height / SPRITE_ROWS);
@@ -106,9 +97,6 @@ const Player = (() => {
     return frames;
   }
 
-  /* ==============================
-     Chroma Key — وردي → رأس
-     ============================== */
   function _applyChromaKey(ctx, w, h, headImg) {
     const imageData = ctx.getImageData(0, 0, w, h);
     const data      = imageData.data;
@@ -138,22 +126,26 @@ const Player = (() => {
   }
 
   /* ==============================
-     رسم Sprite مع Fallback والتوسيط
+     رسم Sprite مع Fallback محسّن
      ============================== */
   function _drawSprite(ctx, charId, x, y, dir, frame, moving) {
     const sp = _sprites[charId];
-
-    // حساب إزاحة الرسم لتتمركز الشخصية (64x64) فوق مربع التصادم (24x28)
     const drawX = x - (SPRITE_DRAW_W - W) / 2;
     const drawY = y - (SPRITE_DRAW_H - H);
 
-    if (!sp || !sp.loaded || !sp[dir]?.length) {
-      // Fallback: مستطيل رمادي أثناء التحميل بالحجم الكبير
+    if (!sp || (!sp.loaded && !sp.hasError)) {
+      // قيد التحميل: مستطيل رمادي
       ctx.fillStyle = 'rgba(120,120,120,0.5)';
       ctx.fillRect(drawX, drawY, SPRITE_DRAW_W, SPRITE_DRAW_H);
-      Utils.drawPixelText(ctx, '...', drawX + SPRITE_DRAW_W / 2, drawY + SPRITE_DRAW_H / 2 - 4, {
-        font: '6px "Press Start 2P"', color: '#fff', align: 'center'
-      });
+      Utils.drawPixelText(ctx, '...', drawX + SPRITE_DRAW_W / 2, drawY + SPRITE_DRAW_H / 2 - 4, { font: '6px "Press Start 2P"', color: '#fff', align: 'center' });
+      return;
+    }
+
+    if (!sp[dir] || !sp[dir].length) {
+      // خطأ 404 (الصورة غير موجودة): مستطيل أحمر
+      ctx.fillStyle = 'rgba(255,50,50,0.5)';
+      ctx.fillRect(drawX, drawY, SPRITE_DRAW_W, SPRITE_DRAW_H);
+      Utils.drawPixelText(ctx, 'ERR', drawX + SPRITE_DRAW_W / 2, drawY + SPRITE_DRAW_H / 2 - 4, { font: '6px "Press Start 2P"', color: '#fff', align: 'center' });
       return;
     }
 
@@ -162,7 +154,6 @@ const Player = (() => {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(frames[f], drawX, drawY, SPRITE_DRAW_W, SPRITE_DRAW_H);
 
-    // ظل بيضاوي يتناسب مع الحجم الجديد، متمركز تحت القدمين
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.beginPath();
     ctx.ellipse(x + W / 2, y + H + 2, SPRITE_DRAW_W / 3.5, 4, 0, 0, Math.PI * 2);
@@ -202,7 +193,6 @@ const Player = (() => {
       _x = clamped.x;
       _y = clamped.y;
 
-      // فريم الـ animation — Troll Man أسرع (36 فريم) ، الباقين أبطأ (3 فريمات)
       const ft   = _charId === 0 ? 0.06 : FRAME_TIME;
       const maxF = _charId === 0 ? TOTAL_FRAMES : 3;
       _frameTimer += delta;
@@ -227,10 +217,8 @@ const Player = (() => {
      ============================== */
   function draw(ctx) {
     if (_charId === 0) {
-      // Troll Man — Sprite Sheet
       _drawSprite(ctx, 0, _x, _y, _dir, _frame, _moving);
     } else {
-      // الشخصيات البرمجية (index 1-10 → CHARACTERS[0-9])
       const char = CHARACTERS[_charId - 1];
       if (char) char.draw(ctx, _x, _y, _dir, _frame, _moving);
     }
@@ -241,7 +229,7 @@ const Player = (() => {
   }
 
   /* ==============================
-     الشخصيات البرمجية (1-10)
+     الشخصيات البرمجية
      ============================== */
   const CHARACTERS = [
     {
@@ -430,8 +418,7 @@ const Player = (() => {
   }
 
   /* ==============================
-     getAllChars — للـ UI والـ Network
-     Troll Man أولاً ثم الشخصيات البرمجية
+     getAllChars
      ============================== */
   function getAllChars() {
     const trollWrapper = {
@@ -452,20 +439,9 @@ const Player = (() => {
   function getCharId()   { return _charId; }
   function getCharName() { return getAllChars()[_charId]?.name || ''; }
 
-  /* ==============================
-     تصدير
-     ============================== */
   return {
-    preload,
-    init,
-    update,
-    draw,
-    getRect,
-    getCenterX,
-    getCenterY,
-    getCharId,
-    getCharName,
-    getAllChars
+    preload, init, update, draw,
+    getRect, getCenterX, getCenterY, getCharId, getCharName, getAllChars
   };
 
 })();
