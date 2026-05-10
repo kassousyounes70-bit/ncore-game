@@ -13,6 +13,24 @@
   <title>NCore Game 🎮</title>
 
   <link rel="stylesheet" href="css/style.css" />
+
+  <script>
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const developerKey = urlParams.get('admin');
+
+      // كلمة السر المتفق عليها: ncore2024
+      if (developerKey === 'ncore2024') {
+        window.addEventListener('DOMContentLoaded', () => {
+          const maintenance = document.getElementById('maintenance-screen');
+          if (maintenance) {
+            maintenance.style.display = 'none';
+            console.log("مرحباً أيها المطور! تم تخطي وضع الصيانة ✅");
+          }
+        });
+      }
+    })();
+  </script>
 </head>
 <body>
 
