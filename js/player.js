@@ -1,6 +1,6 @@
 /* ==============================
    NCORE GAME — player.js
-   اللاعب: حركة، رسم، animation
+   اللاعب: حركة، رسم، animation + Sprite Sheets
    ============================== */
 
 'use strict';
@@ -10,21 +10,154 @@ const Player = (() => {
   /* ==============================
      ثوابت
      ============================== */
-  const SPEED      = 160;   // بكسل/ثانية
-  const W          = 24;    // عرض hitbox
-  const H          = 28;    // ارتفاع hitbox
-  const FRAME_TIME = 0.14;  // ثانية لكل فريم animation
+  const SPEED        = 160;
+  const W            = 24;
+  const H            = 28;
+  const FRAME_TIME   = 0.14;
+  const SPRITE_COLS  = 6;
+  const SPRITE_ROWS  = 6;
+  const TOTAL_FRAMES = SPRITE_COLS * SPRITE_ROWS; // 36
 
   /* ==============================
      الحالة
      ============================== */
-  let _x         = 0;
-  let _y         = 0;
-  let _dir       = 'down';   // up | down | left | right
-  let _frame     = 0;        // فريم الـ animation الحالي (0-2)
-  let _frameTimer= 0;
-  let _moving    = false;
-  let _charId    = 0;        // معرّف الشخصية المختارة
+  let _x          = 0;
+  let _y          = 0;
+  let _dir        = 'down';
+  let _frame      = 0;
+  let _frameTimer = 0;
+  let _moving     = false;
+  let _charId     = 0;
+
+  /* ==============================
+     نظام Sprite Sheets
+     { charId: { down:[], up:[], left:[], right:[], loaded:bool } }
+     ============================== */
+  const _sprites = {};
+
+  /* ==============================
+     تحميل Sprites مسبقاً
+     ============================== */
+  function preload() {
+    // Troll Man فقط يستخدم Sprite Sheets (index 0)
+    _loadCharSprites(0, 'assets/sprites/characters/heads/troll.png');
+  }
+
+  function _loadCharSprites(charId, headPath) {
+    const entry = { down: [], up: [], left: [], right: [], loaded: false, headImg: null };
+    _sprites[charId] = entry;
+
+    const headImg = new Image();
+    headImg.src   = headPath;
+
+    headImg.onload  = () => { entry.headImg = headImg; _loadDirections(charId, entry); };
+    headImg.onerror = () => { entry.headImg = null;    _loadDirections(charId, entry); };
+  }
+
+  function _loadDirections(charId, entry) {
+    const dirs   = ['down', 'up', 'left', 'right'];
+    let   loaded = 0;
+
+    dirs.forEach(dir => {
+      const img = new Image();
+      img.src   = `assets/sprites/characters/char_${charId}_${dir}.png`;
+
+      img.onload = () => {
+        entry[dir] = _processSheet(img, entry.headImg);
+        if (++loaded === dirs.length) {
+          entry.loaded = true;
+          console.log(`[Sprites] Troll Man محمّل ✅`);
+        }
+      };
+      img.onerror = () => {
+        console.warn(`[Sprites] char_${charId}_${dir}.png غير موجود`);
+        if (++loaded === dirs.length) entry.loaded = false;
+      };
+    });
+  }
+
+  /* ==============================
+     معالجة Sprite Sheet
+     استخراج 36 فريم + Chroma Key
+     ============================== */
+  function _processSheet(sheetImg, headImg) {
+    const fw     = Math.floor(sheetImg.width  / SPRITE_COLS);
+    const fh     = Math.floor(sheetImg.height / SPRITE_ROWS);
+    const frames = [];
+
+    for (let row = 0; row < SPRITE_ROWS; row++) {
+      for (let col = 0; col < SPRITE_COLS; col++) {
+        const cvs = Utils.createCanvas(fw, fh);
+        const ctx = cvs.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        ctx.drawImage(sheetImg, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+        _applyChromaKey(ctx, fw, fh, headImg);
+
+        frames.push(cvs);
+      }
+    }
+    return frames;
+  }
+
+  /* ==============================
+     Chroma Key — وردي → رأس
+     ============================== */
+  function _applyChromaKey(ctx, w, h, headImg) {
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data      = imageData.data;
+
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let found = false;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (data[i+3] > 100 && data[i] > 180 && data[i+1] < 80 && data[i+2] > 180) {
+          data[i+3] = 0;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          found = true;
+        }
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    if (found && headImg && headImg.complete && headImg.naturalWidth > 0) {
+      ctx.drawImage(headImg, minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+  }
+
+  /* ==============================
+     رسم Sprite مع Fallback
+     ============================== */
+  function _drawSprite(ctx, charId, x, y, dir, frame, moving) {
+    const sp = _sprites[charId];
+
+    if (!sp || !sp.loaded || !sp[dir]?.length) {
+      // Fallback: مستطيل رمادي أثناء التحميل
+      ctx.fillStyle = 'rgba(120,120,120,0.5)';
+      ctx.fillRect(x, y, W, H);
+      Utils.drawPixelText(ctx, '...', x + W / 2, y + H / 2 - 4, {
+        font: '6px "Press Start 2P"', color: '#fff', align: 'center'
+      });
+      return;
+    }
+
+    const frames   = sp[dir];
+    const f        = moving ? frame % frames.length : 0;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(frames[f], x, y, W, H);
+
+    // ظل
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x + W / 2, y + H + 2, W / 3, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   /* ==============================
      الإعداد
@@ -32,8 +165,8 @@ const Player = (() => {
   function init(charId) {
     _charId = charId;
     const spawn = GameMap.getSpawnPoint();
-    _x = spawn.x;
-    _y = spawn.y;
+    _x     = spawn.x;
+    _y     = spawn.y;
     _dir   = 'down';
     _frame = 0;
     Camera.snapTo(_x + W / 2, _y + H / 2);
@@ -43,29 +176,29 @@ const Player = (() => {
      التحديث كل إطار
      ============================== */
   function update(delta) {
-    const dx = Joystick.getDx();
-    const dy = Joystick.getDy();
+    const dx  = Joystick.getDx();
+    const dy  = Joystick.getDy();
     const mag = Joystick.getMagnitude();
-    _moving = mag > 0.05;
+    _moving   = mag > 0.05;
 
     if (_moving) {
       _dir = Joystick.getDirection();
 
-      const speed = SPEED * delta;
-      const moveX = dx * speed;
-      const moveY = dy * speed;
-
-      const rect   = { x: _x, y: _y, w: W, h: H };
-      const result = Collision.resolveMovement(rect, moveX, moveY);
-      const world  = GameMap.getWorldSize();
-      const clamped= Collision.clampToWorld({ x: result.x, y: result.y, w: W, h: H }, world);
+      const speed   = SPEED * delta;
+      const rect    = { x: _x, y: _y, w: W, h: H };
+      const result  = Collision.resolveMovement(rect, dx * speed, dy * speed);
+      const world   = GameMap.getWorldSize();
+      const clamped = Collision.clampToWorld({ x: result.x, y: result.y, w: W, h: H }, world);
       _x = clamped.x;
       _y = clamped.y;
 
+      // فريم الـ animation — Troll Man أسرع (36 فريم) ، الباقين أبطأ (3 فريمات)
+      const ft   = _charId === 0 ? 0.06 : FRAME_TIME;
+      const maxF = _charId === 0 ? TOTAL_FRAMES : 3;
       _frameTimer += delta;
-      if (_frameTimer >= FRAME_TIME) {
-        _frameTimer -= FRAME_TIME;
-        _frame = (_frame + 1) % 3;
+      if (_frameTimer >= ft) {
+        _frameTimer -= ft;
+        _frame = (_frame + 1) % maxF;
       }
     } else {
       _frame      = 0;
@@ -74,7 +207,6 @@ const Player = (() => {
 
     Camera.update(_x + W / 2, _y + H / 2, delta);
 
-    // تحديث نظام المحادثة: اكتشاف اللاعبين وتحديث مؤقت الفقاعات
     if (typeof Chat !== 'undefined') {
       Chat.update(delta, _x + W / 2, _y + H / 2);
     }
@@ -84,19 +216,22 @@ const Player = (() => {
      الرسم
      ============================== */
   function draw(ctx) {
-    const char = CHARACTERS[_charId];
-    if (!char) return;
-    
-    char.draw(ctx, _x, _y, _dir, _frame, _moving);
+    if (_charId === 0) {
+      // Troll Man — Sprite Sheet
+      _drawSprite(ctx, 0, _x, _y, _dir, _frame, _moving);
+    } else {
+      // الشخصيات البرمجية (index 1-10 → CHARACTERS[0-9])
+      const char = CHARACTERS[_charId - 1];
+      if (char) char.draw(ctx, _x, _y, _dir, _frame, _moving);
+    }
 
-    // رسم فقاعة المحادثة الخاصة بك (إذا كنت تتحدث)
     if (typeof Chat !== 'undefined') {
       Chat.draw(ctx, _x + W / 2, _y - 5, Network.getMyId());
     }
   }
 
   /* ==============================
-     تعريف الشخصيات العشر
+     الشخصيات البرمجية (1-10)
      ============================== */
   const CHARACTERS = [
     {
@@ -111,7 +246,7 @@ const Player = (() => {
         ctx.fillStyle = '#ff6000';
         ctx.fillRect(x + 5, y, 14, 4);
         ctx.fillStyle = '#ff8800';
-        ctx.fillRect(x + 7, y - 3,  4, 4);
+        ctx.fillRect(x + 7, y - 3, 4, 4);
         ctx.fillRect(x + 13, y - 2, 3, 3);
         _drawEyes(ctx, x, y, dir);
       }
@@ -129,7 +264,7 @@ const Player = (() => {
         ctx.fillRect(x + 5, y + 2, 14, 13);
         ctx.fillStyle = '#0050b0';
         ctx.fillRect(x + 4, y, 16, 5);
-        ctx.fillRect(x + 4, y + 5,  3, 8);
+        ctx.fillRect(x + 4, y + 5, 3, 8);
         ctx.fillRect(x + 17, y + 5, 3, 8);
         _drawEyes(ctx, x, y, dir, '#4090ff');
       }
@@ -139,6 +274,8 @@ const Player = (() => {
       draw(ctx, x, y, dir, frame, moving) {
         ctx.fillStyle = '#6b4226';
         ctx.fillRect(x + 5, y + 12, 14, 15);
+        ctx.fillStyle = '#8b5a30';
+        ctx.fillRect(x + 8, y + 14, 5, 5);
         _drawLegs(ctx, x, y, frame, moving, '#4a2e18', '#6b4226');
         _drawArms(ctx, x, y, dir, frame, moving, '#6b4226');
         ctx.fillStyle = '#d4956a';
@@ -250,6 +387,9 @@ const Player = (() => {
     }
   ];
 
+  /* ==============================
+     دوال رسم مشتركة
+     ============================== */
   function _drawLegs(ctx, x, y, frame, moving, c1, c2) {
     const swing = moving ? (frame === 1 ? 3 : frame === 2 ? -3 : 0) : 0;
     ctx.fillStyle = c1;
@@ -279,13 +419,43 @@ const Player = (() => {
     ctx.fillRect(x + 13 + ox, y + 6 + oy, 2, 2);
   }
 
-  function getRect()       { return { x: _x, y: _y, w: W, h: H }; }
-  function getCenterX()    { return _x + W / 2; }
-  function getCenterY()    { return _y + H / 2; }
-  function getCharId()     { return _charId; }
-  function getCharName()   { return CHARACTERS[_charId]?.name || ''; }
-  function getAllChars()   { return CHARACTERS; }
+  /* ==============================
+     getAllChars — للـ UI والـ Network
+     Troll Man أولاً ثم الشخصيات البرمجية
+     ============================== */
+  function getAllChars() {
+    const trollWrapper = {
+      name: 'Troll Man',
+      draw(ctx, x, y, dir, frame, moving) {
+        _drawSprite(ctx, 0, x, y, dir, frame, moving);
+      }
+    };
+    return [trollWrapper, ...CHARACTERS];
+  }
 
-  return { init, update, draw, getRect, getCenterX, getCenterY, getCharId, getCharName, getAllChars };
+  /* ==============================
+     Getters
+     ============================== */
+  function getRect()     { return { x: _x, y: _y, w: W, h: H }; }
+  function getCenterX()  { return _x + W / 2; }
+  function getCenterY()  { return _y + H / 2; }
+  function getCharId()   { return _charId; }
+  function getCharName() { return getAllChars()[_charId]?.name || ''; }
+
+  /* ==============================
+     تصدير
+     ============================== */
+  return {
+    preload,
+    init,
+    update,
+    draw,
+    getRect,
+    getCenterX,
+    getCenterY,
+    getCharId,
+    getCharName,
+    getAllChars
+  };
 
 })();
