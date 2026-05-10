@@ -39,6 +39,23 @@ html, body {
 }
 
 /* ==============================
+   فرض الوضع الأفقي إجبارياً عبر CSS
+   ============================== */
+@media screen and (orientation: portrait) {
+  body {
+    transform: rotate(90deg);
+    transform-origin: center center;
+    width: 100dvh !important;
+    height: 100vw !important;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-top: -50vw;
+    margin-left: -50dvh;
+  }
+}
+
+/* ==============================
    Utility
    ============================== */
 .hidden {
@@ -404,7 +421,6 @@ html, body {
   border-style: solid;
 }
 
-/* زر التفاعل (ACTION) */
 #interact-btn {
   bottom: 30px;
   background: radial-gradient(circle at 35% 35%, #ff5050, #cc0000);
@@ -412,7 +428,6 @@ html, body {
   box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset -2px -2px 5px rgba(0,0,0,0.3);
 }
 
-/* زر التحدث (TALK) - وضع فوق زر ACTION */
 #chat-btn {
   bottom: 110px;
   background: radial-gradient(circle at 35% 35%, var(--color-secondary), #2080c0);
