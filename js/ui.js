@@ -11,8 +11,8 @@ const UI = (() => {
      الحالة
      ============================== */
   let _selectedChar  = 0;
-  let _onStartCb     = null;   // callback عند الضغط على "ادخل"
-  let _previewCanvases = [];   // canvas مصغّر لكل شخصية
+  let _onStartCb     = null;   
+  let _previewCanvases = [];   
   let _animFrame     = 0;
   let _animTimer     = 0;
   let _previewTimer  = 0;
@@ -21,53 +21,9 @@ const UI = (() => {
      شاشة التحميل
      ============================== */
   function showLoading(onDone) {
-    Utils.show('loading-screen');
-    Utils.hide('character-select-screen');
-    Utils.hide('game-container');
-
-    const bar     = Utils.$('loading-bar');
-    const percent = Utils.$('loading-percent');
-    let   prog    = 0;
-
-    // محاكاة تحميل تدريجي
-    const steps = [
-      { target: 15, delay: 120,  label: 'تحميل الأصوات...' },
-      { target: 35, delay: 200,  label: 'بناء الخريطة...' },
-      { target: 60, delay: 300,  label: 'رسم الشخصيات...' },
-      { target: 80, delay: 200,  label: 'إعداد الأجهزة...' },
-      { target: 95, delay: 150,  label: 'تهيئة العالم...' },
-      { target: 100, delay: 100, label: 'جاهز!' }
-    ];
-
-    let si = 0;
-    function nextStep() {
-      if (si >= steps.length) {
-        setTimeout(() => {
-          Utils.hide('loading-screen');
-          onDone && onDone();
-        }, 400);
-        return;
-      }
-      const step = steps[si++];
-      const sub  = Utils.$('loading-screen').querySelector('.pixel-subtitle');
-      if (sub) sub.textContent = step.label;
-
-      const diff   = step.target - prog;
-      const inc    = diff / 10;
-      let   ticks  = 0;
-
-      const iv = setInterval(() => {
-        prog += inc;
-        ticks++;
-        bar.style.width    = Math.min(prog, 100) + '%';
-        percent.textContent = Math.floor(Math.min(prog, 100)) + '%';
-        if (ticks >= 10) {
-          clearInterval(iv);
-          setTimeout(nextStep, step.delay);
-        }
-      }, 30);
-    }
-    nextStep();
+    // تم نقل مسؤلية شريط التحميل الحقيقي إلى main.js
+    // لذلك نتجاوز الحلقة الوهمية ونستدعي دالة الانتهاء فوراً
+    if (onDone) onDone();
   }
 
   /* ==============================
@@ -113,8 +69,6 @@ const UI = (() => {
       card.appendChild(lbl);
       grid.appendChild(card);
 
-      // تمت إزالة حدث touchend الذي كان يعيق تمرير الشاشة
-      // متصفحات الهواتف تستجيب لـ click فورياً عند تفعيل user-scalable=no
       card.addEventListener('click', () => _selectChar(i));
     });
 
@@ -134,7 +88,6 @@ const UI = (() => {
     Utils.show('start-btn');
     const btn = Utils.$('start-btn');
     
-    // إزالة أحداث اللمس المتضاربة والاعتماد على click
     btn.onclick = () => _onStartCb && _onStartCb(_selectedChar);
   }
 
@@ -150,6 +103,7 @@ const UI = (() => {
       _previewTimer += delta;
 
       const frame = Math.floor(_previewTimer * 6) % 3;
+      const chars = Player.getAllChars();
 
       _previewCanvases.forEach((cvs, i) => {
         const ctx = cvs.getContext('2d');
@@ -166,16 +120,19 @@ const UI = (() => {
         ctx.ellipse(cvs.width / 2, cvs.height - 4, 12, 4, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // رسم الشخصية (مصغّرة ومتمركزة)
-        ctx.save();
-        ctx.translate(cvs.width / 2 - 12, cvs.height / 2 - 18);
-        Player.getAllChars()[i].draw(
-          ctx, 0, 0,
-          'down',
-          frame,
-          true
-        );
-        ctx.restore();
+        // رسم الشخصية بأمان وتوسيط رياضي
+        if (chars[i]) {
+          ctx.save();
+          if (i === 0) {
+            // Troll Man (64x64): تصغير بنسبة 65% وتوسيط الإحداثيات
+            ctx.scale(0.65, 0.65);
+            chars[i].draw(ctx, 26, 48, 'down', frame, true);
+          } else {
+            // الشخصيات البرمجية (24x28): توسيط مباشر
+            chars[i].draw(ctx, 12, 14, 'down', frame, true);
+          }
+          ctx.restore();
+        }
 
         // إطار مضيء للمختارة
         if (i === _selectedChar) {
@@ -212,7 +169,6 @@ const UI = (() => {
 
   /* ==============================
      رسالة إشعار مؤقتة
-     تظهر في وسط الشاشة ثم تختفي
      ============================== */
   let _toastEl    = null;
   let _toastTimer = null;
