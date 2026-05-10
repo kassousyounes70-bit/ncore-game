@@ -38,13 +38,15 @@ const Player = (() => {
   const _sprites = {};
 
   /* ==============================
-     تحميل Sprites مسبقاً
+     تحميل Sprites مع Promise (لشريط التحميل)
      ============================== */
-  function preload() {
-    _loadCharSprites(0, 'assets/sprites/characters/heads/troll.png');
+  function preload(onProgress) {
+    return new Promise((resolve) => {
+      _loadCharSprites(0, 'assets/sprites/characters/heads/troll.png', onProgress, resolve);
+    });
   }
 
-  function _loadCharSprites(charId, headPath) {
+  function _loadCharSprites(charId, headPath, onProgress, onComplete) {
     const entry = { down: null, up: null, left: null, right: null, loaded: false, hasError: false, headImg: null };
     _sprites[charId] = entry;
 
@@ -52,31 +54,56 @@ const Player = (() => {
     headImg.crossOrigin = 'anonymous';
     headImg.src   = headPath;
 
-    headImg.onload  = () => { entry.headImg = headImg; _loadDirections(charId, entry); };
-    headImg.onerror = () => { entry.headImg = null;    _loadDirections(charId, entry); };
+    if (onProgress) onProgress(10); // 10% عند بدء تحميل الرأس
+
+    headImg.onload  = () => { 
+      entry.headImg = headImg; 
+      _loadDirections(charId, entry, onProgress, onComplete); 
+    };
+    headImg.onerror = () => { 
+      entry.headImg = null;    
+      _loadDirections(charId, entry, onProgress, onComplete); 
+    };
   }
 
-  function _loadDirections(charId, entry) {
+  function _loadDirections(charId, entry, onProgress, onComplete) {
     const dirs   = ['down', 'up', 'left', 'right'];
     let   loaded = 0;
+    const baseProgress = 20; // 20% بعد الرأس
+
+    if (onProgress) onProgress(baseProgress);
 
     dirs.forEach(dir => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.src   = `assets/sprites/characters/char_${charId}_${dir}.png`;
 
+      const checkFinish = () => {
+        loaded++;
+        const currentProgress = baseProgress + (loaded / dirs.length) * 80;
+        if (onProgress) onProgress(currentProgress);
+        
+        if (loaded === dirs.length) {
+          entry.loaded = true;
+          if (onComplete) onComplete();
+        }
+      };
+
       img.onload = () => {
         entry[dir] = _processSheet(img, entry.headImg);
-        if (++loaded === dirs.length) entry.loaded = true;
+        checkFinish();
       };
       img.onerror = () => {
         console.warn(`[Sprites] char_${charId}_${dir}.png غير موجود`);
         entry.hasError = true;
-        if (++loaded === dirs.length) entry.loaded = true; // السماح برسم الاتجاهات الناجحة
+        checkFinish(); // السماح بالاستمرار رغم الخطأ
       };
     });
   }
 
+  /* ==============================
+     معالجة Sprite Sheet
+     ============================== */
   function _processSheet(sheetImg, headImg) {
     const fw     = Math.floor(sheetImg.width  / SPRITE_COLS);
     const fh     = Math.floor(sheetImg.height / SPRITE_ROWS);
@@ -97,6 +124,9 @@ const Player = (() => {
     return frames;
   }
 
+  /* ==============================
+     Chroma Key — خوارزمية المسافة اللونية مع الحفاظ على الأبعاد
+     ============================== */
   function _applyChromaKey(ctx, w, h, headImg) {
     const imageData = ctx.getImageData(0, 0, w, h);
     const data      = imageData.data;
@@ -104,11 +134,29 @@ const Player = (() => {
     let minX = w, minY = h, maxX = 0, maxY = 0;
     let found = false;
 
+    // اللون الوردي المستهدف Chroma Pink: (255, 0, 255)
+    const targetR = 255;
+    const targetG = 0;
+    const targetB = 255;
+    
+    // معامل التسامح (Tolerance) - يمكنك زيادته إذا تبقت حواف وردية (مثلاً 120 إلى 150)
+    const tolerance = 130; 
+
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
-        if (data[i+3] > 100 && data[i] > 180 && data[i+1] < 80 && data[i+2] > 180) {
-          data[i+3] = 0;
+        
+        if (data[i+3] === 0) continue; // تخطي البكسلات الشفافة
+
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+
+        // حساب المسافة الإقليدية في فضاء الألوان
+        const distance = Math.sqrt(Math.pow(r - targetR, 2) + Math.pow(g - targetG, 2) + Math.pow(b - targetB, 2));
+
+        if (distance < tolerance) {
+          data[i+3] = 0; // تحويل البكسل لشفاف
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
@@ -118,10 +166,33 @@ const Player = (() => {
       }
     }
 
+    // تطبيق المسح وتحديث البكسلات
     ctx.putImageData(imageData, 0, 0);
 
+    // رسم صورة الرأس مع الحفاظ على الأبعاد (Aspect Ratio)
     if (found && headImg && headImg.complete && headImg.naturalWidth > 0) {
-      ctx.drawImage(headImg, minX, minY, maxX - minX + 1, maxY - minY + 1);
+      const boxW = maxX - minX + 1;
+      const boxH = maxY - minY + 1;
+      
+      const imgRatio = headImg.naturalWidth / headImg.naturalHeight;
+      const boxRatio = boxW / boxH;
+      
+      let drawW = boxW;
+      let drawH = boxH;
+      let drawX = minX;
+      let drawY = minY;
+      
+      // معادلة توسيط الرأس داخل المساحة المفرغة (Contain) لمنع التشوه
+      if (imgRatio > boxRatio) {
+        drawH = boxW / imgRatio;
+        drawY = minY + (boxH - drawH) / 2;
+      } else {
+        drawW = boxH * imgRatio;
+        drawX = minX + (boxW - drawW) / 2;
+      }
+      
+      ctx.imageSmoothingEnabled = true; // تنعيم الرأس قليلاً أفضل من تشوه البكسل الحاد للصور الفوتوغرافية
+      ctx.drawImage(headImg, drawX, drawY, drawW, drawH);
     }
   }
 
@@ -134,7 +205,6 @@ const Player = (() => {
     const drawY = y - (SPRITE_DRAW_H - H);
 
     if (!sp || (!sp.loaded && !sp.hasError)) {
-      // قيد التحميل: مستطيل رمادي
       ctx.fillStyle = 'rgba(120,120,120,0.5)';
       ctx.fillRect(drawX, drawY, SPRITE_DRAW_W, SPRITE_DRAW_H);
       Utils.drawPixelText(ctx, '...', drawX + SPRITE_DRAW_W / 2, drawY + SPRITE_DRAW_H / 2 - 4, { font: '6px "Press Start 2P"', color: '#fff', align: 'center' });
@@ -142,7 +212,6 @@ const Player = (() => {
     }
 
     if (!sp[dir] || !sp[dir].length) {
-      // خطأ 404 (الصورة غير موجودة): مستطيل أحمر
       ctx.fillStyle = 'rgba(255,50,50,0.5)';
       ctx.fillRect(drawX, drawY, SPRITE_DRAW_W, SPRITE_DRAW_H);
       Utils.drawPixelText(ctx, 'ERR', drawX + SPRITE_DRAW_W / 2, drawY + SPRITE_DRAW_H / 2 - 4, { font: '6px "Press Start 2P"', color: '#fff', align: 'center' });
