@@ -48,6 +48,7 @@ const Player = (() => {
     _sprites[charId] = entry;
 
     const headImg = new Image();
+    headImg.crossOrigin = 'anonymous';
     headImg.src   = headPath;
 
     headImg.onload  = () => { entry.headImg = headImg; _loadDirections(charId, entry); };
@@ -60,6 +61,7 @@ const Player = (() => {
 
     dirs.forEach(dir => {
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.src   = `assets/sprites/characters/char_${charId}_${dir}.png`;
 
       img.onload = () => {
