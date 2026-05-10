@@ -24,6 +24,8 @@ const MAX_PLAYERS = 50;
    ============================== */
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
+// السطر الجديد: السماح للخادم بقراءة وتوزيع مجلد assets والصور التي بداخله
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -186,4 +188,3 @@ server.listen(PORT, () => {
   console.log(`🚀 يعمل على البورت: ${PORT}`);
   console.log('================================');
 });
-     
