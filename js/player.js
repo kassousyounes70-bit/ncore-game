@@ -11,12 +11,16 @@ const Player = (() => {
      ثوابت
      ============================== */
   const SPEED        = 160;
-  const W            = 24;
-  const H            = 28;
+  const W            = 24;    // عرض مربع التصادم (الفيزياء)
+  const H            = 28;    // ارتفاع مربع التصادم (الفيزياء)
   const FRAME_TIME   = 0.14;
   const SPRITE_COLS  = 6;
   const SPRITE_ROWS  = 6;
   const TOTAL_FRAMES = SPRITE_COLS * SPRITE_ROWS; // 36
+
+  // ثوابت جديدة للرسم المرئي فقط (تغيير الحجم إلى 64x64 كما طلبت)
+  const SPRITE_DRAW_W = 64;
+  const SPRITE_DRAW_H = 64;
 
   /* ==============================
      الحالة
@@ -134,16 +138,20 @@ const Player = (() => {
   }
 
   /* ==============================
-     رسم Sprite مع Fallback
+     رسم Sprite مع Fallback والتوسيط
      ============================== */
   function _drawSprite(ctx, charId, x, y, dir, frame, moving) {
     const sp = _sprites[charId];
 
+    // حساب إزاحة الرسم لتتمركز الشخصية (64x64) فوق مربع التصادم (24x28)
+    const drawX = x - (SPRITE_DRAW_W - W) / 2;
+    const drawY = y - (SPRITE_DRAW_H - H);
+
     if (!sp || !sp.loaded || !sp[dir]?.length) {
-      // Fallback: مستطيل رمادي أثناء التحميل
+      // Fallback: مستطيل رمادي أثناء التحميل بالحجم الكبير
       ctx.fillStyle = 'rgba(120,120,120,0.5)';
-      ctx.fillRect(x, y, W, H);
-      Utils.drawPixelText(ctx, '...', x + W / 2, y + H / 2 - 4, {
+      ctx.fillRect(drawX, drawY, SPRITE_DRAW_W, SPRITE_DRAW_H);
+      Utils.drawPixelText(ctx, '...', drawX + SPRITE_DRAW_W / 2, drawY + SPRITE_DRAW_H / 2 - 4, {
         font: '6px "Press Start 2P"', color: '#fff', align: 'center'
       });
       return;
@@ -152,12 +160,12 @@ const Player = (() => {
     const frames   = sp[dir];
     const f        = moving ? frame % frames.length : 0;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(frames[f], x, y, W, H);
+    ctx.drawImage(frames[f], drawX, drawY, SPRITE_DRAW_W, SPRITE_DRAW_H);
 
-    // ظل
+    // ظل بيضاوي يتناسب مع الحجم الجديد، متمركز تحت القدمين
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.beginPath();
-    ctx.ellipse(x + W / 2, y + H + 2, W / 3, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + W / 2, y + H + 2, SPRITE_DRAW_W / 3.5, 4, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
