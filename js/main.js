@@ -9,7 +9,6 @@
 
   /* ==============================
      منع سلوكيات المتصفح الافتراضية
-     (تكبير، تمرير، قائمة سياق)
      ============================== */
   document.addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('gesturestart', e => e.preventDefault());
@@ -17,7 +16,6 @@
     if (e.target.closest('#joystick-zone')) e.preventDefault();
   }, { passive: false });
 
-  // منع التكبير بالضغط المزدوج على iOS
   let lastTap = 0;
   document.addEventListener('touchend', (e) => {
     const now = Date.now();
@@ -30,19 +28,17 @@
      ============================== */
   function _checkSupport() {
     const issues = [];
-
     if (!window.HTMLCanvasElement)
       issues.push('Canvas غير مدعوم');
     if (!window.requestAnimationFrame)
       issues.push('requestAnimationFrame غير مدعوم');
     if (!window.performance || !window.performance.now)
       issues.push('Performance API غير مدعومة');
-
     return issues;
   }
 
   /* ==============================
-     رسالة خطأ بسيطة
+     رسالة خطأ
      ============================== */
   function _showError(msg) {
     document.body.innerHTML = `
@@ -85,6 +81,9 @@
     }
 
     try {
+      // تحميل Sprites قبل بدء اللعبة
+      Player.preload();
+
       Game.init();
       console.log('%c🎮 NCORE GAME — تم التشغيل بنجاح', 'color:#f0c040; font-size:14px;');
       console.log('%c🕹️ ncore-game.vercel.app', 'color:#40c0f0; font-size:11px;');
@@ -95,7 +94,7 @@
   }
 
   /* ==============================
-     انتظار تحميل الصفحة كاملاً
+     انتظار تحميل الصفحة
      ============================== */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _start);
