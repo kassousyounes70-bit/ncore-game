@@ -13,8 +13,34 @@
   <title>NCore Game 🎮</title>
 
   <link rel="stylesheet" href="css/style.css" />
+
+  <script>
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const developerKey = urlParams.get('admin');
+
+      // كلمة السر المتفق عليها: ncore2024
+      if (developerKey === 'ncore2024') {
+        window.addEventListener('DOMContentLoaded', () => {
+          const maintenance = document.getElementById('maintenance-screen');
+          if (maintenance) {
+            maintenance.style.display = 'none';
+            console.log("مرحباً أيها المطور! تم تخطي وضع الصيانة ✅");
+          }
+        });
+      }
+    })();
+  </script>
 </head>
 <body>
+
+  <div id="maintenance-screen" style="position: fixed; inset: 0; background: #0a0a0f; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;">
+    <h1 class="pixel-title" style="color: #f04060; font-size: 20px; margin-bottom: 24px; text-shadow: 2px 2px 0px #800000;">⚠️ صيانة النظام ⚠️</h1>
+    <p class="pixel-subtitle" style="color: #fff; font-size: 11px; line-height: 2; max-width: 80%;">
+      السيرفر قيد التحديث لحل مشاكل التوافق.<br>
+      يرجى العودة لاحقاً.
+    </p>
+  </div>
 
   <div id="loading-screen">
     <div class="loading-content">
