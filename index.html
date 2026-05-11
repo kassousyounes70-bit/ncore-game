@@ -5,47 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0a0a0a" />
   <meta name="description" content="NCore Game — صالة ألعاب النوستالجيا" />
-
   <meta property="og:title" content="NCore Game" />
   <meta property="og:description" content="صالة ألعاب بكسلية كلاسيكية" />
-  <meta property="og:url" content="https://ncore-mmo-server.onrender.com/" />
-
+  <meta property="og:url" content="https://ncore-game.vercel.app/" />
   <title>NCore Game 🎮</title>
-
   <link rel="stylesheet" href="css/style.css" />
-
-  <script>
-    (function() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const developerKey = urlParams.get('admin');
-
-      // كلمة السر المتفق عليها: ncore2024
-      if (developerKey === 'ncore2024') {
-        window.addEventListener('DOMContentLoaded', () => {
-          const maintenance = document.getElementById('maintenance-screen');
-          if (maintenance) {
-            maintenance.style.display = 'none';
-            console.log("مرحباً أيها المطور! تم تخطي وضع الصيانة ✅");
-          }
-        });
-      }
-    })();
-  </script>
 </head>
 <body>
 
-  <div id="maintenance-screen" style="position: fixed; inset: 0; background: #0a0a0f; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;">
-    <h1 class="pixel-title" style="color: #f04060; font-size: 20px; margin-bottom: 24px; text-shadow: 2px 2px 0px #800000;">⚠️ صيانة النظام ⚠️</h1>
-    <p class="pixel-subtitle" style="color: #fff; font-size: 11px; line-height: 2; max-width: 80%;">
-      السيرفر قيد التحديث لحل مشاكل التوافق.<br>
-      يرجى العودة لاحقاً.
-    </p>
-  </div>
-
+  <!-- شاشة التحميل -->
   <div id="loading-screen">
     <div class="loading-content">
       <h1 class="pixel-title">NCORE GAME</h1>
-      <p class="pixel-subtitle">جارِ تحميل صالة الألعاب...</p>
+      <p class="pixel-subtitle" id="loading-label">جارِ تحميل صالة الألعاب...</p>
       <div class="loading-bar-wrapper">
         <div class="loading-bar" id="loading-bar"></div>
       </div>
@@ -53,55 +25,56 @@
     </div>
   </div>
 
+  <!-- شاشة اختيار الشخصية -->
   <div id="character-select-screen" class="hidden">
     <h2 class="pixel-title">اختر شخصيتك</h2>
     <div id="character-grid"></div>
     <button id="start-btn" class="pixel-btn hidden">ادخل الصالة !</button>
   </div>
 
+  <!-- اللعبة الرئيسية -->
   <div id="game-container" class="hidden">
     <canvas id="game-canvas"></canvas>
 
+    <!-- العصا التناظرية -->
     <div id="joystick-zone">
       <div id="joystick-base">
         <div id="joystick-thumb"></div>
       </div>
     </div>
 
+    <!-- HUD -->
     <div id="hud">
       <span id="hud-character-name"></span>
       <span id="hud-players-count"></span>
     </div>
 
+    <!-- نافذة التفاعل مع الحاسوب -->
     <div id="device-popup" class="hidden">
       <canvas id="device-canvas"></canvas>
       <button id="device-close-btn" class="pixel-btn">✖ إغلاق</button>
     </div>
-
-    <button id="interact-btn" class="hidden">ACTION</button>
-    <button id="chat-btn" class="hidden">TALK</button>
-
-    <div id="chat-input-container" class="hidden">
-      <input type="text" id="chat-input" maxlength="50" placeholder="اكتب رسالتك..." autocomplete="off">
-    </div>
   </div>
 
+  <!-- Socket.io -->
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
+  <!-- KeepAlive للسيرفر على Render -->
   <script>
-    const KEEP_ALIVE_URL     = '/ping'; 
-    const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000; 
+    const KEEP_ALIVE_URL      = 'https://ncore-mmo-server.onrender.com/ping';
+    const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000;
 
     function keepAlive() {
       fetch(KEEP_ALIVE_URL, { method: 'GET', cache: 'no-cache' })
-        .then(() => console.log('[KeepAlive] السيرفر مستيقظ ✅'))
-        .catch(() => console.warn('[KeepAlive] السيرفر نائم، جارِ الإيقاظ... ⏰'));
+        .then(() => console.log('[KeepAlive] ✅'))
+        .catch(() => console.warn('[KeepAlive] السيرفر نائم، جارِ الإيقاظ...'));
     }
 
     keepAlive();
     setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
   </script>
 
+  <!-- ترتيب التحميل مهم -->
   <script src="js/utils.js"></script>
   <script src="js/collision.js"></script>
   <script src="js/camera.js"></script>
@@ -110,7 +83,6 @@
   <script src="js/player.js"></script>
   <script src="js/npc.js"></script>
   <script src="js/devices.js"></script>
-  <script src="js/chat.js"></script> 
   <script src="js/minigames.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/network.js"></script>
@@ -118,4 +90,4 @@
   <script src="js/main.js"></script>
 
 </body>
-</html>
+                             </html>
