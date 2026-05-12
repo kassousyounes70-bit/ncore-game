@@ -93,14 +93,14 @@ const Player = (() => {
       _ft+=delta;if(_ft>=ft){_ft-=ft;_frame=(_frame+1)%mf;}
     } else {_frame=0;_ft=0;}
     Camera.update(_x+W/2,_y+H/2,delta);
-    if(typeof Chat!=='undefined')Chat.update(delta,_x+W/2,_y+H/2);
+    // تم إزالة السطر المسبب للمشكلة هنا!
   }
 
   /* ====== DRAW ====== */
   function draw(ctx){
     if(_charId===0){_drawSprite(ctx,0,_x,_y,_dir,_frame,_moving);}
     else{const c=CHARS[_charId-1];if(c)c.draw(ctx,_x,_y,_dir,_frame,_moving);}
-    if(typeof Chat!=='undefined')Chat.draw(ctx,_x+W/2,_y-5,Network.getMyId());
+    // تم إزالة السطر المسبب للمشكلة هنا أيضاً!
   }
 
   /* ====== CHARACTERS 1-10 ====== */
