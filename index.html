@@ -13,7 +13,6 @@
 </head>
 <body>
 
-  <!-- شاشة التحميل -->
   <div id="loading-screen">
     <div class="loading-content">
       <h1 class="pixel-title">NCORE GAME</h1>
@@ -25,41 +24,40 @@
     </div>
   </div>
 
-  <!-- شاشة اختيار الشخصية -->
   <div id="character-select-screen" class="hidden">
     <h2 class="pixel-title">اختر شخصيتك</h2>
+    
+    <div id="scroll-controls">
+      <button id="scroll-up-btn" class="pixel-btn">⬆️</button>
+      <button id="scroll-down-btn" class="pixel-btn">⬇️</button>
+    </div>
+
     <div id="character-grid"></div>
     <button id="start-btn" class="pixel-btn hidden">ادخل الصالة !</button>
   </div>
 
-  <!-- اللعبة الرئيسية -->
   <div id="game-container" class="hidden">
     <canvas id="game-canvas"></canvas>
 
-    <!-- العصا التناظرية -->
     <div id="joystick-zone">
       <div id="joystick-base">
         <div id="joystick-thumb"></div>
       </div>
     </div>
 
-    <!-- HUD -->
     <div id="hud">
       <span id="hud-character-name"></span>
       <span id="hud-players-count"></span>
     </div>
 
-    <!-- نافذة التفاعل مع الحاسوب -->
     <div id="device-popup" class="hidden">
       <canvas id="device-canvas"></canvas>
       <button id="device-close-btn" class="pixel-btn">✖ إغلاق</button>
     </div>
   </div>
 
-  <!-- Socket.io -->
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
-  <!-- KeepAlive للسيرفر على Render -->
   <script>
     const KEEP_ALIVE_URL      = 'https://ncore-mmo-server.onrender.com/ping';
     const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000;
@@ -74,7 +72,6 @@
     setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
   </script>
 
-  <!-- ترتيب التحميل مهم -->
   <script src="js/utils.js"></script>
   <script src="js/collision.js"></script>
   <script src="js/camera.js"></script>
@@ -90,4 +87,4 @@
   <script src="js/main.js"></script>
 
 </body>
-                             </html>
+</html>
