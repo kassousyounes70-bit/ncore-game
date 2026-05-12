@@ -19,19 +19,30 @@ const Network = (() => {
       _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:'لاعب'});
       _onConn&&_onConn();
     });
+    
     _sock.on('players:list',players=>{
       _players.clear();
       for(const[id,d]of Object.entries(players))if(id!==_myId)_players.set(id,_mk(d));
     });
+    
     _sock.on('player:joined',({id,data})=>{
       if(id===_myId)return;
       _players.set(id,_mk(data));
       UI.showToast('لاعب جديد دخل الصالة 🎮',1800);
     });
+    
     _sock.on('player:moved',({id,x,y,dir})=>{
       const p=_players.get(id);if(!p)return;
       p.tx=x;p.ty=y;p.dir=dir;p.moving=dir!=='idle';
     });
+
+    // استقبال رسالة دردشة من لاعب آخر
+    _sock.on('chat:message',({id, text})=>{
+      if(window.Chat && id !== _myId) {
+         Chat.addBubble(id, text);
+      }
+    });
+
     _sock.on('player:left',id=>{_players.delete(id);});
     _sock.on('disconnect',r=>{_connected=false;console.warn('[Net] انقطع:',r);UI.showToast('جارِ إعادة الاتصال ⏳',2000);});
     _sock.on('reconnect',()=>{
@@ -56,6 +67,12 @@ const Network = (() => {
     _sock.emit('player:move',{x:Math.round(cx),y:Math.round(cy),dir});
   }
 
+  // إرسال رسالة دردشة للسيرفر
+  function sendChat(text) {
+     if(!_connected) return;
+     _sock.emit('chat:message', text);
+  }
+
   function _interp(){
     const FT=0.16;
     for(const p of _players.values()){
@@ -71,7 +88,7 @@ const Network = (() => {
     for(const p of _players.values()){
       if(!Camera.isVisible({x:p.x-20,y:p.y-20,w:PW+40,h:PH+40}))continue;
       const char=allChars[p.charId];if(!char)continue;
-      // ظل
+      
       ctx.fillStyle='rgba(0,0,0,0.22)';
       ctx.beginPath();ctx.ellipse(p.x,p.y+PH/2+4,10,4,0,0,Math.PI*2);ctx.fill();
       char.draw(ctx,p.x-PW/2,p.y-PH/2,p.dir,p.frame,p.moving);
@@ -89,6 +106,9 @@ const Network = (() => {
   function getPlayerCount(){return _players.size;}
   function isConnected(){return _connected;}
   function getMyId(){return _myId;}
+  
+  // دالة لجلب قائمة اللاعبين (يحتاجها chat.js)
+  function getPlayers(){return _players;}
 
-  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId};
+  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId, sendChat, getPlayers};
 })();
