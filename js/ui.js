@@ -35,6 +35,18 @@ const UI = (() => {
     _onStart=onStart;
     Utils.show('character-select-screen');Utils.hide('loading-screen');Utils.hide('game-container');
     _buildGrid();_startPreview();
+
+    // تفعيل أزرار التمرير (الصعود والنزول)
+    const scrollContainer = Utils.$('character-select-screen');
+    const upBtn = Utils.$('scroll-up-btn');
+    const downBtn = Utils.$('scroll-down-btn');
+    
+    if(upBtn) {
+      upBtn.onclick = () => scrollContainer.scrollBy({ top: -180, behavior: 'smooth' });
+    }
+    if(downBtn) {
+      downBtn.onclick = () => scrollContainer.scrollBy({ top: 180, behavior: 'smooth' });
+    }
   }
 
   function _buildGrid(){
