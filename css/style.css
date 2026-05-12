@@ -165,7 +165,8 @@ html, body {
   background: var(--color-bg);
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-start;
-  padding: 20px 14px 16px;
+  /* التعديل الأول: رفع الحشوة السفلية لـ 90px لكي لا تغطي الأزرار على آخر شخصيات */
+  padding: 20px 14px 90px;
   gap: 18px; overflow-y: auto; z-index: 90;
 }
 
@@ -196,6 +197,18 @@ html, body {
   font-family: var(--pixel-font);
   font-size: 7px; color: var(--color-primary);
   text-align: center; line-height: 1.5;
+}
+
+/* التعديل الثاني والأهم: تثبيت زر الدخول ليطفو في يمين الشاشة دائمًا */
+#start-btn {
+  position: fixed !important;
+  bottom: 20px;
+  right: 25px;
+  z-index: 100;
+  padding: 14px 28px;
+  font-size: clamp(10px, 2.5vw, 16px);
+  /* إضافة ظل أقوى لكي يبرز كزر عائم */
+  box-shadow: 4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3), 0 0 15px rgba(0,0,0,0.7) !important;
 }
 
 /* ==============================
@@ -297,3 +310,4 @@ html, body {
 ::-webkit-scrollbar-track { background: var(--color-bg); }
 ::-webkit-scrollbar-thumb { background: var(--color-border); }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+     
