@@ -1,18 +1,25 @@
 'use strict';
 require('dotenv').config();
-const express=require('express'),http=require('http'),{Server}=require('socket.io'),cors=require('cors');
-const app=express(),server=http.createServer(app);
+const express=require('express'), http=require('http'), {Server}=require('socket.io'), cors=require('cors');
+const path = require('path'); // إضافة مكتبة إدارة المسارات
+const app=express(), server=http.createServer(app);
 const PORT=process.env.PORT||3000;
-const CLIENT=process.env.CLIENT_URL||'https://ncore-game.vercel.app';
 const MAX=50;
 
-app.use(cors({origin:[CLIENT,'http://localhost:3000','http://127.0.0.1:5500'],methods:['GET','POST']}));
+app.use(cors({origin:'*', methods:['GET','POST']}));
 app.use(express.json());
 
+// ==========================================
+// التعديل الجوهري: إخبار الخادم بتقديم ملفات الواجهة
+// نستخدم '../' للرجوع مجلد واحد للخلف (لأن هذا الملف داخل مجلد server)
+// لكي يتمكن من رؤية index.html ومجلدات js و css
+// ==========================================
+app.use(express.static(path.join(__dirname, '../')));
+
 const io=new Server(server,{
-  cors:{origin:[CLIENT,'http://localhost:3000','http://127.0.0.1:5500'],methods:['GET','POST']},
+  cors: { origin: '*', methods:['GET','POST'] },
   transports:['websocket'],
-  pingInterval:25000,pingTimeout:60000
+  pingInterval:25000, pingTimeout:60000
 });
 
 const players=new Map();
@@ -68,9 +75,15 @@ app.get('/ping',(req,res)=>res.json({
   time:new Date().toISOString()
 }));
 
-app.get('/',(req,res)=>res.json({
+// تم تغيير هذا المسار من '/' إلى '/status' لكي لا يمنع عرض اللعبة!
+app.get('/status',(req,res)=>res.json({
   game:'NCore MMO Server v2',players:`${players.size}/${MAX}`,status:'running'
 }));
+
+// مسار الدخول الرئيسي: يقوم بإرسال ملف اللعبة index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../index.html'));
+});
 
 /* ====== تنظيف اللاعبين غير النشطين (كل 5 دقائق) ====== */
 setInterval(()=>{
@@ -98,7 +111,6 @@ server.listen(PORT,()=>{
   console.log('================================');
   console.log(`🎮 NCore MMO Server v2`);
   console.log(`🚀 Port: ${PORT}`);
-  console.log(`🌐 Client: ${CLIENT}`);
   console.log(`👥 Max: ${MAX}`);
   console.log('================================');
 });
