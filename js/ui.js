@@ -1,236 +1,113 @@
-/* ==============================
-   NCORE GAME — ui.js
-   واجهة المستخدم: تحميل، اختيار شخصية، HUD
-   ============================== */
-
 'use strict';
-
 const UI = (() => {
+  let _sel=0,_onStart=null,_prevCvs=[],_raf=0,_pt=0;
 
-  /* ==============================
-     الحالة
-     ============================== */
-  let _selectedChar  = 0;
-  let _onStartCb     = null;   
-  let _previewCanvases = [];   
-  let _animFrame     = 0;
-  let _animTimer     = 0;
-  let _previewTimer  = 0;
-
-  /* ==============================
-     شاشة التحميل
-     ============================== */
-  function showLoading(onDone) {
-    // تم نقل مسؤلية شريط التحميل الحقيقي إلى main.js
-    // لذلك نتجاوز الحلقة الوهمية ونستدعي دالة الانتهاء فوراً
-    if (onDone) onDone();
+  /* ====== LOADING ====== */
+  function showLoading(onDone){
+    Utils.show('loading-screen');Utils.hide('character-select-screen');Utils.hide('game-container');
+    const bar=Utils.$('loading-bar'),pct=Utils.$('loading-percent'),lbl=Utils.$('loading-label');
+    let prog=0;
+    const steps=[
+      {t:15,d:120,l:'تحميل الأصوات...'},
+      {t:35,d:200,l:'بناء الخريطة...'},
+      {t:60,d:300,l:'رسم الشخصيات...'},
+      {t:80,d:200,l:'إعداد الأجهزة...'},
+      {t:95,d:150,l:'تهيئة العالم...'},
+      {t:100,d:100,l:'جاهز! 🎮'}
+    ];
+    let si=0;
+    function next(){
+      if(si>=steps.length){setTimeout(()=>{Utils.hide('loading-screen');onDone&&onDone();},400);return;}
+      const s=steps[si++];if(lbl)lbl.textContent=s.l;
+      const inc=(s.t-prog)/10;let ticks=0;
+      const iv=setInterval(()=>{
+        prog+=inc;ticks++;
+        bar.style.width=Math.min(prog,100)+'%';
+        pct.textContent=Math.floor(Math.min(prog,100))+'%';
+        if(ticks>=10){clearInterval(iv);setTimeout(next,s.d);}
+      },30);
+    }
+    next();
   }
 
-  /* ==============================
-     شاشة اختيار الشخصية
-     ============================== */
-  function showCharacterSelect(onStart) {
-    _onStartCb = onStart;
-    Utils.show('character-select-screen');
-    Utils.hide('loading-screen');
-    Utils.hide('game-container');
-
-    _buildGrid();
-    _startPreviewAnimation();
+  /* ====== CHARACTER SELECT ====== */
+  function showCharacterSelect(onStart){
+    _onStart=onStart;
+    Utils.show('character-select-screen');Utils.hide('loading-screen');Utils.hide('game-container');
+    _buildGrid();_startPreview();
   }
 
-  /* ---- بناء شبكة الشخصيات ---- */
-  function _buildGrid() {
-    const grid  = Utils.$('character-grid');
-    grid.innerHTML = '';
-    _previewCanvases = [];
-
-    const chars = Player.getAllChars();
-
-    chars.forEach((char, i) => {
-      const card = document.createElement('div');
-      card.className = 'char-card';
-      card.dataset.id = i;
-
-      // Canvas مصغّر للعرض
-      const cvs = document.createElement('canvas');
-      cvs.width  = 48;
-      cvs.height = 56;
-      cvs.style.width  = '48px';
-      cvs.style.height = '56px';
-      _previewCanvases.push(cvs);
-
-      // اسم الشخصية
-      const lbl = document.createElement('div');
-      lbl.className   = 'char-name';
-      lbl.textContent = char.name;
-
-      card.appendChild(cvs);
-      card.appendChild(lbl);
-      grid.appendChild(card);
-
-      card.addEventListener('click', () => _selectChar(i));
+  function _buildGrid(){
+    const grid=Utils.$('character-grid');grid.innerHTML='';_prevCvs=[];
+    Player.getAllChars().forEach((char,i)=>{
+      const card=document.createElement('div');card.className='char-card';card.dataset.id=i;
+      const cvs=document.createElement('canvas');cvs.width=56;cvs.height=64;
+      cvs.style.width='56px';cvs.style.height='64px';_prevCvs.push(cvs);
+      const lbl=document.createElement('div');lbl.className='char-name';lbl.textContent=char.name;
+      card.appendChild(cvs);card.appendChild(lbl);grid.appendChild(card);
+      card.addEventListener('click',()=>_select(i));
     });
-
-    // اختيار أول شخصية افتراضياً
-    _selectChar(0);
+    _select(0);
   }
 
-  function _selectChar(id) {
-    _selectedChar = id;
-
-    // تحديث الـ CSS
-    document.querySelectorAll('.char-card').forEach((c, i) => {
-      c.classList.toggle('selected', i === id);
-    });
-
-    // إظهار زر البدء
+  function _select(id){
+    _sel=id;
+    document.querySelectorAll('.char-card').forEach((c,i)=>c.classList.toggle('selected',i===id));
     Utils.show('start-btn');
-    const btn = Utils.$('start-btn');
-    
-    btn.onclick = () => _onStartCb && _onStartCb(_selectedChar);
+    Utils.$('start-btn').onclick=()=>_onStart&&_onStart(_sel);
   }
 
-  /* ---- Animation معاينة الشخصيات ---- */
-  function _startPreviewAnimation() {
-    if (_animFrame) cancelAnimationFrame(_animFrame);
-    _previewTimer = 0;
-    let last = performance.now();
-
-    function loop(now) {
-      const delta = (now - last) / 1000;
-      last = now;
-      _previewTimer += delta;
-
-      const frame = Math.floor(_previewTimer * 6) % 3;
-      const chars = Player.getAllChars();
-
-      _previewCanvases.forEach((cvs, i) => {
-        const ctx = cvs.getContext('2d');
-        ctx.clearRect(0, 0, cvs.width, cvs.height);
-        ctx.imageSmoothingEnabled = false;
-
-        // خلفية البطاقة
-        ctx.fillStyle = '#0e0e1e';
-        ctx.fillRect(0, 0, cvs.width, cvs.height);
-
-        // ظل
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath();
-        ctx.ellipse(cvs.width / 2, cvs.height - 4, 12, 4, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // رسم الشخصية بأمان وتوسيط رياضي
-        if (chars[i]) {
-          ctx.save();
-          if (i === 0) {
-            // Troll Man (64x64): تصغير بنسبة 65% وتوسيط الإحداثيات
-            ctx.scale(0.65, 0.65);
-            chars[i].draw(ctx, 26, 48, 'down', frame, true);
-          } else {
-            // الشخصيات البرمجية (24x28): توسيط مباشر
-            chars[i].draw(ctx, 12, 14, 'down', frame, true);
-          }
-          ctx.restore();
-        }
-
-        // إطار مضيء للمختارة
-        if (i === _selectedChar) {
-          ctx.strokeStyle = 'rgba(64,240,128,0.8)';
-          ctx.lineWidth   = 2;
-          ctx.strokeRect(1, 1, cvs.width - 2, cvs.height - 2);
-        }
+  function _startPreview(){
+    if(_raf)cancelAnimationFrame(_raf);
+    _pt=0;let last=performance.now();
+    function loop(now){
+      const delta=(now-last)/1000;last=now;_pt+=delta;
+      const frame=Math.floor(_pt*7)%3;
+      _prevCvs.forEach((cvs,i)=>{
+        const ctx=cvs.getContext('2d');
+        ctx.imageSmoothingEnabled=false;
+        ctx.fillStyle='#0e0e1e';ctx.fillRect(0,0,cvs.width,cvs.height);
+        ctx.fillStyle='rgba(0,0,0,0.28)';
+        ctx.beginPath();ctx.ellipse(cvs.width/2,cvs.height-4,13,4,0,0,Math.PI*2);ctx.fill();
+        ctx.save();ctx.translate(cvs.width/2-12,cvs.height/2-18);
+        Player.getAllChars()[i].draw(ctx,0,0,'down',frame,true);
+        ctx.restore();
+        if(i===_sel){ctx.strokeStyle='rgba(64,240,128,0.85)';ctx.lineWidth=2;ctx.strokeRect(1,1,cvs.width-2,cvs.height-2);}
       });
-
-      _animFrame = requestAnimationFrame(loop);
+      _raf=requestAnimationFrame(loop);
     }
-    _animFrame = requestAnimationFrame(loop);
+    _raf=requestAnimationFrame(loop);
   }
 
-  function stopPreviewAnimation() {
-    if (_animFrame) {
-      cancelAnimationFrame(_animFrame);
-      _animFrame = 0;
-    }
-  }
+  function stopPreviewAnimation(){if(_raf){cancelAnimationFrame(_raf);_raf=0;}}
 
-  /* ==============================
-     HUD داخل اللعبة
-     ============================== */
-  function showHUD(charName) {
+  /* ====== HUD ====== */
+  function showHUD(name){
     Utils.show('hud');
-    const el = Utils.$('hud-character-name');
-    if (el) el.textContent = '⚡ ' + charName;
+    const el=Utils.$('hud-character-name');if(el)el.textContent='⚡ '+name;
   }
+  function hideHUD(){Utils.hide('hud');}
 
-  function hideHUD() {
-    Utils.hide('hud');
-  }
-
-  /* ==============================
-     رسالة إشعار مؤقتة
-     ============================== */
-  let _toastEl    = null;
-  let _toastTimer = null;
-
-  function showToast(msg, duration = 2500) {
-    if (!_toastEl) {
-      _toastEl = document.createElement('div');
-      _toastEl.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(10,10,20,0.92);
-        border: 2px solid #f0c040;
-        padding: 12px 20px;
-        font-family: 'Press Start 2P', monospace;
-        font-size: 10px;
-        color: #f0c040;
-        z-index: 999;
-        text-align: center;
-        pointer-events: none;
-        line-height: 1.6;
-      `;
-      document.body.appendChild(_toastEl);
+  /* ====== TOAST ====== */
+  let _toast=null,_toastTimer=null;
+  function showToast(msg,dur=2500){
+    if(!_toast){
+      _toast=document.createElement('div');
+      _toast.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'+
+        'background:rgba(10,10,20,0.94);border:2px solid #f0c040;padding:12px 22px;'+
+        'font-family:"Press Start 2P",monospace;font-size:10px;color:#f0c040;z-index:999;'+
+        'text-align:center;pointer-events:none;line-height:1.8;transition:opacity 0.4s;';
+      document.body.appendChild(_toast);
     }
-    _toastEl.textContent = msg;
-    _toastEl.style.display = 'block';
-    _toastEl.style.opacity  = '1';
-
-    if (_toastTimer) clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => {
-      _toastEl.style.opacity = '0';
-      setTimeout(() => { _toastEl.style.display = 'none'; }, 400);
-    }, duration);
+    _toast.textContent=msg;_toast.style.display='block';_toast.style.opacity='1';
+    if(_toastTimer)clearTimeout(_toastTimer);
+    _toastTimer=setTimeout(()=>{
+      _toast.style.opacity='0';setTimeout(()=>{_toast.style.display='none';},400);
+    },dur);
   }
 
-  /* ==============================
-     شاشة اللعبة الرئيسية
-     ============================== */
-  function showGame() {
-    Utils.hide('loading-screen');
-    Utils.hide('character-select-screen');
-    Utils.show('game-container');
-  }
+  function showGame(){Utils.hide('loading-screen');Utils.hide('character-select-screen');Utils.show('game-container');}
+  function getSelectedChar(){return _sel;}
 
-  /* ==============================
-     Getters
-     ============================== */
-  function getSelectedChar() { return _selectedChar; }
-
-  /* ==============================
-     تصدير
-     ============================== */
-  return {
-    showLoading,
-    showCharacterSelect,
-    stopPreviewAnimation,
-    showHUD,
-    hideHUD,
-    showToast,
-    showGame,
-    getSelectedChar
-  };
-
+  return{showLoading,showCharacterSelect,stopPreviewAnimation,showHUD,hideHUD,showToast,showGame,getSelectedChar};
 })();
