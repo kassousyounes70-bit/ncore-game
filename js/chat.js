@@ -1,43 +1,68 @@
 'use strict';
 const Chat = (() => {
-  const MAX_CHARS = 100;
-  const PROXIMITY_DIST = 200; // تم زيادة المسافة لضمان ظهور الزر
-  
   const activeBubbles = new Map(); 
-
   let chatBtn, chatModal, chatInput, chatSendBtn, chatCloseBtn;
 
   function init() {
+    // الحماية القصوى: بناء الزر برمجياً إذا لم يكن موجوداً
     chatBtn = document.getElementById('chat-action-btn');
+    if(!chatBtn) {
+        chatBtn = document.createElement('button');
+        chatBtn.id = 'chat-action-btn';
+        chatBtn.className = 'pixel-btn';
+        chatBtn.textContent = '💬 تحدث';
+        chatBtn.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:40;padding:12px 18px;font-size:10px;display:none;box-shadow:4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3);';
+        const container = document.getElementById('game-container') || document.body;
+        container.appendChild(chatBtn);
+    }
+
+    // بناء نافذة الدردشة برمجياً إذا لم تكن موجودة
     chatModal = document.getElementById('chat-modal');
+    if(!chatModal) {
+        chatModal = document.createElement('div');
+        chatModal.id = 'chat-modal';
+        chatModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:100;';
+        chatModal.innerHTML = `
+            <div style="background:#1a1a2e;border:4px solid #2a2a4e;padding:20px;display:flex;flex-direction:column;gap:15px;width:300px;text-align:center;">
+                <h3 style="color:#f0c040;font-family:'Press Start 2P',monospace;font-size:10px;">محادثة قريبة</h3>
+                <input type="text" id="chat-input" placeholder="اكتب رسالتك..." dir="auto" style="padding:10px;font-family:'Press Start 2P',monospace;font-size:8px;background:#0a0a0f;color:#fff;border:2px solid #2a2a4e;outline:none;" />
+                <div style="display:flex;gap:10px;justify-content:center;">
+                    <button id="chat-send-btn" class="pixel-btn" style="background:#40f080;">إرسال</button>
+                    <button id="chat-close-btn" class="pixel-btn" style="background:#f04060;">إلغاء</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(chatModal);
+    }
+
     chatInput = document.getElementById('chat-input');
     chatSendBtn = document.getElementById('chat-send-btn');
     chatCloseBtn = document.getElementById('chat-close-btn');
 
-    if(chatBtn) chatBtn.onclick = openChat;
-    if(chatCloseBtn) chatCloseBtn.onclick = closeChat;
+    chatBtn.onclick = openChat;
+    chatCloseBtn.onclick = closeChat;
+    chatSendBtn.onclick = sendChat;
     
-    if(chatSendBtn) {
-        chatSendBtn.onclick = sendChat;
-    }
+    // قراءة أقصى طول للدردشة من ملف الإضافات
+    const maxLen = (typeof Addon !== 'undefined') ? Addon.Settings.maxChatChars : 100;
+    chatInput.maxLength = maxLen;
     
-    if(chatInput) {
-       chatInput.maxLength = MAX_CHARS;
-       chatInput.addEventListener('keypress', (e) => {
-          if(e.key === 'Enter') sendChat();
-       });
-    }
+    chatInput.addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') sendChat();
+    });
   }
 
   function update(myPlayer, otherPlayers) {
      if(!myPlayer) return;
 
      let isNear = false;
+     // قراءة المسافة من ملف الإضافات
+     const distLimit = (typeof Addon !== 'undefined') ? Addon.Settings.chatDistance : 200;
+
      if (otherPlayers) {
          for (const [id, p] of otherPlayers.entries()) {
-            // استخدام Math.hypot مباشرة لتفادي أي خطأ إذا كانت الدالة مفقودة في utils.js
             const dist = Math.hypot(myPlayer.x - p.x, myPlayer.y - p.y);
-            if (dist < PROXIMITY_DIST) {
+            if (dist < distLimit) {
                isNear = true; 
                break;
             }
@@ -45,21 +70,20 @@ const Chat = (() => {
      }
 
      if(chatBtn && chatModal) {
-        if(isNear && chatModal.classList.contains('hidden')) {
-           chatBtn.classList.remove('hidden');
+        const isModalOpen = (chatModal.style.display === 'flex');
+        // فرض الظهور والإخفاء عبر inline styles لتخطي أي CSS يعرقله
+        if(isNear && !isModalOpen) {
+           chatBtn.style.display = 'block';
         } else if (!isNear) {
-           chatBtn.classList.add('hidden');
-           // إغلاق النافذة تلقائياً إذا ابتعد اللاعب
-           if(!chatModal.classList.contains('hidden')) closeChat();
+           chatBtn.style.display = 'none';
+           if(isModalOpen) closeChat();
         }
      }
 
      const delta = 16.6; 
      for (const [id, bubble] of activeBubbles.entries()) {
         bubble.timer -= delta;
-        if (bubble.timer <= 0) {
-           activeBubbles.delete(id);
-        }
+        if (bubble.timer <= 0) activeBubbles.delete(id);
      }
   }
 
@@ -85,7 +109,7 @@ const Chat = (() => {
 
      const text = bubble.text;
      const metrics = ctx.measureText(text);
-     const tw = metrics.width + 24; 
+     const tw = Math.max(metrics.width + 24, 60); 
      const th = 36;                 
      const bx = x;
      const by = y - 45;             
@@ -114,23 +138,24 @@ const Chat = (() => {
   }
 
   function openChat() {
-     chatModal.classList.remove('hidden');
-     chatBtn.classList.add('hidden');
+     chatModal.style.display = 'flex';
+     chatBtn.style.display = 'none';
      chatInput.value = '';
      chatInput.focus();
   }
 
   function closeChat() {
-     chatModal.classList.add('hidden');
+     chatModal.style.display = 'none';
   }
 
   function sendChat() {
      const text = chatInput.value.trim();
+     const maxLen = (typeof Addon !== 'undefined') ? Addon.Settings.maxChatChars : 100;
      if(text.length > 0) {
-        const safeText = text.substring(0, MAX_CHARS); 
+        const safeText = text.substring(0, maxLen); 
         addBubble('me', safeText);
         
-        if (window.Network && Network.isConnected()) {
+        if (typeof Network !== 'undefined' && Network.isConnected()) {
             Network.sendChat(safeText);
         }
      }
@@ -144,3 +169,4 @@ const Chat = (() => {
 
   return { init, update, drawBubbles, addBubble };
 })();
+  
