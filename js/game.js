@@ -14,6 +14,9 @@ const Game = (() => {
     GameMap.init();
     Camera.init(_cvs.width,_cvs.height,2560,1920,0.12);
     Devices.init();Joystick.init();
+    
+    // تهيئة نظام المحادثة
+    if(window.Chat) Chat.init();
   }
 
   function _onChar(charId){
@@ -39,6 +42,12 @@ const Game = (() => {
       Network.sendPosition(Player.getCenterX(),Player.getCenterY(),Player.getRect(),Joystick.getDirection());
     }
     NPC.update(delta);Devices.update(delta);
+    
+    // تحديث المحادثة المكانية (فحص المسافات والمؤقتات)
+    if(window.Chat && Network.isConnected()) {
+       Chat.update({x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
+    }
+
     // عداد اللاعبين
     const el=Utils.$('hud-players-count');
     if(el)el.textContent='👥 '+(Network.getPlayerCount()+1);
@@ -53,6 +62,12 @@ const Game = (() => {
       NPC.draw(ctx);
       Network.drawOtherPlayers(ctx,Player.getAllChars());
       Player.draw(ctx);
+      
+      // رسم فقاعات الدردشة (تُرسم آخر شيء لتكون فوق الجميع)
+      if(window.Chat) {
+         Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
+      }
+
       if(_debug)Collision.debugDraw(ctx,Camera.getOffset());
     Camera.endDraw(ctx);
     _vignette(ctx,cw,ch);
@@ -68,12 +83,16 @@ const Game = (() => {
     const gc=Utils.$('game-container');
     function onTap(e){
       const t=e.target;
-      if(t.closest('#joystick-zone')||t.closest('#device-popup')||t.closest('#hud'))return;
+      if(t.closest('#joystick-zone')||t.closest('#device-popup')||t.closest('#hud')||t.closest('#chat-action-btn')||t.closest('#chat-modal'))return;
       if(Devices.hasActive())Devices.close();
       else if(Devices.getNear())Devices.tryOpen();
     }
     gc.addEventListener('click',onTap);
-    gc.addEventListener('touchend',e=>{e.preventDefault();onTap(e);},{passive:false});
+    gc.addEventListener('touchend',e=>{
+        // استثناء عناصر الواجهة من منع اللمس
+        if(e.target.closest('#chat-input')||e.target.closest('#chat-modal')||e.target.closest('#chat-action-btn')) return;
+        e.preventDefault();onTap(e);
+    },{passive:false});
   }
 
   function _resize(){
