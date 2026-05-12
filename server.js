@@ -1,7 +1,9 @@
 'use strict';
 require('dotenv').config();
 const express=require('express'), http=require('http'), {Server}=require('socket.io'), cors=require('cors');
-const path = require('path'); // إضافة مكتبة إدارة المسارات
+const path = require('path');
+const fs = require('fs');
+
 const app=express(), server=http.createServer(app);
 const PORT=process.env.PORT||3000;
 const MAX=50;
@@ -9,12 +11,13 @@ const MAX=50;
 app.use(cors({origin:'*', methods:['GET','POST']}));
 app.use(express.json());
 
-// ==========================================
-// التعديل الجوهري: إخبار الخادم بتقديم ملفات الواجهة
-// نستخدم '../' للرجوع مجلد واحد للخلف (لأن هذا الملف داخل مجلد server)
-// لكي يتمكن من رؤية index.html ومجلدات js و css
-// ==========================================
-app.use(express.static(path.join(__dirname, '../')));
+// التعديل الجديد: البحث التلقائي عن مسار ملفات الواجهة لتفادي مشكلة Not Found
+let publicPath = path.join(__dirname, '../');
+if (!fs.existsSync(path.join(publicPath, 'index.html'))) {
+    publicPath = __dirname; // إذا كان الملف في نفس المجلد
+}
+
+app.use(express.static(publicPath));
 
 const io=new Server(server,{
   cors: { origin: '*', methods:['GET','POST'] },
@@ -75,17 +78,21 @@ app.get('/ping',(req,res)=>res.json({
   time:new Date().toISOString()
 }));
 
-// تم تغيير هذا المسار من '/' إلى '/status' لكي لا يمنع عرض اللعبة!
 app.get('/status',(req,res)=>res.json({
   game:'NCore MMO Server v2',players:`${players.size}/${MAX}`,status:'running'
 }));
 
-// مسار الدخول الرئيسي: يقوم بإرسال ملف اللعبة index.html
+// إرسال اللعبة عند الدخول للرابط
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../index.html'));
+  const indexPath = path.join(publicPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send('Not Found: الرجاء التأكد من رفع ملف index.html إلى GitHub.');
+  }
 });
 
-/* ====== تنظيف اللاعبين غير النشطين (كل 5 دقائق) ====== */
+/* ====== تنظيف اللاعبين ====== */
 setInterval(()=>{
   const now=Date.now(),timeout=10*60*1000;
   players.forEach((p,id)=>{
@@ -111,6 +118,6 @@ server.listen(PORT,()=>{
   console.log('================================');
   console.log(`🎮 NCore MMO Server v2`);
   console.log(`🚀 Port: ${PORT}`);
-  console.log(`👥 Max: ${MAX}`);
+  console.log(`📂 Path: ${publicPath}`);
   console.log('================================');
 });
