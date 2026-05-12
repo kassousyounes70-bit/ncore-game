@@ -66,7 +66,6 @@ html, body {
     animation: pulse 1.5s ease-in-out infinite;
   }
 
-  /* إخفاء كل شيء في الوضع العمودي */
   #loading-screen,
   #character-select-screen,
   #game-container {
@@ -118,7 +117,7 @@ html, body {
     4px 100%,0 calc(100% - 4px)
   );
 }
-.pixel-btn:hover  { background: #ffe070; }
+.pixel-btn:hover  { background: #ffe070; filter: brightness(1.1); }
 .pixel-btn:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 #a07000; }
 
 /* ==============================
@@ -167,18 +166,15 @@ html, body {
   align-items: center; justify-content: flex-start;
   padding: 20px 14px 90px;
   gap: 18px; overflow-y: auto; z-index: 90;
-  /* إخفاء شريط التمرير الافتراضي لأننا سنستخدم الأزرار */
   scrollbar-width: none; 
 }
-#character-select-screen::-webkit-scrollbar {
-  display: none;
-}
+#character-select-screen::-webkit-scrollbar { display: none; }
 
 #character-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 12px; width: 100%; max-width: 960px;
-  padding-bottom: 30px; /* مساحة إضافية في الأسفل لتسهيل الوصول لآخر شخصية */
+  padding-bottom: 30px;
 }
 
 .char-card {
@@ -204,7 +200,6 @@ html, body {
   text-align: center; line-height: 1.5;
 }
 
-/* زر الدخول (اليمين) */
 #start-btn {
   position: fixed !important;
   bottom: 20px;
@@ -216,23 +211,29 @@ html, body {
 }
 
 /* ==============================
-   أزرار التمرير الصعود والنزول (اليسار)
+   أزرار التمرير والأسهم البكسلية
    ============================== */
 #scroll-controls {
-  position: fixed;
-  left: 20px;
-  top: 50%;
+  position: fixed; left: 20px; top: 50%;
   transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  z-index: 100;
+  display: flex; flex-direction: column; gap: 20px; z-index: 100;
 }
 
 #scroll-up-btn, #scroll-down-btn {
-  padding: 15px 18px;
-  font-size: 16px;
+  padding: 14px 16px;
   box-shadow: 4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3), 0 0 15px rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.pixel-arrow-up, .pixel-arrow-down {
+  display: inline-block; width: 16px; height: 16px;
+  background-color: var(--color-bg);
+}
+.pixel-arrow-up {
+  clip-path: polygon(50% 0%, 100% 50%, 70% 50%, 70% 100%, 30% 100%, 30% 50%, 0% 50%);
+}
+.pixel-arrow-down {
+  clip-path: polygon(30% 0%, 70% 0%, 70% 50%, 100% 50%, 50% 100%, 0% 50%, 30% 50%);
 }
 
 /* ==============================
@@ -301,6 +302,59 @@ html, body {
 }
 
 /* ==============================
+   نظام المحادثة (الدردشة)
+   ============================== */
+#chat-action-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 40;
+  padding: 12px 18px;
+  font-size: 10px;
+  box-shadow: 4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3), 0 0 15px rgba(240,192,64,0.6);
+  animation: pulse 1.5s infinite;
+}
+
+#chat-modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+
+.chat-box {
+  background: var(--color-panel);
+  border: 4px solid var(--color-border);
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 15px;
+  box-shadow: 0 0 30px rgba(64,192,240,0.4), inset 0 0 20px rgba(0,0,0,0.5);
+  width: clamp(260px, 80vw, 400px);
+  clip-path: polygon(
+    0 8px,8px 0,calc(100% - 8px) 0,100% 8px,
+    100% calc(100% - 8px),calc(100% - 8px) 100%,
+    8px 100%,0 calc(100% - 8px)
+  );
+}
+
+#chat-input {
+  width: 100%;
+  padding: 12px;
+  font-family: var(--pixel-font);
+  font-size: 10px;
+  color: #fff;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  outline: none;
+}
+#chat-input:focus {
+  border-color: var(--color-secondary);
+}
+
+.chat-actions {
+  display: flex; gap: 12px; justify-content: center;
+}
+
+/* ==============================
    Device Popup
    ============================== */
 #device-popup {
@@ -321,9 +375,4 @@ html, body {
 
 #device-canvas { image-rendering: pixelated; border: 2px solid var(--color-border); }
 #device-close-btn { font-size: 8px; padding: 7px 16px; }
-
-/* ==============================
-   Animations
-   ============================== */
-@keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0} }
 
