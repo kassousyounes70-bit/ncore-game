@@ -1,232 +1,95 @@
-/* ==============================
-   NCORE GAME — game.js (v2 Multiplayer)
-   المدير الرئيسي للعبة وحلقة اللعب
-   ============================== */
-
 'use strict';
-
 const Game = (() => {
+  const S={LOADING:'loading',SELECT:'select',PLAYING:'playing',PAUSED:'paused'};
+  let _state=S.LOADING,_cvs=null,_ctx=null,_last=0,_raf=null,_debug=false;
 
-  const STATE = {
-    LOADING    : 'loading',
-    SELECT     : 'select',
-    CONNECTING : 'connecting',
-    PLAYING    : 'playing',
-    PAUSED     : 'paused'
-  };
-
-  let _state    = STATE.LOADING;
-  let _canvas   = null;
-  let _ctx      = null;
-  let _lastTime = 0;
-  let _rafId    = null;
-  let _debug    = false;
-
-  /* ==============================
-     الإعداد
-     ============================== */
-  function init() {
-    _canvas = Utils.$('game-canvas');
-    _ctx    = _canvas.getContext('2d');
-    _ctx.imageSmoothingEnabled = false;
-
-    _resizeCanvas();
-    window.addEventListener('resize', _resizeCanvas);
-
-    UI.showLoading(() => {
-      _initSystems();
-      UI.showCharacterSelect(_onCharSelected);
-      _state = STATE.SELECT;
-    });
+  function init(){
+    _cvs=Utils.$('game-canvas');_ctx=_cvs.getContext('2d');
+    _ctx.imageSmoothingEnabled=false;
+    _resize();window.addEventListener('resize',_resize);
+    UI.showLoading(()=>{_initSystems();UI.showCharacterSelect(_onChar);_state=S.SELECT;});
   }
 
-  function _initSystems() {
+  function _initSystems(){
     GameMap.init();
-    // إعطاء أبعاد وهمية في البداية، سيتم تعديلها فوراً في resizeCanvas
-    Camera.init(_canvas.width, _canvas.height, 1920, 1440, 0.12);
-    Devices.init();
-    Joystick.init();
-    
-    if (typeof Chat !== 'undefined') {
-      Chat.init();
-    }
+    Camera.init(_cvs.width,_cvs.height,2560,1920,0.12);
+    Devices.init();Joystick.init();
   }
 
-  function _onCharSelected(charId) {
-    UI.stopPreviewAnimation();
-    _state = STATE.CONNECTING;
-    UI.showToast('جارِ الاتصال بالخادم... الرجاء الانتظار ⏳', 60000);
-
-    Network.connect(charId, () => {
-      UI.showToast('تم الاتصال بنجاح! مرحباً بك في الصالة 🎮', 2500);
-      UI.showGame();
-      Player.init(charId);
-      NPC.init();
-      UI.showHUD(Player.getCharName());
-      Joystick.show();
-      _registerInteraction();
-
-      _state    = STATE.PLAYING;
-      _lastTime = performance.now();
-      _rafId    = requestAnimationFrame(_loop);
-    });
+  function _onChar(charId){
+    UI.stopPreviewAnimation();UI.showGame();
+    Player.init(charId);NPC.init();
+    UI.showHUD(Player.getCharName());
+    Joystick.show();_regInteract();
+    Network.connect(charId,()=>UI.showToast('مرحباً بك في صالة الألعاب! 🎮',2500));
+    _state=S.PLAYING;_last=performance.now();_raf=requestAnimationFrame(_loop);
   }
 
-  /* ==============================
-     حلقة اللعب
-     ============================== */
-  function _loop(timestamp) {
-    if (_state !== STATE.PLAYING) return;
-
-    const delta = Math.min((timestamp - _lastTime) / 1000, 0.05);
-    _lastTime   = timestamp;
-
-    _update(delta);
-    _draw();
-
-    _rafId = requestAnimationFrame(_loop);
+  function _loop(ts){
+    if(_state!==S.PLAYING)return;
+    const delta=Math.min((ts-_last)/1000,0.05);_last=ts;
+    _update(delta);_draw();_raf=requestAnimationFrame(_loop);
   }
 
-  /* ==============================
-     التحديث
-     ============================== */
-  function _update(delta) {
-    const deviceOpen = Devices.hasActive();
+  function _update(delta){
+    const open=Devices.hasActive();
     Joystick.update();
-
-    if (!deviceOpen) {
+    if(!open){
       Player.update(delta);
-      Network.sendPosition(
-        Player.getCenterX(),
-        Player.getCenterY(),
-        Player.getRect(),
-        Joystick.getDirection()
-      );
+      Network.sendPosition(Player.getCenterX(),Player.getCenterY(),Player.getRect(),Joystick.getDirection());
     }
-
-    NPC.update(delta);
-    Devices.update(delta);
-    _updatePlayersHUD();
+    NPC.update(delta);Devices.update(delta);
+    // عداد اللاعبين
+    const el=Utils.$('hud-players-count');
+    if(el)el.textContent='👥 '+(Network.getPlayerCount()+1);
   }
 
-  function _updatePlayersHUD() {
-    const el = Utils.$('hud-players-count');
-    if (el) el.textContent = '👥 ' + (Network.getPlayerCount() + 1);
-  }
-
-  /* ==============================
-     الرسم
-     ============================== */
-  function _draw() {
-    const ctx = _ctx;
-    const cw  = _canvas.width;
-    const ch  = _canvas.height;
-
-    ctx.fillStyle = '#050510';
-    ctx.fillRect(0, 0, cw, ch);
-
+  function _draw(){
+    const ctx=_ctx,cw=_cvs.width,ch=_cvs.height;
+    ctx.fillStyle='#050510';ctx.fillRect(0,0,cw,ch);
     Camera.beginDraw(ctx);
       GameMap.draw(ctx);
       Devices.drawPrompt(ctx);
       NPC.draw(ctx);
-      Network.drawOtherPlayers(ctx, Player.getAllChars());
+      Network.drawOtherPlayers(ctx,Player.getAllChars());
       Player.draw(ctx);
-      if (_debug) Collision.debugDraw(ctx, Camera.getOffset());
+      if(_debug)Collision.debugDraw(ctx,Camera.getOffset());
     Camera.endDraw(ctx);
-
-    _drawVignette(ctx, cw, ch);
+    _vignette(ctx,cw,ch);
   }
 
-  function _drawVignette(ctx, w, h) {
-    const grad = ctx.createRadialGradient(
-      w / 2, h / 2, h * 0.3,
-      w / 2, h / 2, h * 0.85
-    );
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,10,0.55)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
+  function _vignette(ctx,w,h){
+    const gr=ctx.createRadialGradient(w/2,h/2,h*0.3,w/2,h/2,h*0.88);
+    gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(0,0,10,0.52)');
+    ctx.fillStyle=gr;ctx.fillRect(0,0,w,h);
   }
 
-  /* ==============================
-     التفاعل
-     ============================== */
-  function _registerInteraction() {
-    const gc = Utils.$('game-container');
-
-    function _onTap(e) {
-      const t = e.target;
-      if (
-        t.closest('#joystick-zone') ||
-        t.closest('#device-popup')  ||
-        t.closest('#hud') ||
-        t.closest('#interact-btn') ||
-        t.closest('#chat-btn') ||
-        t.closest('#chat-input-container')
-      ) return;
-
-      if (Devices.hasActive()) Devices.close();
+  function _regInteract(){
+    const gc=Utils.$('game-container');
+    function onTap(e){
+      const t=e.target;
+      if(t.closest('#joystick-zone')||t.closest('#device-popup')||t.closest('#hud'))return;
+      if(Devices.hasActive())Devices.close();
+      else if(Devices.getNear())Devices.tryOpen();
     }
-
-    gc.addEventListener('click', _onTap);
-    gc.addEventListener('touchend', _onTap);
+    gc.addEventListener('click',onTap);
+    gc.addEventListener('touchend',e=>{e.preventDefault();onTap(e);},{passive:false});
   }
 
-  /* ==============================
-     تغيير الحجم - معدلة لتعكس دوران CSS
-     ============================== */
-  function _resizeCanvas() {
-    if (!_canvas) return;
-    
-    // إذا كان الهاتف عمودياً، قم بعكس العرض والطول للـ Canvas الداخلي
-    const isPortrait = window.innerHeight > window.innerWidth;
-    
-    if (isPortrait) {
-      _canvas.width  = window.innerHeight;
-      _canvas.height = window.innerWidth;
-    } else {
-      _canvas.width  = window.innerWidth;
-      _canvas.height = window.innerHeight;
-    }
-    
-    _ctx.imageSmoothingEnabled = false;
-    
-    if (_state === STATE.PLAYING) {
-      Camera.resize(_canvas.width, _canvas.height);
-    }
+  function _resize(){
+    if(!_cvs)return;
+    _cvs.width=window.innerWidth;_cvs.height=window.innerHeight;
+    _ctx.imageSmoothingEnabled=false;
+    if(_state===S.PLAYING)Camera.resize(_cvs.width,_cvs.height);
   }
 
-  /* ==============================
-     إيقاف / استئناف
-     ============================== */
-  function pause() {
-    if (_state === STATE.PLAYING) {
-      _state = STATE.PAUSED;
-      if (_rafId) cancelAnimationFrame(_rafId);
-    }
-  }
+  function pause(){if(_state===S.PLAYING){_state=S.PAUSED;if(_raf)cancelAnimationFrame(_raf);}}
+  function resume(){if(_state===S.PAUSED){_state=S.PLAYING;_last=performance.now();_raf=requestAnimationFrame(_loop);}}
 
-  function resume() {
-    if (_state === STATE.PAUSED) {
-      _state    = STATE.PLAYING;
-      _lastTime = performance.now();
-      _rafId    = requestAnimationFrame(_loop);
-    }
-  }
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) pause();
-    else                 resume();
+  document.addEventListener('visibilitychange',()=>document.hidden?pause():resume());
+  window.addEventListener('keydown',e=>{
+    if(e.code==='F2'){e.preventDefault();_debug=!_debug;UI.showToast(_debug?'🔴 Debug ON':'✅ Debug OFF',1200);}
   });
 
-  window.addEventListener('keydown', (e) => {
-    if (e.code === 'F2') {
-      e.preventDefault();
-      _debug = !_debug;
-      UI.showToast(_debug ? '🔴 Debug ON' : '✅ Debug OFF', 1500);
-    }
-  });
-
-  return { init, pause, resume };
-
+  return{init,pause,resume};
 })();
