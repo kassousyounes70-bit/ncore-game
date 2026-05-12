@@ -11,7 +11,7 @@ const MAX=50;
 app.use(cors({origin:'*', methods:['GET','POST']}));
 app.use(express.json());
 
-// التعديل الجديد: البحث التلقائي عن مسار ملفات الواجهة لتفادي مشكلة Not Found
+// البحث التلقائي عن مسار ملفات الواجهة لتفادي مشكلة Not Found
 let publicPath = path.join(__dirname, '../');
 if (!fs.existsSync(path.join(publicPath, 'index.html'))) {
     publicPath = __dirname; // إذا كان الملف في نفس المجلد
@@ -57,6 +57,22 @@ io.on('connection',sock=>{
     if(Math.hypot(nx-p.x,ny-p.y)<90){
       p.x=nx;p.y=ny;p.dir=_dir(data.dir);p.joinedAt=Date.now();
       sock.broadcast.emit('player:moved',{id:sock.id,x:p.x,y:p.y,dir:p.dir});
+    }
+  });
+
+  // ==========================================
+  // إضافة نظام المحادثة: استلام وإذاعة الرسائل
+  // ==========================================
+  sock.on('chat:message', text => {
+    const p = players.get(sock.id);
+    if(!p) return; // التأكد أن اللاعب مسجل في الخادم
+    
+    // تنظيف النص لضمان الأمان والحد الأقصى
+    const safeText = _cleanChat(text);
+    if(safeText.length > 0) {
+       p.joinedAt = Date.now(); // تحديث نشاط اللاعب (تجنب الطرد للخمول)
+       // إرسال الرسالة لجميع اللاعبين الآخرين
+       sock.broadcast.emit('chat:message', { id: sock.id, text: safeText });
     }
   });
 
@@ -108,6 +124,10 @@ setInterval(()=>{
 /* ====== Helpers ====== */
 function _clamp(v,mn,mx){return Math.max(mn,Math.min(mx,Number(v)||0));}
 function _clean(s){return String(s).replace(/[<>"'&]/g,'').trim().slice(0,16)||'لاعب';}
+
+// دالة جديدة لتنظيف الدردشة (السماح بـ 100 حرف والإيموجي ومنع أكواد HTML)
+function _cleanChat(s){return String(s).replace(/[<>]/g,'').trim().slice(0,100);} 
+
 function _dir(d){return['up','down','left','right','idle'].includes(d)?d:'idle';}
 function _log(){console.log(`[Stats] ${players.size}/${MAX} | ${Math.round(process.memoryUsage().heapUsed/1024/1024)}MB`);}
 
