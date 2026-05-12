@@ -36,16 +36,29 @@ const UI = (() => {
     Utils.show('character-select-screen');Utils.hide('loading-screen');Utils.hide('game-container');
     _buildGrid();_startPreview();
 
-    // التعديل: استهداف شبكة الشخصيات بدلاً من الشاشة الكاملة
     const scrollContainer = Utils.$('character-grid');
     const upBtn = Utils.$('scroll-up-btn');
     const downBtn = Utils.$('scroll-down-btn');
     
+    // إصلاح الأزرار لتعمل بقوة على الهواتف (Touch + Click)
+    function scrollUp(e) {
+        if(e) e.preventDefault();
+        if(scrollContainer.scrollBy) scrollContainer.scrollBy({ top: -180, behavior: 'smooth' });
+        else scrollContainer.scrollTop -= 180;
+    }
+    function scrollDown(e) {
+        if(e) e.preventDefault();
+        if(scrollContainer.scrollBy) scrollContainer.scrollBy({ top: 180, behavior: 'smooth' });
+        else scrollContainer.scrollTop += 180;
+    }
+
     if(upBtn) {
-      upBtn.onclick = () => scrollContainer.scrollBy({ top: -180, behavior: 'smooth' });
+      upBtn.onclick = scrollUp;
+      upBtn.ontouchstart = scrollUp;
     }
     if(downBtn) {
-      downBtn.onclick = () => scrollContainer.scrollBy({ top: 180, behavior: 'smooth' });
+      downBtn.onclick = scrollDown;
+      downBtn.ontouchstart = scrollDown;
     }
   }
 
