@@ -36,8 +36,8 @@ const UI = (() => {
     Utils.show('character-select-screen');Utils.hide('loading-screen');Utils.hide('game-container');
     _buildGrid();_startPreview();
 
-    // تفعيل أزرار التمرير (الصعود والنزول)
-    const scrollContainer = Utils.$('character-select-screen');
+    // التعديل: استهداف شبكة الشخصيات بدلاً من الشاشة الكاملة
+    const scrollContainer = Utils.$('character-grid');
     const upBtn = Utils.$('scroll-up-btn');
     const downBtn = Utils.$('scroll-down-btn');
     
