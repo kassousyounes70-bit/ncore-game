@@ -17,7 +17,6 @@ const Devices = (() => {
     _closeBtn.addEventListener('click',close);
     _closeBtn.addEventListener('touchend',e=>{e.preventDefault();close();});
     
-    // أحداث زر التكبير والتصغير
     _fsBtn.addEventListener('click',toggleFullscreen);
     _fsBtn.addEventListener('touchend',e=>{e.preventDefault();toggleFullscreen();});
 
@@ -33,6 +32,8 @@ const Devices = (() => {
         _pEl.classList.remove('fullscreen');
         _fsBtn.textContent = '⛶ تكبير';
     }
+    // إعادة التركيز بعد التغيير لضمان استمرار التحكم
+    if(_iframe) _iframe.focus();
   }
 
   function update(delta){
@@ -42,7 +43,6 @@ const Devices = (() => {
     _promptT+=delta*3;
     _promptA=(_near&&!_active)?0.6+Math.sin(_promptT)*0.4:0;
     
-    // تشغيل أنيميشن الألعاب القديمة فقط إذا لم تكن تلعب لعبة حقيقية
     if(_active && _iframe.classList.contains('hidden')){
        _render(_active);
     }
@@ -56,17 +56,21 @@ const Devices = (() => {
     _pCtx.imageSmoothingEnabled=false;
     Utils.show(_pEl);
 
-    // البحث عن رقم الحاسوب لمعرفة هل لديه لعبة مخصصة
     const devs = GameMap.getDevices();
     const devId = devs.indexOf(dev);
 
     if (typeof GamesData !== 'undefined' && GamesData[devId]) {
-        // تشغيل اللعبة الحقيقية
         Utils.hide(_pCvs);
         Utils.show(_iframe);
         _iframe.src = GamesData[devId];
+        
+        // --- تعديل جوهري للتركيز ---
+        _iframe.focus();
+        // محاولة إجبار التركيز داخل محتوى الـ Iframe بعد التحميل
+        _iframe.onload = () => {
+            _iframe.contentWindow.focus();
+        };
     } else {
-        // تشغيل الألعاب المصغرة مع رسالة (سيتم توفير الألعاب)
         Utils.hide(_iframe);
         Utils.show(_pCvs);
         _render(dev);
@@ -78,29 +82,21 @@ const Devices = (() => {
   function close(){
     _active=null;
     Utils.hide(_pEl);
-    _iframe.src = ''; // إيقاف اللعبة والصوت عند الخروج
-    if(_isFullscreen) toggleFullscreen(); // إعادة النافذة لحجمها الطبيعي
+    _iframe.src = ''; 
+    if(_isFullscreen) toggleFullscreen();
     Joystick.reset();Joystick.show();
-    if(typeof MiniGames !== 'undefined') MiniGames.stop();
+    MiniGames.stop();
   }
 
   function _render(dev){
     const ctx=_pCtx,w=400,h=300;
     ctx.clearRect(0,0,w,h);
-    // إطار الشاشة
     ctx.fillStyle='#1c1c1c';ctx.fillRect(0,0,w,h);
     ctx.strokeStyle='#404060';ctx.lineWidth=3;ctx.strokeRect(2,2,w-4,h-4);
     ctx.fillStyle='#050520';ctx.fillRect(10,10,w-20,h-36);
     
-    // استخراج رقم الجهاز لتمريره إلى ملف minigames
-    const devId = GameMap.getDevices().indexOf(dev);
+    MiniGames.drawPC(ctx,11,11,w-22,h-48,_anim);
 
-    // محتوى الألعاب المصغرة مع إرسال رقم الجهاز (devId)
-    if(typeof MiniGames !== 'undefined'){
-       MiniGames.drawPC(ctx,11,11,w-22,h-48,_anim, devId);
-    }
-
-    // رسالة التشويق (سيتم توفير الألعاب)
     ctx.fillStyle='rgba(0,0,0,0.7)';
     ctx.fillRect(10,h/2-25, w-20, 50);
     Utils.drawPixelText(ctx,'سيتم توفير مزيد من الألعاب هنا!',w/2,h/2-4,
@@ -108,13 +104,11 @@ const Devices = (() => {
     Utils.drawPixelText(ctx,'ابحث عن الحاسوب السري!',w/2,h/2+12,
         {font:'8px "Press Start 2P"',color:'#f0c040',shadow:'#000',align:'center'});
 
-    // شريط أسفل
     ctx.fillStyle='#1a1a2e';ctx.fillRect(0,h-32,w,32);
     ctx.strokeStyle='#2a2a4e';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,h-32);ctx.lineTo(w,h-32);ctx.stroke();
     Utils.drawPixelText(ctx,'FLASH GAMES — NostGames',w/2,h-22,
       {font:'6px "Press Start 2P"',color:'#40c0f0',shadow:'#002244',align:'center'});
     
-    // LED بريق
     const gr=ctx.createLinearGradient(0,0,0,12);
     gr.addColorStop(0,'rgba(64,192,240,0.12)');gr.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=gr;ctx.fillRect(0,0,w,12);
@@ -124,14 +118,8 @@ const Devices = (() => {
     if(!_near||_promptA<=0||_active)return;
     const d=_near,cx=d.x+d.w/2,cy=d.y-16;
     ctx.save();ctx.globalAlpha=_promptA;
-    
-    // استخراج رقم الجهاز لإظهاره فوق الحاسوب عند الاقتراب
-    const devId = GameMap.getDevices().indexOf(d);
-
     Utils.drawPixelRect(ctx,cx-24,cy-11,48,20,3,'rgba(240,192,64,0.92)','#f0c040',2);
-    // تغيير النص ليظهر رقم الحاسوب مباشرة قبل الدخول
-    Utils.drawPixelText(ctx,'▶ PC '+devId,cx,cy-7,{font:'5px "Press Start 2P"',color:'#000',align:'center'});
-    
+    Utils.drawPixelText(ctx,'▶ TAP',cx,cy-7,{font:'6px "Press Start 2P"',color:'#000',align:'center'});
     ctx.restore();
   }
 

@@ -10,30 +10,13 @@ const MiniGames = (() => {
     {name:'Stick Fighter',       fn:_stickfight},
   ];
 
-  // تم التعديل هنا: إضافة devId لمعرفة رقم الجهاز الحالي
-  function drawPC(ctx,x,y,w,h,t,devId){
-    
-    // التعديل الأهم: إذا كان هناك رابط حقيقي لهذا الحاسوب، لا ترسم الألعاب الوهمية!
-    if (typeof GamesData !== 'undefined' && devId != null && GamesData[devId]) {
-      ctx.fillStyle = '#000'; // جعل الشاشة سوداء فارغة خلف الإطار
-      ctx.fillRect(x,y,w,h);
-      return; 
-    }
-
+  function drawPC(ctx,x,y,w,h,t){
     _pcIdx=Math.floor((t%( SWITCH*GAMES.length))/SWITCH)%GAMES.length;
     GAMES[_pcIdx].fn(ctx,x,y,w,h,t);
-    
     // اسم اللعبة
     ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(x,y,w,16);
     Utils.drawPixelText(ctx,GAMES[_pcIdx].name,x+w/2,y+2,
       {font:'6px "Press Start 2P"',color:'#f0c040',shadow:'#000',align:'center'});
-      
-    // رسم رقم الحاسوب (ID) في الزاوية العلوية اليمنى
-    if (devId != null) {
-      Utils.drawPixelText(ctx, 'ID:' + devId, x+w-2, y+2,
-        {font:'5px "Press Start 2P"',color:'#ffffff',shadow:'#000000',align:'right'});
-    }
-
     // شريط تقدم
     const prog=(t%SWITCH)/SWITCH;
     ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(x,y+h-4,w,4);
