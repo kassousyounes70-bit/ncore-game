@@ -6,10 +6,20 @@ const Joystick = (() => {
   let _dx=0,_dy=0,_mag=0;
   const _keys={up:false,down:false,left:false,right:false};
 
+  // التحقق من هوية اللاعب: هل يستخدم تطبيقنا؟
+  const _isAppClient = navigator.userAgent.includes("NostaGamesClient");
+
   function init(){
     _base=Utils.$('joystick-base');
     _thumb=Utils.$('joystick-thumb');
     _zone=Utils.$('joystick-zone');
+    
+    // إذا كان من التطبيق، قم بإخفاء المنطقة مبكراً
+    if (_isAppClient && _zone) {
+        _zone.style.display = 'none';
+        return; // توقف هنا ولا تكمل ربط الأحداث لأننا لن نحتاج العصا
+    }
+
     if(!_base||!_thumb||!_zone)return;
     _upd();
     _zone.addEventListener('touchstart',_ts,{passive:false});
@@ -44,6 +54,9 @@ const Joystick = (() => {
   function _rst(){_active=false;_tid=null;_dx=0;_dy=0;_mag=0;if(_thumb)_thumb.style.transform='translate(-50%,-50%)';}
 
   function update(){
+    // إذا كان من التطبيق، لا تقم بتحديث أوامر العصا الداخلية للعبة
+    if(_isAppClient) return; 
+
     if(!_active){
       let kx=0,ky=0;
       if(_keys.left)kx-=1;if(_keys.right)kx+=1;
@@ -53,9 +66,21 @@ const Joystick = (() => {
     }
   }
 
-  function reset(){_rst();_keys.up=false;_keys.down=false;_keys.left=false;_keys.right=false;}
-  function show(){if(_zone)Utils.show(_zone);}
-  function hide(){if(_zone)Utils.hide(_zone);}
+  function reset(){
+      if(_isAppClient) return; 
+      _rst();_keys.up=false;_keys.down=false;_keys.left=false;_keys.right=false;
+  }
+  
+  function show(){
+      // إذا كان اللاعب من التطبيق، تجاهل أمر الإظهار تماماً!
+      if (_isAppClient) return; 
+      if(_zone)Utils.show(_zone);
+  }
+  
+  function hide(){
+      if(_zone)Utils.hide(_zone);
+  }
+  
   function getDx(){return _dx;}
   function getDy(){return _dy;}
   function getMagnitude(){return _mag;}
