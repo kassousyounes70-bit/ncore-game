@@ -5,7 +5,7 @@
  */
 const GameControls = {
     // الحاسوب رقم 29
-    12: {
+    29: {
         joystick: 'arrows', // يمكن أن تكون 'arrows' للأسهم أو 'wasd' للحروف
         buttons: ['z', 'x', 'Enter'] // الأزرار الإضافية
     },

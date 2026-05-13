@@ -80,19 +80,17 @@ const Game = (() => {
   }
 
   function _regInteract(){
-    const gc=Utils.$('game-container');
-    function onTap(e){
-      const t=e.target;
-      if(t.closest('#joystick-zone')||t.closest('#device-popup')||t.closest('#hud')||t.closest('#chat-action-btn')||t.closest('#chat-modal'))return;
-      if(Devices.hasActive())Devices.close();
-      else if(Devices.getNear())Devices.tryOpen();
+    // ربط زر التفاعل الجديد بدلاً من الضغط العشوائي على الشاشة
+    const interactBtn = Utils.$('interact-btn');
+    if (interactBtn) {
+      const onInteract = (e) => {
+        e.preventDefault();
+        if(Devices.hasActive()) Devices.close();
+        else if(Devices.getNear()) Devices.tryOpen();
+      };
+      interactBtn.addEventListener('click', onInteract);
+      interactBtn.addEventListener('touchend', onInteract, {passive: false});
     }
-    gc.addEventListener('click',onTap);
-    gc.addEventListener('touchend',e=>{
-        // استثناء عناصر الواجهة من منع اللمس
-        if(e.target.closest('#chat-input')||e.target.closest('#chat-modal')||e.target.closest('#chat-action-btn')) return;
-        e.preventDefault();onTap(e);
-    },{passive:false});
   }
 
   function _resize(){

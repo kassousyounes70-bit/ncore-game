@@ -2,6 +2,7 @@
 const Devices = (() => {
   let _active=null,_near=null;
   let _pCvs=null,_pCtx=null,_pEl=null,_closeBtn=null,_fsBtn=null,_iframe=null;
+  let _interactBtn=null; // المتغير الخاص بزر التفاعل الجديد
   let _anim=0,_promptA=0,_promptT=0;
   let _isFullscreen=false;
   const RANGE=68;
@@ -13,6 +14,9 @@ const Devices = (() => {
     _closeBtn=Utils.$('device-close-btn');
     _fsBtn=Utils.$('device-fs-btn');
     _iframe=Utils.$('device-iframe');
+    
+    // ربط زر التفاعل
+    _interactBtn=Utils.$('interact-btn');
 
     _closeBtn.addEventListener('click',close);
     _closeBtn.addEventListener('touchend',e=>{e.preventDefault();close();});
@@ -42,6 +46,16 @@ const Devices = (() => {
     _promptT+=delta*3;
     _promptA=(_near&&!_active)?0.6+Math.sin(_promptT)*0.4:0;
     
+    // --- الذكاء الاصطناعي لزر التفاعل ---
+    // إذا كنت قريباً من جهاز (ولم يكن مفتوحاً بالفعل)، أظهر الزر. وإلا، أخفه.
+    if (_interactBtn) {
+        if (_near && !_active) {
+            Utils.show(_interactBtn);
+        } else {
+            Utils.hide(_interactBtn);
+        }
+    }
+
     if(_active && _iframe.classList.contains('hidden')){
        _render(_active);
     }
@@ -68,7 +82,6 @@ const Devices = (() => {
             _iframe.contentWindow.focus();
         };
 
-        // --- التعديل الجوهري: تشغيل واجهة التحكم الذكية للعبة ---
         if (typeof GamepadUI !== 'undefined') {
             GamepadUI.showForGame(devId);
         }
@@ -88,7 +101,6 @@ const Devices = (() => {
     _iframe.src = ''; 
     if(_isFullscreen) toggleFullscreen();
     
-    // --- التعديل الجوهري: إخفاء واجهة التحكم وإرجاع عصا المشي ---
     if (typeof GamepadUI !== 'undefined') {
         GamepadUI.hide();
     }
