@@ -81,7 +81,7 @@ const Devices = (() => {
     _iframe.src = ''; // إيقاف اللعبة والصوت عند الخروج
     if(_isFullscreen) toggleFullscreen(); // إعادة النافذة لحجمها الطبيعي
     Joystick.reset();Joystick.show();
-    MiniGames.stop();
+    if(typeof MiniGames !== 'undefined') MiniGames.stop();
   }
 
   function _render(dev){
@@ -92,8 +92,13 @@ const Devices = (() => {
     ctx.strokeStyle='#404060';ctx.lineWidth=3;ctx.strokeRect(2,2,w-4,h-4);
     ctx.fillStyle='#050520';ctx.fillRect(10,10,w-20,h-36);
     
-    // محتوى الألعاب المصغرة
-    MiniGames.drawPC(ctx,11,11,w-22,h-48,_anim);
+    // استخراج رقم الجهاز لتمريره إلى ملف minigames
+    const devId = GameMap.getDevices().indexOf(dev);
+
+    // محتوى الألعاب المصغرة مع إرسال رقم الجهاز (devId)
+    if(typeof MiniGames !== 'undefined'){
+       MiniGames.drawPC(ctx,11,11,w-22,h-48,_anim, devId);
+    }
 
     // رسالة التشويق (سيتم توفير الألعاب)
     ctx.fillStyle='rgba(0,0,0,0.7)';
@@ -119,8 +124,14 @@ const Devices = (() => {
     if(!_near||_promptA<=0||_active)return;
     const d=_near,cx=d.x+d.w/2,cy=d.y-16;
     ctx.save();ctx.globalAlpha=_promptA;
+    
+    // استخراج رقم الجهاز لإظهاره فوق الحاسوب عند الاقتراب
+    const devId = GameMap.getDevices().indexOf(d);
+
     Utils.drawPixelRect(ctx,cx-24,cy-11,48,20,3,'rgba(240,192,64,0.92)','#f0c040',2);
-    Utils.drawPixelText(ctx,'▶ TAP',cx,cy-7,{font:'6px "Press Start 2P"',color:'#000',align:'center'});
+    // تغيير النص ليظهر رقم الحاسوب مباشرة قبل الدخول
+    Utils.drawPixelText(ctx,'▶ PC '+devId,cx,cy-7,{font:'5px "Press Start 2P"',color:'#000',align:'center'});
+    
     ctx.restore();
   }
 
