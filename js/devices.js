@@ -2,7 +2,7 @@
 const Devices = (() => {
   let _active=null,_near=null;
   let _pCvs=null,_pCtx=null,_pEl=null,_closeBtn=null,_fsBtn=null,_iframe=null;
-  let _interactBtn=null; // المتغير الخاص بزر التفاعل الجديد
+  let _interactBtn=null; 
   let _anim=0,_promptA=0,_promptT=0;
   let _isFullscreen=false;
   const RANGE=68;
@@ -46,13 +46,14 @@ const Devices = (() => {
     _promptT+=delta*3;
     _promptA=(_near&&!_active)?0.6+Math.sin(_promptT)*0.4:0;
     
-    // --- الذكاء الاصطناعي لزر التفاعل ---
-    // إذا كنت قريباً من جهاز (ولم يكن مفتوحاً بالفعل)، أظهر الزر. وإلا، أخفه.
+    // --- إصلاح الذكاء الاصطناعي لزر التفاعل ---
     if (_interactBtn) {
         if (_near && !_active) {
-            Utils.show(_interactBtn);
+            _interactBtn.classList.remove('hidden');
+            _interactBtn.style.display = 'block';
         } else {
-            Utils.hide(_interactBtn);
+            _interactBtn.classList.add('hidden');
+            _interactBtn.style.display = 'none';
         }
     }
 
@@ -67,14 +68,21 @@ const Devices = (() => {
     _active=dev;_anim=0;
     _pCvs.width=400;_pCvs.height=300;
     _pCtx.imageSmoothingEnabled=false;
-    Utils.show(_pEl);
+    
+    // إخفاء زر التفاعل عند فتح الجهاز
+    if (_interactBtn) {
+        _interactBtn.classList.add('hidden');
+        _interactBtn.style.display = 'none';
+    }
+
+    Utils.show('device-popup');
 
     const devs = GameMap.getDevices();
     const devId = devs.indexOf(dev);
 
     if (typeof GamesData !== 'undefined' && GamesData[devId]) {
-        Utils.hide(_pCvs);
-        Utils.show(_iframe);
+        Utils.hide('device-canvas');
+        Utils.show('device-iframe');
         _iframe.src = GamesData[devId];
         
         _iframe.focus();
@@ -87,8 +95,8 @@ const Devices = (() => {
         }
 
     } else {
-        Utils.hide(_iframe);
-        Utils.show(_pCvs);
+        Utils.hide('device-iframe');
+        Utils.show('device-canvas');
         _render(dev);
     }
 
@@ -97,7 +105,7 @@ const Devices = (() => {
 
   function close(){
     _active=null;
-    Utils.hide(_pEl);
+    Utils.hide('device-popup');
     _iframe.src = ''; 
     if(_isFullscreen) toggleFullscreen();
     

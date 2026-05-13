@@ -4,7 +4,6 @@ const Chat = (() => {
   let chatBtn, chatModal, chatInput, chatSendBtn, chatCloseBtn;
 
   function init() {
-    // الحماية القصوى: بناء الزر برمجياً إذا لم يكن موجوداً
     chatBtn = document.getElementById('chat-action-btn');
     if(!chatBtn) {
         chatBtn = document.createElement('button');
@@ -16,7 +15,6 @@ const Chat = (() => {
         container.appendChild(chatBtn);
     }
 
-    // بناء نافذة الدردشة برمجياً إذا لم تكن موجودة
     chatModal = document.getElementById('chat-modal');
     if(!chatModal) {
         chatModal = document.createElement('div');
@@ -40,10 +38,10 @@ const Chat = (() => {
     chatCloseBtn = document.getElementById('chat-close-btn');
 
     chatBtn.onclick = openChat;
+    chatBtn.ontouchstart = (e) => { e.preventDefault(); openChat(); };
     chatCloseBtn.onclick = closeChat;
     chatSendBtn.onclick = sendChat;
     
-    // قراءة أقصى طول للدردشة من ملف الإضافات
     const maxLen = (typeof Addon !== 'undefined') ? Addon.Settings.maxChatChars : 100;
     chatInput.maxLength = maxLen;
     
@@ -56,7 +54,6 @@ const Chat = (() => {
      if(!myPlayer) return;
 
      let isNear = false;
-     // قراءة المسافة من ملف الإضافات
      const distLimit = (typeof Addon !== 'undefined') ? Addon.Settings.chatDistance : 200;
 
      if (otherPlayers) {
@@ -69,12 +66,15 @@ const Chat = (() => {
          }
      }
 
+     // --- إصلاح إظهار زر الدردشة ---
      if(chatBtn && chatModal) {
         const isModalOpen = (chatModal.style.display === 'flex');
-        // فرض الظهور والإخفاء عبر inline styles لتخطي أي CSS يعرقله
+        
         if(isNear && !isModalOpen) {
+           chatBtn.classList.remove('hidden');
            chatBtn.style.display = 'block';
         } else if (!isNear) {
+           chatBtn.classList.add('hidden');
            chatBtn.style.display = 'none';
            if(isModalOpen) closeChat();
         }
@@ -139,6 +139,7 @@ const Chat = (() => {
 
   function openChat() {
      chatModal.style.display = 'flex';
+     chatBtn.classList.add('hidden');
      chatBtn.style.display = 'none';
      chatInput.value = '';
      chatInput.focus();
@@ -169,4 +170,3 @@ const Chat = (() => {
 
   return { init, update, drawBubbles, addBubble };
 })();
-  
