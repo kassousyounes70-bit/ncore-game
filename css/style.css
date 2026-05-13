@@ -272,7 +272,7 @@ html, body {
 }
 
 /* ==============================
-   Joystick
+   Joystick (المشي في الصالة)
    ============================== */
 #joystick-zone {
   position: fixed; bottom: 24px; left: 24px;
@@ -376,7 +376,6 @@ html, body {
 
 #device-canvas { image-rendering: pixelated; border: 2px solid var(--color-border); }
 
-/* تنسيق الإطار الخاص بالألعاب */
 #device-iframe {
   width: 400px;
   height: 300px;
@@ -386,7 +385,6 @@ html, body {
 
 #device-close-btn, #device-fs-btn { font-size: 8px; padding: 8px 16px; }
 
-/* وضع التكبير الشامل (Fullscreen Mode) */
 #device-popup.fullscreen {
   width: 100% !important;
   height: 100% !important;
@@ -400,7 +398,7 @@ html, body {
   clip-path: none !important;
   padding: 10px !important;
   box-sizing: border-box;
-  z-index: 9999;
+  z-index: 50; /* Changed to be under gamepad-zone */
 }
 
 #device-popup.fullscreen #device-canvas,
@@ -408,4 +406,147 @@ html, body {
   width: 100% !important;
   height: calc(100% - 40px) !important;
   flex-grow: 1;
+}
+
+/* ==============================
+   نظام التحكم الذكي للألعاب (Gamepad Zone)
+   ============================== */
+#gamepad-zone {
+  position: fixed;
+  inset: 0;
+  z-index: 60; /* أعلى من شاشة اللعبة */
+  pointer-events: none; /* السماح باللمس للشاشة بالخلف */
+  transition: background 0.3s ease;
+}
+
+/* وضع التعديل - Edit Mode */
+#gamepad-zone.edit-mode {
+  background: rgba(0, 0, 0, 0.5);
+  background-image: radial-gradient(rgba(240, 192, 64, 0.2) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: auto; /* لالتقاط جميع اللمسات أثناء التعديل */
+}
+
+#gamepad-edit-tools {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+  z-index: 100;
+}
+
+/* تصميم الأزرار الوهمية العامة */
+.virtual-btn {
+  position: absolute; /* ضروري ليتمكن اللاعب من وضعها أينما يشاء */
+  pointer-events: auto;
+  touch-action: none; /* منع تمرير الشاشة عند سحب الزر */
+  
+  font-family: var(--pixel-font);
+  font-weight: bold;
+  color: #000;               /* النص باللون الأسود */
+  background: var(--color-primary); /* الزر باللون الأصفر */
+  border: 3px solid #000;    /* إطار أسود محيط لتشبه الرسمة */
+  
+  box-shadow: 0 4px 0 #a07000, inset 0 -3px 0 rgba(0,0,0,0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: filter 0.1s;
+}
+
+/* عند الضغط على الزر */
+.virtual-btn:active, .virtual-btn.active-press {
+  transform: translateY(4px) !important; /* الإزاحة للأسفل لمحاكاة الضغط */
+  box-shadow: 0 0 0 #a07000, inset 0 -3px 0 rgba(0,0,0,0.25);
+  filter: brightness(0.85);
+}
+
+/* تأثير الزر أثناء سحبه وتغيير مكانه */
+.virtual-btn.dragging {
+  opacity: 0.85;
+  transform: scale(1.15) !important; /* تكبير الزر أثناء السحب */
+  box-shadow: 0 10px 20px rgba(0,0,0,0.6), 0 0 15px var(--color-green);
+  border-color: var(--color-green);
+  z-index: 999;
+}
+
+/* الأزرار الدائرية (الحروف والأرقام كما طلبت) */
+.action-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-size: 16px;
+}
+
+/* أزرار الاتجاهات (D-Pad) */
+.dpad-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  font-size: 18px;
+}
+
+/* الأزرار الخاصة (Enter, Space, إلخ) */
+.special-btn {
+  width: auto;
+  min-width: 68px;
+  height: 44px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 10px;
+}
+
+/* إخفاء الأزرار مبدئياً ريثما يضعها الذكاء الاصطناعي في أماكنها */
+.gamepad-cluster .virtual-btn {
+  top: -1000px;
+  left: -1000px;
+}
+
+/* ==============================
+   عصا التحكم الخاصة بالألعاب (Gamepad Joystick)
+   ============================== */
+#gamepad-joystick-base {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  /* لون أزرق/سيان لتمييزها عن العصا الصفراء الخاصة بالمشي */
+  border: 3px solid rgba(64, 192, 240, 0.4); 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 15px rgba(64, 192, 240, 0.15);
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 90;
+}
+
+#gamepad-joystick-thumb {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  /* تدرج لوني أزرق لامع */
+  background: radial-gradient(circle at 35% 35%, #80d0f0, #40c0f0);
+  border: 3px solid #005588;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 -3px 0 rgba(0,0,0,0.2);
+  pointer-events: none; /* الإصبع يتفاعل مع القاعدة وليس مع هذا العنصر الداخلي */
+}
+
+#gamepad-joystick-base.dragging {
+  opacity: 0.85;
+  transform: scale(1.1);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.6), 0 0 15px var(--color-green);
+  border-color: var(--color-green);
+  z-index: 999;
 }
