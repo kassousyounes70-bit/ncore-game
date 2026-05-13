@@ -4,12 +4,29 @@ const express=require('express'), http=require('http'), {Server}=require('socket
 const path = require('path');
 const fs = require('fs');
 
+// استدعاء مكتبة البروكسي
+const { createProxyMiddleware } = require('http-proxy-middleware');
+
 const app=express(), server=http.createServer(app);
 const PORT=process.env.PORT||3000;
 const MAX=50;
 
 app.use(cors({origin:'*', methods:['GET','POST']}));
 app.use(express.json());
+
+// ==========================================
+// 🚀 نظام البروكسي (الخادم الوكيل) لفك حماية الألعاب
+// أي طلب يبدأ بـ /2021 سيتم تحويله سراً إلى kdata1.com
+// ==========================================
+app.use('/2021', createProxyMiddleware({
+  target: 'https://kdata1.com',
+  changeOrigin: true, // إخفاء المصدر الأصلي لخداع اللعبة
+  secure: false,      // تجاهل أخطاء SSL إن وجدت
+  headers: {
+    // محاكاة متصفح حقيقي لتفادي الحظر
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+  }
+}));
 
 // البحث التلقائي عن مسار ملفات الواجهة لتفادي مشكلة Not Found
 let publicPath = path.join(__dirname, '../');
@@ -60,18 +77,13 @@ io.on('connection',sock=>{
     }
   });
 
-  // ==========================================
-  // إضافة نظام المحادثة: استلام وإذاعة الرسائل
-  // ==========================================
   sock.on('chat:message', text => {
     const p = players.get(sock.id);
-    if(!p) return; // التأكد أن اللاعب مسجل في الخادم
+    if(!p) return; 
     
-    // تنظيف النص لضمان الأمان والحد الأقصى
     const safeText = _cleanChat(text);
     if(safeText.length > 0) {
-       p.joinedAt = Date.now(); // تحديث نشاط اللاعب (تجنب الطرد للخمول)
-       // إرسال الرسالة لجميع اللاعبين الآخرين
+       p.joinedAt = Date.now(); 
        sock.broadcast.emit('chat:message', { id: sock.id, text: safeText });
     }
   });
@@ -124,10 +136,7 @@ setInterval(()=>{
 /* ====== Helpers ====== */
 function _clamp(v,mn,mx){return Math.max(mn,Math.min(mx,Number(v)||0));}
 function _clean(s){return String(s).replace(/[<>"'&]/g,'').trim().slice(0,16)||'لاعب';}
-
-// دالة جديدة لتنظيف الدردشة (السماح بـ 100 حرف والإيموجي ومنع أكواد HTML)
 function _cleanChat(s){return String(s).replace(/[<>]/g,'').trim().slice(0,100);} 
-
 function _dir(d){return['up','down','left','right','idle'].includes(d)?d:'idle';}
 function _log(){console.log(`[Stats] ${players.size}/${MAX} | ${Math.round(process.memoryUsage().heapUsed/1024/1024)}MB`);}
 
