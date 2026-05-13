@@ -22,6 +22,10 @@ const Game = (() => {
   function _onChar(charId){
     UI.stopPreviewAnimation();UI.showGame();
     Player.init(charId);NPC.init();
+    
+    // [إصلاح جوهري]: تحديث الكاميرا فوراً لتنتقل إلى موقع اللاعب عند الدخول
+    Camera.update(Player.getCenterX(), Player.getCenterY());
+
     UI.showHUD(Player.getCharName());
     Joystick.show();_regInteract();
     Network.connect(charId,()=>UI.showToast('مرحباً بك في صالة الألعاب! 🎮',2500));
@@ -37,13 +41,19 @@ const Game = (() => {
   function _update(delta){
     const open=Devices.hasActive();
     Joystick.update();
+    
     if(!open){
       Player.update(delta);
+      
+      // [إصلاح جوهري]: الكاميرا يجب أن تتبع اللاعب في كل إطار (Frame)
+      Camera.update(Player.getCenterX(), Player.getCenterY());
+      
       Network.sendPosition(Player.getCenterX(),Player.getCenterY(),Player.getRect(),Joystick.getDirection());
     }
+    
     NPC.update(delta);Devices.update(delta);
     
-    // تحديث المحادثة المكانية (فحص المسافات والمؤقتات)
+    // تحديث المحادثة المكانية
     if(window.Chat && Network.isConnected()) {
        Chat.update({x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
     }
@@ -63,7 +73,7 @@ const Game = (() => {
       Network.drawOtherPlayers(ctx,Player.getAllChars());
       Player.draw(ctx);
       
-      // رسم فقاعات الدردشة (تُرسم آخر شيء لتكون فوق الجميع)
+      // رسم فقاعات الدردشة
       if(window.Chat) {
          Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
       }
