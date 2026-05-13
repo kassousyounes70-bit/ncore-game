@@ -239,16 +239,19 @@ const GameMap = (() => {
   }
 
   /* ======================== PC STATION ======================== */
+  // التعديل 1: تمرير رقم الجهاز (Index) أثناء رسمه
   function _drawAllPCs(ctx){
-    for(const d of _devs){
+    for(let i = 0; i < _devs.length; i++){
+      const d = _devs[i];
       if(!Camera.isVisible(d))continue;
-      _drawPC(ctx,d.x,d.y,d.facing||'down');
+      _drawPC(ctx, d.x, d.y, d.facing||'down', i);
     }
   }
 
-  function _drawPC(ctx,x,y,facing){
+  // التعديل 2: استقبال رقم الجهاز وإرساله إلى دالة الشاشة
+  function _drawPC(ctx,x,y,facing, devId){
     _desk(ctx,x,y);
-    _monitor(ctx,x,y);
+    _monitor(ctx,x,y, devId);
     _keyboard(ctx,x,y);
     _chair(ctx,x,y,facing);
     _accessories(ctx,x,y);
@@ -269,7 +272,8 @@ const GameMap = (() => {
     ctx.strokeStyle='#180a00';ctx.lineWidth=2;ctx.strokeRect(x,y,96,72);
   }
 
-  function _monitor(ctx,x,y){
+  // التعديل 3: استقبال الرقم ورسمه داخل الشاشة
+  function _monitor(ctx,x,y, devId){
     const mx=x+20,my=y+4,mw=58,mh=44;
     // إطار الشاشة
     ctx.fillStyle='#1c1c1c';ctx.fillRect(mx,my,mw,mh);
@@ -286,10 +290,22 @@ const GameMap = (() => {
     ctx.fillStyle='#000080';ctx.fillRect(sx,sy+sh-6,18,5);
     ctx.fillStyle='#00aa00';ctx.fillRect(sx+1,sy+sh-5,14,4);
     Utils.drawPixelText(ctx,'Start',sx+2,sy+sh-5,{font:'3px "Press Start 2P"',color:'#fff'});
+    
     // أيقونات
     ctx.fillStyle='#ffff40';ctx.fillRect(sx+3,sy+3,6,6);
     ctx.fillStyle='#40ffff';ctx.fillRect(sx+3,sy+11,6,6);
     ctx.fillStyle='#ff8040';ctx.fillRect(sx+13,sy+3,6,6);
+
+    // --- رسم رقم الحاسوب على الشاشة من الخارج ---
+    if (devId != null) {
+      Utils.drawPixelText(ctx, devId.toString(), sx+sw-6, sy+6, {
+        font:'5px "Press Start 2P"',
+        color:'#ffffff',
+        shadow:'rgba(0,0,0,0.8)',
+        align:'right'
+      });
+    }
+
     // بريق الشاشة
     ctx.fillStyle='rgba(255,255,255,0.07)';ctx.fillRect(sx,sy,sw,3);ctx.fillRect(sx,sy,3,sh);
     // LED أخضر
