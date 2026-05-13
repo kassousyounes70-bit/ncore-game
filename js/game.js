@@ -23,8 +23,8 @@ const Game = (() => {
     UI.stopPreviewAnimation();UI.showGame();
     Player.init(charId);NPC.init();
     
-    // [إصلاح جوهري]: تحديث الكاميرا فوراً لتنتقل إلى موقع اللاعب عند الدخول
-    Camera.update(Player.getCenterX(), Player.getCenterY());
+    // الحل: استخدام snapTo لانتقال الكاميرا فوراً في البداية بدون أنميشن
+    Camera.snapTo(Player.getCenterX(), Player.getCenterY());
 
     UI.showHUD(Player.getCharName());
     Joystick.show();_regInteract();
@@ -45,8 +45,8 @@ const Game = (() => {
     if(!open){
       Player.update(delta);
       
-      // [إصلاح جوهري]: الكاميرا يجب أن تتبع اللاعب في كل إطار (Frame)
-      Camera.update(Player.getCenterX(), Player.getCenterY());
+      // الخطأ كان هنا: نسينا تمرير الـ delta! يجب أن تكون 3 معاملات.
+      Camera.update(Player.getCenterX(), Player.getCenterY(), delta);
       
       Network.sendPosition(Player.getCenterX(),Player.getCenterY(),Player.getRect(),Joystick.getDirection());
     }
@@ -90,7 +90,7 @@ const Game = (() => {
   }
 
   function _regInteract(){
-    // ربط زر التفاعل الجديد بدلاً من الضغط العشوائي على الشاشة
+    // ربط زر التفاعل الجديد
     const interactBtn = Utils.$('interact-btn');
     if (interactBtn) {
       const onInteract = (e) => {
