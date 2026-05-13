@@ -26,12 +26,10 @@
 
   <div id="character-select-screen" class="hidden">
     <h2 class="pixel-title">اختر شخصيتك</h2>
-    
     <div id="scroll-controls">
       <button id="scroll-up-btn" class="pixel-btn"><span class="pixel-arrow-up"></span></button>
       <button id="scroll-down-btn" class="pixel-btn"><span class="pixel-arrow-down"></span></button>
     </div>
-
     <div id="character-grid"></div>
     <button id="start-btn" class="pixel-btn hidden">ادخل الصالة !</button>
   </div>
@@ -45,6 +43,73 @@
       </div>
     </div>
 
+    <div id="gamepad-zone" class="hidden">
+      
+      <div id="gamepad-edit-tools">
+        <button id="edit-layout-btn" class="pixel-btn" style="background: var(--color-primary);">تعديل الأزرار 🛠️</button>
+        <button id="save-layout-btn" class="pixel-btn hidden" style="background: var(--color-green);">حفظ ✅</button>
+        <button id="reset-layout-btn" class="pixel-btn hidden" style="background: var(--color-accent);">افتراضي 🔄</button>
+      </div>
+
+      <!-- عصا التحكم الخاصة بالألعاب (مختلفة عن عصا الصالة) -->
+      <div id="gamepad-joystick-base" class="gamepad-joystick-draggable hidden" data-key="joystick">
+        <div id="gamepad-joystick-thumb"></div>
+      </div>
+
+      <div id="dpad-container" class="gamepad-cluster">
+        <button id="pad-up" class="virtual-btn dpad-btn hidden" data-key="ArrowUp">⬆</button>
+        <button id="pad-left" class="virtual-btn dpad-btn hidden" data-key="ArrowLeft">⬅</button>
+        <button id="pad-right" class="virtual-btn dpad-btn hidden" data-key="ArrowRight">➡</button>
+        <button id="pad-down" class="virtual-btn dpad-btn hidden" data-key="ArrowDown">⬇</button>
+      </div>
+
+      <div id="action-container" class="gamepad-cluster">
+        <button id="pad-a" class="virtual-btn action-btn hidden" data-key="a">A</button>
+        <button id="pad-b" class="virtual-btn action-btn hidden" data-key="b">B</button>
+        <button id="pad-c" class="virtual-btn action-btn hidden" data-key="c">C</button>
+        <button id="pad-d" class="virtual-btn action-btn hidden" data-key="d">D</button>
+        <button id="pad-e" class="virtual-btn action-btn hidden" data-key="e">E</button>
+        <button id="pad-f" class="virtual-btn action-btn hidden" data-key="f">F</button>
+        <button id="pad-g" class="virtual-btn action-btn hidden" data-key="g">G</button>
+        <button id="pad-h" class="virtual-btn action-btn hidden" data-key="h">H</button>
+        <button id="pad-i" class="virtual-btn action-btn hidden" data-key="i">I</button>
+        <button id="pad-j" class="virtual-btn action-btn hidden" data-key="j">J</button>
+        <button id="pad-k" class="virtual-btn action-btn hidden" data-key="k">K</button>
+        <button id="pad-l" class="virtual-btn action-btn hidden" data-key="l">L</button>
+        <button id="pad-m" class="virtual-btn action-btn hidden" data-key="m">M</button>
+        <button id="pad-n" class="virtual-btn action-btn hidden" data-key="n">N</button>
+        <button id="pad-o" class="virtual-btn action-btn hidden" data-key="o">O</button>
+        <button id="pad-p" class="virtual-btn action-btn hidden" data-key="p">P</button>
+        <button id="pad-q" class="virtual-btn action-btn hidden" data-key="q">Q</button>
+        <button id="pad-r" class="virtual-btn action-btn hidden" data-key="r">R</button>
+        <button id="pad-s" class="virtual-btn action-btn hidden" data-key="s">S</button>
+        <button id="pad-t" class="virtual-btn action-btn hidden" data-key="t">T</button>
+        <button id="pad-u" class="virtual-btn action-btn hidden" data-key="u">U</button>
+        <button id="pad-v" class="virtual-btn action-btn hidden" data-key="v">V</button>
+        <button id="pad-w" class="virtual-btn action-btn hidden" data-key="w">W</button>
+        <button id="pad-x" class="virtual-btn action-btn hidden" data-key="x">X</button>
+        <button id="pad-y" class="virtual-btn action-btn hidden" data-key="y">Y</button>
+        <button id="pad-z" class="virtual-btn action-btn hidden" data-key="z">Z</button>
+
+        <button id="pad-0" class="virtual-btn action-btn hidden" data-key="0">0</button>
+        <button id="pad-1" class="virtual-btn action-btn hidden" data-key="1">1</button>
+        <button id="pad-2" class="virtual-btn action-btn hidden" data-key="2">2</button>
+        <button id="pad-3" class="virtual-btn action-btn hidden" data-key="3">3</button>
+        <button id="pad-4" class="virtual-btn action-btn hidden" data-key="4">4</button>
+        <button id="pad-5" class="virtual-btn action-btn hidden" data-key="5">5</button>
+        <button id="pad-6" class="virtual-btn action-btn hidden" data-key="6">6</button>
+        <button id="pad-7" class="virtual-btn action-btn hidden" data-key="7">7</button>
+        <button id="pad-8" class="virtual-btn action-btn hidden" data-key="8">8</button>
+        <button id="pad-9" class="virtual-btn action-btn hidden" data-key="9">9</button>
+
+        <button id="pad-enter" class="virtual-btn action-btn special-btn hidden" data-key="Enter">ENT</button>
+        <button id="pad-space" class="virtual-btn action-btn special-btn hidden" data-key=" ">SPC</button>
+        <button id="pad-esc" class="virtual-btn action-btn special-btn hidden" data-key="Escape">ESC</button>
+        <button id="pad-shift" class="virtual-btn action-btn special-btn hidden" data-key="Shift">SHF</button>
+        <button id="pad-tab" class="virtual-btn action-btn special-btn hidden" data-key="Tab">TAB</button>
+        <button id="pad-backspace" class="virtual-btn action-btn special-btn hidden" data-key="Backspace">DEL</button>
+      </div>
+    </div>
     <div id="hud">
       <span id="hud-character-name"></span>
       <span id="hud-players-count"></span>
@@ -57,9 +122,7 @@
         <button id="device-fs-btn" class="pixel-btn" style="background: var(--color-secondary);">⛶ تكبير</button>
         <button id="device-close-btn" class="pixel-btn" style="background: var(--color-accent);">✖ إغلاق</button>
       </div>
-      
       <canvas id="device-canvas"></canvas>
-      
       <iframe id="device-iframe" class="hidden" src="" frameborder="0" allowfullscreen></iframe>
     </div>
   </div>
@@ -76,17 +139,14 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-
   <script>
     const KEEP_ALIVE_URL      = 'https://ncore-mmo-server.onrender.com/ping';
     const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000;
-
     function keepAlive() {
       fetch(KEEP_ALIVE_URL, { method: 'GET', cache: 'no-cache' })
         .then(() => console.log('[KeepAlive] ✅'))
         .catch(() => console.warn('[KeepAlive] السيرفر نائم، جارِ الإيقاظ...'));
     }
-
     keepAlive();
     setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
   </script>
@@ -98,17 +158,15 @@
   <script src="js/map.js"></script>
   <script src="js/player.js"></script>
   <script src="js/npc.js"></script>
-  
   <script src="js/games_data.js"></script>
   
-  <script src="js/input_bridge.js"></script>
+  <script src="js/game_controls.js"></script>
+  <script src="js/gamepad.js"></script>
   
   <script src="js/devices.js"></script>
   <script src="js/minigames.js"></script>
   <script src="js/ui.js"></script>
-  
   <script src="js/chat.js"></script>
-  
   <script src="js/network.js"></script>
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>
