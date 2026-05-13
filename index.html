@@ -43,13 +43,9 @@
       </div>
     </div>
 
+    <!-- نظام التحكم بالألعاب (Gamepad) -->
     <div id="gamepad-zone" class="hidden">
-      
-      <div id="gamepad-edit-tools">
-        <button id="edit-layout-btn" class="pixel-btn" style="background: var(--color-primary);">تعديل الأزرار 🛠️</button>
-        <button id="save-layout-btn" class="pixel-btn hidden" style="background: var(--color-green);">حفظ ✅</button>
-        <button id="reset-layout-btn" class="pixel-btn hidden" style="background: var(--color-accent);">افتراضي 🔄</button>
-      </div>
+      <!-- تمت إزالة أدوات التعديل من هنا ونقلها إلى شريط الحاسوب (device-header) -->
 
       <!-- عصا التحكم الخاصة بالألعاب (مختلفة عن عصا الصالة) -->
       <div id="gamepad-joystick-base" class="gamepad-joystick-draggable hidden" data-key="joystick">
@@ -110,18 +106,31 @@
         <button id="pad-backspace" class="virtual-btn action-btn special-btn hidden" data-key="Backspace">DEL</button>
       </div>
     </div>
+
     <div id="hud">
       <span id="hud-character-name"></span>
       <span id="hud-players-count"></span>
     </div>
 
+    <!-- زر التفاعل الجديد لفتح الحواسيب -->
+    <button id="interact-btn" class="pixel-btn hidden" style="position: fixed; bottom: 74px; right: 24px; z-index: 40; background: var(--color-primary); box-shadow: 4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3), 0 0 15px rgba(240,192,64,0.6); animation: pulse 1.5s infinite;">🕹️ تفاعل</button>
+    
     <button id="chat-action-btn" class="pixel-btn hidden">💬 تحدث</button>
 
     <div id="device-popup" class="hidden">
-      <div id="device-header" style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-bottom: 5px;">
-        <button id="device-fs-btn" class="pixel-btn" style="background: var(--color-secondary);">⛶ تكبير</button>
-        <button id="device-close-btn" class="pixel-btn" style="background: var(--color-accent);">✖ إغلاق</button>
+      <!-- تم نقل أزرار التعديل لتكون في المنتصف بين التكبير والإغلاق -->
+      <div id="device-header" style="display: flex; gap: 8px; width: 100%; justify-content: space-between; align-items: center; margin-bottom: 5px; z-index: 101;">
+        <button id="device-fs-btn" class="pixel-btn" style="background: var(--color-secondary); padding: 8px 12px; font-size: 8px;">⛶ تكبير</button>
+        
+        <div id="gamepad-edit-tools" style="display: flex; gap: 5px; pointer-events: auto;">
+          <button id="edit-layout-btn" class="pixel-btn" style="background: var(--color-primary); padding: 8px 10px; font-size: 8px;">تعديل 🛠️</button>
+          <button id="save-layout-btn" class="pixel-btn hidden" style="background: var(--color-green); padding: 8px 10px; font-size: 8px;">حفظ ✅</button>
+          <button id="reset-layout-btn" class="pixel-btn hidden" style="background: var(--color-accent); padding: 8px 10px; font-size: 8px;">🔄</button>
+        </div>
+
+        <button id="device-close-btn" class="pixel-btn" style="background: var(--color-accent); padding: 8px 12px; font-size: 8px;">✖ إغلاق</button>
       </div>
+      
       <canvas id="device-canvas"></canvas>
       <iframe id="device-iframe" class="hidden" src="" frameborder="0" allowfullscreen></iframe>
     </div>
