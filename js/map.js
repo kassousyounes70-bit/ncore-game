@@ -240,15 +240,16 @@ const GameMap = (() => {
 
   /* ======================== PC STATION ======================== */
   function _drawAllPCs(ctx){
-    for(const d of _devs){
+    for(let i=0; i<_devs.length; i++){
+      const d = _devs[i];
       if(!Camera.isVisible(d))continue;
-      _drawPC(ctx,d.x,d.y,d.facing||'down');
+      _drawPC(ctx, d.x, d.y, d.facing||'down', i);
     }
   }
 
-  function _drawPC(ctx,x,y,facing){
+  function _drawPC(ctx,x,y,facing, devId){
     _desk(ctx,x,y);
-    _monitor(ctx,x,y);
+    _monitor(ctx,x,y, devId);
     _keyboard(ctx,x,y);
     _chair(ctx,x,y,facing);
     _accessories(ctx,x,y);
@@ -269,7 +270,7 @@ const GameMap = (() => {
     ctx.strokeStyle='#180a00';ctx.lineWidth=2;ctx.strokeRect(x,y,96,72);
   }
 
-  function _monitor(ctx,x,y){
+  function _monitor(ctx,x,y, devId){
     const mx=x+20,my=y+4,mw=58,mh=44;
     // إطار الشاشة
     ctx.fillStyle='#1c1c1c';ctx.fillRect(mx,my,mw,mh);
@@ -300,6 +301,13 @@ const GameMap = (() => {
     ctx.strokeRect(mx+mw/2-4,my+mh,8,6);ctx.strokeRect(mx+mw/2-14,my+mh+4,28,4);
     // إطار الشاشة الكلي
     ctx.strokeStyle='#080808';ctx.lineWidth=2;ctx.strokeRect(mx,my,mw,mh);
+
+    // رسم الرقم التعريفي للحاسوب
+    if (devId != null) {
+      Utils.drawPixelText(ctx, devId.toString(), mx+mw-6, my+14, {
+        font:'6px "Press Start 2P"', color:'#fff', align:'right', shadow:'#000'
+      });
+    }
   }
 
   function _keyboard(ctx,x,y){

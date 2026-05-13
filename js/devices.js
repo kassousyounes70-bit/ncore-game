@@ -103,7 +103,8 @@ const Devices = (() => {
     ctx.strokeStyle='#404060';ctx.lineWidth=3;ctx.strokeRect(2,2,w-4,h-4);
     ctx.fillStyle='#050520';ctx.fillRect(10,10,w-20,h-36);
     
-    MiniGames.drawPC(ctx,11,11,w-22,h-48,_anim);
+    const devId = GameMap.getDevices().indexOf(dev);
+    MiniGames.drawPC(ctx,11,11,w-22,h-48,_anim, devId);
 
     ctx.fillStyle='rgba(0,0,0,0.7)';
     ctx.fillRect(10,h/2-25, w-20, 50);

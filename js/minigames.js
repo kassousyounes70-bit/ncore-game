@@ -10,7 +10,14 @@ const MiniGames = (() => {
     {name:'Stick Fighter',       fn:_stickfight},
   ];
 
-  function drawPC(ctx,x,y,w,h,t){
+  function drawPC(ctx,x,y,w,h,t,devId){
+    // إذا كانت هناك لعبة حقيقية، اجعل الشاشة سوداء خلفها وتوقف عن الرسم
+    if (typeof GamesData !== 'undefined' && devId != null && GamesData[devId]) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(x,y,w,h);
+      return; 
+    }
+    
     _pcIdx=Math.floor((t%( SWITCH*GAMES.length))/SWITCH)%GAMES.length;
     GAMES[_pcIdx].fn(ctx,x,y,w,h,t);
     // اسم اللعبة
