@@ -32,7 +32,6 @@ const Devices = (() => {
         _pEl.classList.remove('fullscreen');
         _fsBtn.textContent = '⛶ تكبير';
     }
-    // إعادة التركيز بعد التغيير لضمان استمرار التحكم
     if(_iframe) _iframe.focus();
   }
 
@@ -64,12 +63,16 @@ const Devices = (() => {
         Utils.show(_iframe);
         _iframe.src = GamesData[devId];
         
-        // --- تعديل جوهري للتركيز ---
         _iframe.focus();
-        // محاولة إجبار التركيز داخل محتوى الـ Iframe بعد التحميل
         _iframe.onload = () => {
             _iframe.contentWindow.focus();
         };
+
+        // --- التعديل الجوهري: تشغيل واجهة التحكم الذكية للعبة ---
+        if (typeof GamepadUI !== 'undefined') {
+            GamepadUI.showForGame(devId);
+        }
+
     } else {
         Utils.hide(_iframe);
         Utils.show(_pCvs);
@@ -84,6 +87,11 @@ const Devices = (() => {
     Utils.hide(_pEl);
     _iframe.src = ''; 
     if(_isFullscreen) toggleFullscreen();
+    
+    // --- التعديل الجوهري: إخفاء واجهة التحكم وإرجاع عصا المشي ---
+    if (typeof GamepadUI !== 'undefined') {
+        GamepadUI.hide();
+    }
     Joystick.reset();Joystick.show();
     MiniGames.stop();
   }
