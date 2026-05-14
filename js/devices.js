@@ -57,7 +57,7 @@ const Devices = (() => {
         }
     }
 
-    if(_active && _iframe.classList.contains('hidden')){
+    if(_active && _iframe.classList.contains('hidden') && (!window.AndroidApp || !window.AndroidApp.triggerNativeTakeover)){
        _render(_active);
     }
   }
@@ -81,24 +81,34 @@ const Devices = (() => {
     const devId = devs.indexOf(dev);
 
     if (typeof GamesData !== 'undefined' && GamesData[devId]) {
-        Utils.hide('device-canvas');
-        Utils.show('device-iframe');
-        _iframe.src = GamesData[devId];
         
-        _iframe.focus();
-        _iframe.onload = () => {
-            _iframe.contentWindow.focus();
+        // =========================================
+        // 🚀 الجولة الأخيرة: تفعيل الاستحواذ الأصلي (Native Takeover)
+        // =========================================
+        if (window.AndroidApp && window.AndroidApp.triggerNativeTakeover) {
+            // 📱 التطبيق متصل: نرسل الرابط والأزرار دون استخدام Iframe!
             
-            // =========================================
-            // 🚀 إرسال الإشارة إلى تطبيق الأندرويد!
-            // =========================================
-            if (window.AndroidApp && window.AndroidApp.onGameScreenOpened) {
-                window.AndroidApp.onGameScreenOpened(GamesData[devId]);
-            }
-        };
+            // يمكنك هنا تخصيص الأزرار لكل لعبة لاحقاً (مثلاً بناءً على devId)، لكن هذا هو المطلوب حالياً:
+            let requiredKeys = "UP,DOWN,LEFT,RIGHT,Z,A,ENTER";
+            
+            // نداء لتطبيق الأندرويد ليقوم هو بفتح الشاشة بملء الشاشة ورسم الأزرار
+            window.AndroidApp.triggerNativeTakeover(GamesData[devId], requiredKeys);
+            
+        } else {
+            // 🌐 اللاعب داخل متصفح ويب عادي: نفتح اللعبة في الـ Iframe الكلاسيكي
+            Utils.hide('device-canvas');
+            Utils.show('device-iframe');
+            _iframe.src = GamesData[devId];
+            
+            _iframe.focus();
+            _iframe.onload = () => {
+                _iframe.contentWindow.focus();
+            };
 
-        if (typeof GamepadUI !== 'undefined') {
-            GamepadUI.showForGame(devId);
+            // إظهار الأزرار المخصصة للمتصفح إن وجدت
+            if (typeof GamepadUI !== 'undefined') {
+                GamepadUI.showForGame(devId);
+            }
         }
 
     } else {
@@ -116,9 +126,7 @@ const Devices = (() => {
     _iframe.src = ''; 
     if(_isFullscreen) toggleFullscreen();
     
-    // =========================================
-    // 🛑 إرسال إشارة للتطبيق أن الشاشة أُغلقت
-    // =========================================
+    // 🛑 إرسال إشارة إغلاق في حال احتجناها لاحقاً
     if (window.AndroidApp && window.AndroidApp.onGameScreenClosed) {
         window.AndroidApp.onGameScreenClosed();
     }
