@@ -1,171 +1,145 @@
 'use strict';
 const Chat = (() => {
-  const activeBubbles = new Map(); 
+  const MAX_CHARS = 100;
+  const activeBubbles = new Map();
   let chatBtn, chatModal, chatInput, chatSendBtn, chatCloseBtn;
 
   function init() {
-    chatBtn = document.getElementById('chat-action-btn');
-    if(!chatBtn) {
-        chatBtn = document.createElement('button');
-        chatBtn.id = 'chat-action-btn';
-        chatBtn.className = 'pixel-btn';
-        chatBtn.textContent = '💬 تحدث';
-        chatBtn.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:40;padding:12px 18px;font-size:10px;display:none;box-shadow:4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3);';
-        const container = document.getElementById('game-container') || document.body;
-        container.appendChild(chatBtn);
-    }
+    chatBtn      = Utils.$('chat-action-btn');
+    chatModal    = Utils.$('chat-modal');
+    chatInput    = Utils.$('chat-input');
+    chatSendBtn  = Utils.$('chat-send-btn');
+    chatCloseBtn = Utils.$('chat-close-btn');
+    if(!chatInput) return;
 
-    chatModal = document.getElementById('chat-modal');
-    if(!chatModal) {
-        chatModal = document.createElement('div');
-        chatModal.id = 'chat-modal';
-        chatModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:100;';
-        chatModal.innerHTML = `
-            <div style="background:#1a1a2e;border:4px solid #2a2a4e;padding:20px;display:flex;flex-direction:column;gap:15px;width:300px;text-align:center;">
-                <h3 style="color:#f0c040;font-family:'Press Start 2P',monospace;font-size:10px;">محادثة قريبة</h3>
-                <input type="text" id="chat-input" placeholder="اكتب رسالتك..." dir="auto" style="padding:10px;font-family:'Press Start 2P',monospace;font-size:8px;background:#0a0a0f;color:#fff;border:2px solid #2a2a4e;outline:none;" />
-                <div style="display:flex;gap:10px;justify-content:center;">
-                    <button id="chat-send-btn" class="pixel-btn" style="background:#40f080;">إرسال</button>
-                    <button id="chat-close-btn" class="pixel-btn" style="background:#f04060;">إلغاء</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(chatModal);
-    }
+    chatInput.maxLength = MAX_CHARS;
+    // دعم Enter للإرسال
+    chatInput.addEventListener('keypress', e => { if(e.key==='Enter') sendChat(); });
 
-    chatInput = document.getElementById('chat-input');
-    chatSendBtn = document.getElementById('chat-send-btn');
-    chatCloseBtn = document.getElementById('chat-close-btn');
-
-    chatBtn.onclick = openChat;
-    chatBtn.ontouchstart = (e) => { e.preventDefault(); openChat(); };
-    chatCloseBtn.onclick = closeChat;
-    chatSendBtn.onclick = sendChat;
-    
-    const maxLen = (typeof Addon !== 'undefined') ? Addon.Settings.maxChatChars : 100;
-    chatInput.maxLength = maxLen;
-    
-    chatInput.addEventListener('keypress', (e) => {
-        if(e.key === 'Enter') sendChat();
-    });
+    if(chatBtn)      { chatBtn.onclick = openChat; chatBtn.ontouchstart = e=>{ e.preventDefault(); openChat(); }; }
+    if(chatCloseBtn) { chatCloseBtn.onclick = closeChat; }
+    if(chatSendBtn)  { chatSendBtn.onclick  = sendChat;  }
   }
 
   function update(myPlayer, otherPlayers) {
-     if(!myPlayer) return;
-
-     let isNear = false;
-     const distLimit = (typeof Addon !== 'undefined') ? Addon.Settings.chatDistance : 200;
-
-     if (otherPlayers) {
-         for (const [id, p] of otherPlayers.entries()) {
-            const dist = Math.hypot(myPlayer.x - p.x, myPlayer.y - p.y);
-            if (dist < distLimit) {
-               isNear = true; 
-               break;
-            }
-         }
-     }
-
-     // --- إصلاح إظهار زر الدردشة ---
-     if(chatBtn && chatModal) {
-        const isModalOpen = (chatModal.style.display === 'flex');
-        
-        if(isNear && !isModalOpen) {
-           chatBtn.classList.remove('hidden');
-           chatBtn.style.display = 'block';
-        } else if (!isNear) {
-           chatBtn.classList.add('hidden');
-           chatBtn.style.display = 'none';
-           if(isModalOpen) closeChat();
-        }
-     }
-
-     const delta = 16.6; 
-     for (const [id, bubble] of activeBubbles.entries()) {
-        bubble.timer -= delta;
-        if (bubble.timer <= 0) activeBubbles.delete(id);
-     }
+    if(!myPlayer) return;
+    let isNear = false;
+    const DIST = 220;
+    if(otherPlayers) {
+      for(const [, p] of otherPlayers.entries()) {
+        if(Math.hypot(myPlayer.x - p.x, myPlayer.y - p.y) < DIST){ isNear=true; break; }
+      }
+    }
+    if(chatBtn && chatModal) {
+      const open = chatModal.style.display === 'flex';
+      if(isNear && !open)    { chatBtn.classList.remove('hidden'); chatBtn.style.display='block'; }
+      else if(!isNear)       { chatBtn.classList.add('hidden'); chatBtn.style.display='none'; if(open) closeChat(); }
+    }
+    const delta = 16.6;
+    for(const [id, b] of activeBubbles.entries()) {
+      b.timer -= delta;
+      if(b.timer <= 0) activeBubbles.delete(id);
+    }
   }
 
+  /* ====== رسم الفقاعات ====== */
   function drawBubbles(ctx, myPlayer, otherPlayers) {
-     if (myPlayer && activeBubbles.has('me')) {
-        _drawBubble(ctx, myPlayer.x, myPlayer.y, activeBubbles.get('me'));
-     }
-     if (otherPlayers) {
-         for (const [id, p] of otherPlayers.entries()) {
-            if (activeBubbles.has(id)) {
-               _drawBubble(ctx, p.x, p.y, activeBubbles.get(id));
-            }
-         }
-     }
+    if(myPlayer && activeBubbles.has('me'))
+      _drawBubble(ctx, myPlayer.x, myPlayer.y, activeBubbles.get('me'));
+    if(otherPlayers) {
+      for(const [id, p] of otherPlayers.entries()) {
+        if(activeBubbles.has(id)) _drawBubble(ctx, p.x, p.y, activeBubbles.get(id));
+      }
+    }
   }
 
   function _drawBubble(ctx, x, y, bubble) {
-     ctx.save();
-     ctx.font = '20px "Press Start 2P", monospace';
-     ctx.textAlign = 'center';
-     ctx.textBaseline = 'bottom';
-     ctx.direction = "rtl";
+    ctx.save();
 
-     const text = bubble.text;
-     const metrics = ctx.measureText(text);
-     const tw = Math.max(metrics.width + 24, 60); 
-     const th = 36;                 
-     const bx = x;
-     const by = y - 45;             
+    // ---- خط يدعم العربية والإنجليزية والإيموجي ----
+    const FONT_SIZE = 20;
+    ctx.font = `${FONT_SIZE}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Arial, sans-serif`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.direction    = 'rtl';
 
-     let alpha = 1;
-     if (bubble.timer < 500) alpha = bubble.timer / 500;
-     ctx.globalAlpha = Math.max(0, alpha);
+    const text    = bubble.text;
+    const metrics = ctx.measureText(text);
+    const tw = Math.max(metrics.width + 28, 70);
+    const th = FONT_SIZE + 20;
+    const bx = x;
+    const by = y - 55;
 
-     ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-     ctx.strokeStyle = '#0a0a0f';
-     ctx.lineWidth = 3;
-     
-     ctx.fillRect(bx - tw/2, by - th, tw, th);
-     ctx.strokeRect(bx - tw/2, by - th, tw, th);
+    let alpha = 1;
+    if(bubble.timer < 600) alpha = bubble.timer / 600;
+    ctx.globalAlpha = Math.max(0, alpha);
 
-     ctx.beginPath();
-     ctx.moveTo(bx - 6, by);
-     ctx.lineTo(bx + 6, by);
-     ctx.lineTo(bx, by + 8);
-     ctx.fill();
-     ctx.stroke();
+    // خلفية الفقاعة
+    ctx.fillStyle   = 'rgba(255,255,255,0.96)';
+    ctx.strokeStyle = '#0a0a0f';
+    ctx.lineWidth   = 2.5;
+    _roundRect(ctx, bx - tw/2, by - th/2, tw, th, 8);
+    ctx.fill(); ctx.stroke();
 
-     ctx.fillStyle = '#0a0a0f';
-     ctx.fillText(text, bx, by - 10);
-     ctx.restore();
+    // ذيل الفقاعة
+    ctx.beginPath();
+    ctx.moveTo(bx-7, by + th/2);
+    ctx.lineTo(bx+7, by + th/2);
+    ctx.lineTo(bx,   by + th/2 + 10);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.fill();
+    ctx.strokeStyle = '#0a0a0f'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx-7, by + th/2 + 1);
+    ctx.lineTo(bx,   by + th/2 + 10);
+    ctx.lineTo(bx+7, by + th/2 + 1);
+    ctx.stroke();
+
+    // نص الرسالة
+    ctx.fillStyle   = '#0a0a0f';
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.fillText(text, bx, by);
+
+    ctx.restore();
   }
 
+  // مستطيل بزوايا دائرية
+  function _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+    ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+    ctx.closePath();
+  }
+
+  /* ====== فتح / إغلاق / إرسال ====== */
   function openChat() {
-     chatModal.style.display = 'flex';
-     chatBtn.classList.add('hidden');
-     chatBtn.style.display = 'none';
-     chatInput.value = '';
-     chatInput.focus();
+    if(!chatModal) return;
+    chatModal.style.display = 'flex';
+    if(chatBtn){ chatBtn.classList.add('hidden'); chatBtn.style.display='none'; }
+    if(chatInput){ chatInput.value=''; chatInput.focus(); }
   }
 
   function closeChat() {
-     chatModal.style.display = 'none';
+    if(chatModal) chatModal.style.display = 'none';
   }
 
   function sendChat() {
-     const text = chatInput.value.trim();
-     const maxLen = (typeof Addon !== 'undefined') ? Addon.Settings.maxChatChars : 100;
-     if(text.length > 0) {
-        const safeText = text.substring(0, maxLen); 
-        addBubble('me', safeText);
-        
-        if (typeof Network !== 'undefined' && Network.isConnected()) {
-            Network.sendChat(safeText);
-        }
-     }
-     closeChat();
+    if(!chatInput) return;
+    const text = chatInput.value.trim().substring(0, MAX_CHARS);
+    if(text.length > 0) {
+      addBubble('me', text);
+      if(typeof Network !== 'undefined' && Network.isConnected())
+        Network.sendChat(text);
+    }
+    closeChat();
   }
 
   function addBubble(playerId, text) {
-     const duration = 2000 + (text.length * 100);
-     activeBubbles.set(playerId, { text: text, timer: duration });
+    const duration = Math.min(2000 + text.length * 80, 6000);
+    activeBubbles.set(playerId, { text, timer: duration });
   }
 
   return { init, update, drawBubbles, addBubble };
