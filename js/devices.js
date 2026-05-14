@@ -88,6 +88,13 @@ const Devices = (() => {
         _iframe.focus();
         _iframe.onload = () => {
             _iframe.contentWindow.focus();
+            
+            // =========================================
+            // 🚀 إرسال الإشارة إلى تطبيق الأندرويد!
+            // =========================================
+            if (window.AndroidApp && window.AndroidApp.onGameScreenOpened) {
+                window.AndroidApp.onGameScreenOpened(GamesData[devId]);
+            }
         };
 
         if (typeof GamepadUI !== 'undefined') {
@@ -109,6 +116,13 @@ const Devices = (() => {
     _iframe.src = ''; 
     if(_isFullscreen) toggleFullscreen();
     
+    // =========================================
+    // 🛑 إرسال إشارة للتطبيق أن الشاشة أُغلقت
+    // =========================================
+    if (window.AndroidApp && window.AndroidApp.onGameScreenClosed) {
+        window.AndroidApp.onGameScreenClosed();
+    }
+
     if (typeof GamepadUI !== 'undefined') {
         GamepadUI.hide();
     }
