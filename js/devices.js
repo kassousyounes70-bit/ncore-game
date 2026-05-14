@@ -88,11 +88,22 @@ const Devices = (() => {
         if (window.AndroidApp && window.AndroidApp.triggerNativeTakeover) {
             // 📱 التطبيق متصل: نرسل الرابط والأزرار دون استخدام Iframe!
             
-            // يمكنك هنا تخصيص الأزرار لكل لعبة لاحقاً (مثلاً بناءً على devId)، لكن هذا هو المطلوب حالياً:
-            let requiredKeys = "UP,DOWN,LEFT,RIGHT,Z,A,ENTER";
+            // الوضع الافتراضي: عصا تحكم بالأسهم
+            let requiredKeys = "JOYSTICK_ARROWS,Z,A,ENTER";
+            
+            // مثال لبرمجة ذكية: إذا كانت اللعبة رقم 2 أو 5 تحتاج حروف WASD
+            if (devId === 2 || devId === 5) {
+                requiredKeys = "JOYSTICK_WASD,J,K,SPACE";
+            }
             
             // نداء لتطبيق الأندرويد ليقوم هو بفتح الشاشة بملء الشاشة ورسم الأزرار
             window.AndroidApp.triggerNativeTakeover(GamesData[devId], requiredKeys);
+            
+            // إغلاق نافذة الحاسوب فوراً لكي يعود اللاعب للعالم مباشرة بعد إنهاء اللعبة
+            close();
+            
+            // 🛑 مهم جداً: إنهاء الدالة هنا لكي لا يقوم الكود في الأسفل بإخفاء أزرار التحكم الخاصة بالعالم
+            return;
             
         } else {
             // 🌐 اللاعب داخل متصفح ويب عادي: نفتح اللعبة في الـ Iframe الكلاسيكي
