@@ -5,6 +5,7 @@ const http     = require('http');
 const https    = require('https');
 const { Server } = require('socket.io');
 const cors     = require('cors');
+const mongoose = require('mongoose'); // تمت إضافة مكتبة قاعدة البيانات
 
 const app    = express();
 const server = http.createServer(app);
@@ -13,7 +14,7 @@ const CLIENT = process.env.CLIENT_URL || 'https://ncore-game.vercel.app';
 const MAX    = 50;
 
 /* ==============================
-   CORS
+   CORS & Middleware
    ============================== */
 app.use(cors({
   origin: [CLIENT, 'http://localhost:3000', 'http://127.0.0.1:5500',
@@ -23,15 +24,69 @@ app.use(cors({
 app.use(express.json());
 
 /* ==============================
-   🎮 بروكسي الألعاب
-   يحقن script الاستماع تلقائياً في كل HTML
+   🗄️ Database (MongoDB Atlas)
    ============================== */
+// 🚨 استبدل عبارة (ضع_كلمة_السر_هنا) بكلمة السر الحقيقية الخاصة بك
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://kassousyounes70_db_user:ضع_كلمة_السر_هنا@ncore-vault-db.s8ugksn.mongodb.net/ncore_db?retryWrites=true&w=majority&appName=ncore-vault-db";
 
-// السكريبت الذي يُحقن داخل اللعبة ليستقبل ضغطات الأزرار
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ [Database] متصل بقاعدة بيانات MongoDB (Vault) بنجاح'))
+  .catch(err => console.error('❌ [Database] فشل الاتصال بقاعدة البيانات:', err));
+
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    name: String,
+    avatarId: Number,
+    coins: Number,
+    playHours: Number,
+    gamesLoaded: Number,
+    tickets: Number,
+    lastSyncTime: Number
+});
+
+const User = mongoose.model('User', userSchema);
+
+/* ==============================
+   📡 API Routes (التحقق والمزامنة)
+   ============================== */
+app.get('/api/check-username', async (req, res) => {
+    try {
+        const requestedUsername = req.query.user;
+        if (!requestedUsername) {
+            return res.status(400).json({ error: "الرجاء توفير اسم مستخدم" });
+        }
+        const existingUser = await User.findOne({ username: requestedUsername });
+        res.json({ available: !existingUser });
+    } catch (error) {
+        console.error('[API Error]', error);
+        res.status(500).json({ error: "خطأ في الخادم" });
+    }
+});
+
+app.post('/sync', async (req, res) => {
+    try {
+        const profileData = req.body;
+        if (!profileData.username) {
+            return res.status(400).json({ error: "اسم المستخدم مفقود" });
+        }
+        await User.findOneAndUpdate(
+            { username: profileData.username }, 
+            profileData, 
+            { upsert: true, new: true }
+        );
+        res.status(200).json({ message: "تمت المزامنة بنجاح" });
+    } catch (error) {
+        console.error('[API Error]', error);
+        res.status(500).json({ error: "خطأ أثناء المزامنة" });
+    }
+});
+
+/* ==============================
+   🎮 بروكسي الألعاب
+   ============================== */
 const INJECT_SCRIPT = `
 <script>
 (function(){
-  // استقبال postMessage من الصالة وتحويله لأحداث لوحة مفاتيح
   window.addEventListener('message', function(e) {
     if (!e.data || !e.data.type) return;
     if (e.data.type !== 'keydown' && e.data.type !== 'keyup') return;
@@ -40,15 +95,12 @@ const INJECT_SCRIPT = `
       keyCode: e.data.keyCode, which: e.data.keyCode,
       bubbles: true, cancelable: true
     };
-    // إرسال للعناصر الرئيسية
     [window, document, document.body].forEach(function(t){
       if(t) try { t.dispatchEvent(new KeyboardEvent(e.data.type, opts)); } catch(x){}
     });
-    // إرسال لكل الـ canvas
     document.querySelectorAll('canvas').forEach(function(c){
       try { c.focus(); c.dispatchEvent(new KeyboardEvent(e.data.type, opts)); } catch(x){}
     });
-    // إذا لم يكن هناك عنصر مُفعَّل، فعّل أول canvas
     if (e.data.type === 'keydown') {
       var active = document.activeElement;
       if (!active || active === document.body) {
@@ -61,7 +113,6 @@ const INJECT_SCRIPT = `
 })();
 </script>`;
 
-// دالة مساعدة لطلب URL خارجي
 function fetchUrl(url, callback) {
   const mod = url.startsWith('https') ? https : http;
   const req = mod.get(url, {
@@ -77,9 +128,7 @@ function fetchUrl(url, callback) {
   return req;
 }
 
-// مسار البروكسي — يخدم أي محتوى من kdata1.com
 app.get('/game-proxy/*', (req, res) => {
-  // استخراج المسار من URL
   const gamePath = req.params[0] || '';
   const query    = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   const target   = `https://kdata1.com/${gamePath}${query}`;
@@ -87,14 +136,10 @@ app.get('/game-proxy/*', (req, res) => {
   console.log(`[Proxy] ← ${target}`);
 
   fetchUrl(target, (proxyRes) => {
-    if (!proxyRes) {
-      return res.status(502).send('Proxy connection failed');
-    }
+    if (!proxyRes) return res.status(502).send('Proxy connection failed');
 
-    // إعادة التوجيه
     if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
       const loc = proxyRes.headers.location;
-      // تحويل الرابط ليمر عبر بروكسينا
       const newLoc = loc.startsWith('http')
         ? loc.replace('https://kdata1.com', '/game-proxy').replace('http://kdata1.com', '/game-proxy')
         : `/game-proxy/${loc.replace(/^\//, '')}`;
@@ -103,7 +148,6 @@ app.get('/game-proxy/*', (req, res) => {
 
     const contentType = proxyRes.headers['content-type'] || 'application/octet-stream';
 
-    // إزالة قيود الـ iframe والـ CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.removeHeader('X-Frame-Options');
@@ -111,20 +155,15 @@ app.get('/game-proxy/*', (req, res) => {
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=1800');
 
-    // إذا كان HTML → احقن السكريبت
     if (contentType.includes('text/html')) {
       let html = '';
       proxyRes.setEncoding('utf8');
       proxyRes.on('data', chunk => { html += chunk; });
       proxyRes.on('end', () => {
-        // إصلاح الروابط النسبية لتمر عبر البروكسي
         html = html
-          .replace(/(href|src|action)="(\/[^"]*?)"/g, (_, attr, path) =>
-            `${attr}="/game-proxy${path}"`)
-          .replace(/url\(["']?\/((?!\/)[^"')]*?)["']?\)/g,
-            `url('/game-proxy/$1')`);
+          .replace(/(href|src|action)="(\/[^"]*?)"/g, (_, attr, path) => `${attr}="/game-proxy${path}"`)
+          .replace(/url\(["']?\/((?!\/)[^"')]*?)["']?\)/g, `url('/game-proxy/$1')`);
 
-        // حقن السكريبت
         const modified = html.includes('</head>')
           ? html.replace('</head>', INJECT_SCRIPT + '</head>')
           : html.includes('<body')
@@ -132,10 +171,8 @@ app.get('/game-proxy/*', (req, res) => {
             : INJECT_SCRIPT + html;
 
         res.send(modified);
-        console.log(`[Proxy] ✅ HTML injected (${modified.length} bytes)`);
       });
     } else {
-      // ملفات أخرى (JS, CSS, صور) → بث مباشر
       proxyRes.pipe(res);
     }
   });
@@ -179,6 +216,14 @@ io.on('connection', sock => {
     players.forEach((v, k) => { if (k !== sock.id) curr[k] = v; });
     sock.emit('players:list', curr);
     sock.broadcast.emit('player:joined', { id: sock.id, data: p });
+    
+    // 📩 رسالة النظام الترحيبية التوجيهية تظهر للاعب المُنضم فقط
+    sock.emit('chat:message', { 
+        id: 'SYSTEM', 
+        name: 'النظام 🛡️',
+        text: 'مرحباً بك في عالم N-CORE الافتراضي! 🌐 هذا العالم صُمم وهُندس بشغف، وبكم نرتقي. فضلاً ساعدونا في تطويره وبقاء الخوادم حية عبر مشاهدة الإعلانات 💖' 
+    });
+
     _log();
   });
 
@@ -210,7 +255,7 @@ io.on('connection', sock => {
 });
 
 /* ==============================
-   HTTP Routes
+   HTTP Routes (Basic)
    ============================== */
 app.get('/ping', (req, res) => res.json({
   status:  'alive',
@@ -222,7 +267,7 @@ app.get('/ping', (req, res) => res.json({
 }));
 
 app.get('/', (req, res) => res.json({
-  game:    'NCore MMO Server v2',
+  game:    'NCore Monolith Server v3',
   players: `${players.size}/${MAX}`,
   status:  'running'
 }));
@@ -255,10 +300,10 @@ process.on('unhandledRejection',   r   => console.error('[FATAL Promise]', r));
 
 server.listen(PORT, () => {
   console.log('================================');
-  console.log(`🎮 NCore MMO Server v2`);
+  console.log(`🎮 NCore Monolith Server v3`);
   console.log(`🚀 Port: ${PORT}`);
   console.log(`🌐 Client: ${CLIENT}`);
-  console.log(`👥 Max: ${MAX}`);
-  console.log(`🎯 Proxy: /game-proxy/*`);
+  console.log(`👥 Max Players: ${MAX}`);
+  console.log(`🗄️  Database API connected`);
   console.log('================================');
 });
