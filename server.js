@@ -27,7 +27,7 @@ app.use(express.json());
    🗄️ Database (MongoDB Atlas)
    ============================== */
 // 🚨 استبدل عبارة (ضع_كلمة_السر_هنا) بكلمة السر الحقيقية الخاصة بك
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://kassousyounes70_db_user:ضع_كلمة_السر_هنا@ncore-vault-db.s8ugksn.mongodb.net/ncore_db?retryWrites=true&w=majority&appName=ncore-vault-db";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://kassousyounes70_db_user:C0LgWEH4kRa8mqcZ@ncore-vault-db.s8ugksn.mongodb.net/ncore_db?retryWrites=true&w=majority&appName=ncore-vault-db";
 
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('✅ [Database] متصل بقاعدة بيانات MongoDB (Vault) بنجاح'))
