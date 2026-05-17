@@ -1,7 +1,7 @@
 {
   "name": "ncore-mmo-server",
-  "version": "2.0.0",
-  "description": "NCore Game — Multiplayer Server",
+  "version": "3.0.0",
+  "description": "NCore Monolith Server with Firestore",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -16,7 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
     "http-proxy-middleware": "^3.0.0",
-    "mongoose": "^8.0.3"
+    "firebase-admin": "^12.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

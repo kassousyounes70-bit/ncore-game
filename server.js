@@ -5,13 +5,23 @@ const http = require('http');
 const https = require('https');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const mongoose = require('mongoose');
 const path = require('path');
+const admin = require('firebase-admin');
+
+// 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري المرفق
+const serviceAccount = require('./n-core-nostagames-firebase-adminsdk-fbsvc-3114be4889.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
+console.log('✅ [Database] متصل بمحرك Firebase Firestore بنجاح');
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const CLIENT = process.env.CLIENT_URL || 'https://ncore-game.vercel.app';
+const CLIENT = process.env.CLIENT_URL || 'https://ncore-mmo-server.onrender.com';
 const MAX = 50;
 
 const io = new Server(server, {
@@ -26,27 +36,29 @@ app.use(cors({
   methods: ['GET', 'POST']
 }));
 app.use(express.json());
+
+// مسارات استضافة الملفات (OTA & Frontend)
 app.use('/updates', express.static(path.join(__dirname, 'updates')));
+app.use('/js', express.static(path.join(__dirname, 'js')));
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
+app.use('/Avatar', express.static(path.join(__dirname, 'Avatar')));
+app.use('/css', express.static(path.join(__dirname, 'css')));
+app.use('/styles', express.static(path.join(__dirname, 'styles')));
+app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://kassousyounes70_db_user:C0LgWEH4kRa8mqcZ@ncore-vault-db.s8ugksn.mongodb.net/ncore_db?retryWrites=true&w=majority&appName=ncore-vault-db";
-
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ [Database] متصل بقاعدة بيانات MongoDB (Vault) بنجاح'))
-  .catch(err => console.error('❌ [Database] فشل الاتصال بقاعدة البيانات:', err));
-
-const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    name: String,
-    isBoy: { type: Boolean, default: true },
-    avatarId: Number,
-    coins: Number,
-    playHours: Number,
-    gamesLoaded: Number,
-    tickets: Number,
-    lastSyncTime: Number
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-const User = mongoose.model('User', userSchema);
+app.get('/status', (req, res) => res.json({
+  game:    'NCore Monolith Server v4 (Firestore Edition)',
+  players: `${players.size}/${MAX}`,
+  status:  'running'
+}));
+
+// ==========================================
+// مسارات واجهة برمجة التطبيقات (Firestore API)
+// ==========================================
 
 app.get('/api/check-username', async (req, res) => {
     try {
@@ -54,8 +66,9 @@ app.get('/api/check-username', async (req, res) => {
         if (!requestedUsername) {
             return res.status(400).json({ error: "الرجاء توفير اسم مستخدم" });
         }
-        const existingUser = await User.findOne({ username: requestedUsername });
-        res.json({ available: !existingUser });
+        
+        const userDoc = await db.collection('users').doc(requestedUsername).get();
+        res.json({ available: !userDoc.exists });
     } catch (error) {
         console.error('[API Error]', error);
         res.status(500).json({ error: "خطأ في الخادم" });
@@ -68,17 +81,18 @@ app.post('/sync', async (req, res) => {
         if (!profileData.username) {
             return res.status(400).json({ error: "اسم المستخدم مفقود" });
         }
-        await User.findOneAndUpdate(
-            { username: profileData.username }, 
-            profileData, 
-            { upsert: true, new: true }
-        );
+        
+        await db.collection('users').doc(profileData.username).set(profileData, { merge: true });
         res.status(200).json({ message: "تمت المزامنة بنجاح" });
     } catch (error) {
         console.error('[API Error]', error);
         res.status(500).json({ error: "خطأ أثناء المزامنة" });
     }
 });
+
+// ==========================================
+// الجسر البرمجي للألعاب والاتصالات الحية (Socket.io)
+// ==========================================
 
 const INJECT_SCRIPT = `
 <script>
@@ -128,8 +142,6 @@ app.get('/game-proxy/*', (req, res) => {
   const gamePath = req.params[0] || '';
   const query    = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   const target   = `https://kdata1.com/${gamePath}${query}`;
-
-  console.log(`[Proxy] ← ${target}`);
 
   fetchUrl(target, (proxyRes) => {
     if (!proxyRes) return res.status(502).send('Proxy connection failed');
@@ -245,12 +257,6 @@ app.get('/ping', (req, res) => res.json({
   time:    new Date().toISOString()
 }));
 
-app.get('/', (req, res) => res.json({
-  game:    'NCore Monolith Server v3',
-  players: `${players.size}/${MAX}`,
-  status:  'running'
-}));
-
 setInterval(() => {
   const now = Date.now(), timeout = 10 * 60 * 1000;
   players.forEach((p, id) => {
@@ -273,10 +279,10 @@ process.on('unhandledRejection',   r   => console.error('[FATAL Promise]', r));
 
 server.listen(PORT, () => {
   console.log('================================');
-  console.log(`🎮 NCore Monolith Server v3`);
+  console.log(`🎮 NCore Monolith Server v4 (Firestore Edition)`);
   console.log(`🚀 Port: ${PORT}`);
   console.log(`🌐 Client: ${CLIENT}`);
   console.log(`👥 Max Players: ${MAX}`);
-  console.log(`🗄️  Database API connected`);
+  console.log(`🗄️  Firebase Admin Connected`);
   console.log('================================');
 });
