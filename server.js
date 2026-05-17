@@ -36,6 +36,9 @@ app.use('/updates', express.static(path.join(__dirname, 'updates')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/Avatar', express.static(path.join(__dirname, 'Avatar')));
+app.use('/css', express.static(path.join(__dirname, 'css')));       // تم فتح البوابة لملفات التصميم
+app.use('/styles', express.static(path.join(__dirname, 'styles'))); // كخيار بديل لأسماء المجلدات
+app.use('/fonts', express.static(path.join(__dirname, 'fonts')));   // السماح بمرور الخطوط إن وجدت
 
 // تسليم واجهة اللعبة (ملف HTML) عند زيارة الرابط الرئيسي
 app.get('/', (req, res) => {
