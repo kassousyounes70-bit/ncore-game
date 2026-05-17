@@ -1,32 +1,26 @@
 'use strict';
 require('dotenv').config();
-const express  = require('express');
-const http     = require('http');
-const https    = require('https');
+const express = require('express');
+const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
-const cors     = require('cors');
-const mongoose = require('mongoose'); // تمت إضافة مكتبة قاعدة البيانات
+const cors = require('cors');
+const mongoose = require('mongoose');
+const path = require('path');
 
-const app    = express();
+const app = express();
 const server = http.createServer(app);
-const PORT   = process.env.PORT   || 3000;
+const PORT = process.env.PORT || 3000;
 const CLIENT = process.env.CLIENT_URL || 'https://ncore-game.vercel.app';
-const MAX    = 50;
+const MAX = 50;
 
-/* ==============================
-   CORS & Middleware
-   ============================== */
 app.use(cors({
-  origin: [CLIENT, 'http://localhost:3000', 'http://127.0.0.1:5500',
-           'https://appassets.androidplatform.net'],
-  methods: ['GET','POST']
+  origin: [CLIENT, 'http://localhost:3000', 'http://127.0.0.1:5500', 'https://appassets.androidplatform.net'],
+  methods: ['GET', 'POST']
 }));
 app.use(express.json());
+app.use('/updates', express.static(path.join(__dirname, 'updates')));
 
-/* ==============================
-   🗄️ Database (MongoDB Atlas)
-   ============================== */
-// 🚨 استبدل عبارة (ضع_كلمة_السر_هنا) بكلمة السر الحقيقية الخاصة بك
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://kassousyounes70_db_user:C0LgWEH4kRa8mqcZ@ncore-vault-db.s8ugksn.mongodb.net/ncore_db?retryWrites=true&w=majority&appName=ncore-vault-db";
 
 mongoose.connect(MONGODB_URI)
@@ -36,6 +30,7 @@ mongoose.connect(MONGODB_URI)
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     name: String,
+    isBoy: { type: Boolean, default: true },
     avatarId: Number,
     coins: Number,
     playHours: Number,
@@ -46,9 +41,6 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-/* ==============================
-   📡 API Routes (التحقق والمزامنة)
-   ============================== */
 app.get('/api/check-username', async (req, res) => {
     try {
         const requestedUsername = req.query.user;
@@ -81,9 +73,6 @@ app.post('/sync', async (req, res) => {
     }
 });
 
-/* ==============================
-   🎮 بروكسي الألعاب
-   ============================== */
 const INJECT_SCRIPT = `
 <script>
 (function(){
@@ -178,20 +167,6 @@ app.get('/game-proxy/*', (req, res) => {
   });
 });
 
-/* ==============================
-   Socket.io — Multiplayer
-   ============================== */
-const io = new Server(server, {
-  cors: {
-    origin: [CLIENT, 'http://localhost:3000', 'http://127.0.0.1:5500',
-             'https://appassets.androidplatform.net'],
-    methods: ['GET','POST']
-  },
-  transports:    ['websocket'],
-  pingInterval:  25000,
-  pingTimeout:   60000
-});
-
 const players = new Map();
 
 io.on('connection', sock => {
@@ -207,7 +182,8 @@ io.on('connection', sock => {
       x:        _clamp(data.x   || 2400, 60, 2500),
       y:        _clamp(data.y   || 960,  60, 1860),
       dir:      _dir(data.dir),
-      charId:   _clamp(data.charId || 0, 0, 10),
+      avatarId: _clamp(data.avatarId || 0, 0, 1000),
+      isBoy:    data.isBoy !== undefined ? data.isBoy : true,
       name:     _clean(data.name || 'لاعب'),
       joinedAt: Date.now()
     };
@@ -217,7 +193,6 @@ io.on('connection', sock => {
     sock.emit('players:list', curr);
     sock.broadcast.emit('player:joined', { id: sock.id, data: p });
     
-    // 📩 رسالة النظام الترحيبية التوجيهية تظهر للاعب المُنضم فقط
     sock.emit('chat:message', { 
         id: 'SYSTEM', 
         name: 'النظام 🛡️',
@@ -254,9 +229,6 @@ io.on('connection', sock => {
   sock.on('error', err => console.error(`[Err] ${sock.id}:`, err.message));
 });
 
-/* ==============================
-   HTTP Routes (Basic)
-   ============================== */
 app.get('/ping', (req, res) => res.json({
   status:  'alive',
   players: players.size,
@@ -272,9 +244,6 @@ app.get('/', (req, res) => res.json({
   status:  'running'
 }));
 
-/* ==============================
-   Cleanup
-   ============================== */
 setInterval(() => {
   const now = Date.now(), timeout = 10 * 60 * 1000;
   players.forEach((p, id) => {
@@ -287,9 +256,6 @@ setInterval(() => {
   });
 }, 5 * 60 * 1000);
 
-/* ==============================
-   Helpers
-   ============================== */
 function _clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, Number(v) || 0)); }
 function _clean(s) { return String(s).replace(/[<>"'&]/g, '').trim().slice(0, 16) || 'لاعب'; }
 function _dir(d) { return ['up','down','left','right','idle'].includes(d) ? d : 'idle'; }
