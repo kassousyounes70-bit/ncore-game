@@ -14,6 +14,13 @@ const PORT = process.env.PORT || 3000;
 const CLIENT = process.env.CLIENT_URL || 'https://ncore-game.vercel.app';
 const MAX = 50;
 
+const io = new Server(server, {
+  cors: {
+    origin: [CLIENT, 'http://localhost:3000', 'http://127.0.0.1:5500', 'https://appassets.androidplatform.net'],
+    methods: ['GET', 'POST']
+  }
+});
+
 app.use(cors({
   origin: [CLIENT, 'http://localhost:3000', 'http://127.0.0.1:5500', 'https://appassets.androidplatform.net'],
   methods: ['GET', 'POST']
