@@ -11,9 +11,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-
-// اعتماد خادم Render كواجهة أساسية وإلغاء Vercel تماماً
-const CLIENT = process.env.CLIENT_URL || 'https://ncore-mmo-server.onrender.com';
+const CLIENT = process.env.CLIENT_URL || 'https://ncore-game.vercel.app';
 const MAX = 50;
 
 const io = new Server(server, {
@@ -28,29 +26,7 @@ app.use(cors({
   methods: ['GET', 'POST']
 }));
 app.use(express.json());
-
-// مسار التحديثات (OTA)
 app.use('/updates', express.static(path.join(__dirname, 'updates')));
-
-// التوجيه الانتقائي للموارد: مشاركة المجلدات المطلوبة فقط لحماية الجذر والأكواد الحساسة
-app.use('/js', express.static(path.join(__dirname, 'js')));
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
-app.use('/Avatar', express.static(path.join(__dirname, 'Avatar')));
-app.use('/css', express.static(path.join(__dirname, 'css')));       // تم فتح البوابة لملفات التصميم
-app.use('/styles', express.static(path.join(__dirname, 'styles'))); // كخيار بديل لأسماء المجلدات
-app.use('/fonts', express.static(path.join(__dirname, 'fonts')));   // السماح بمرور الخطوط إن وجدت
-
-// تسليم واجهة اللعبة (ملف HTML) عند زيارة الرابط الرئيسي
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// نقل بيانات فحص الصحة إلى مسار فرعي لكي لا تتعارض مع واجهة اللعبة
-app.get('/status', (req, res) => res.json({
-  game:    'NCore Monolith Server v3',
-  players: `${players.size}/${MAX}`,
-  status:  'running'
-}));
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://kassousyounes70_db_user:C0LgWEH4kRa8mqcZ@ncore-vault-db.s8ugksn.mongodb.net/ncore_db?retryWrites=true&w=majority&appName=ncore-vault-db";
 
@@ -267,6 +243,12 @@ app.get('/ping', (req, res) => res.json({
   uptime:  Math.floor(process.uptime()) + 's',
   memory:  Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
   time:    new Date().toISOString()
+}));
+
+app.get('/', (req, res) => res.json({
+  game:    'NCore Monolith Server v3',
+  players: `${players.size}/${MAX}`,
+  status:  'running'
 }));
 
 setInterval(() => {
