@@ -75,6 +75,27 @@ app.get('/api/check-username', async (req, res) => {
     }
 });
 
+// المسار الهندسي الجديد: سحب بيانات اللاعب المحدثة (Pull Sync)
+app.get('/api/profile', async (req, res) => {
+    try {
+        const username = req.query.user;
+        if (!username) {
+            return res.status(400).json({ error: "اسم المستخدم مفقود" });
+        }
+
+        const userDoc = await db.collection('users').doc(username).get();
+        
+        if (!userDoc.exists) {
+            return res.status(404).json({ error: "اللاعب غير موجود" });
+        }
+
+        res.status(200).json(userDoc.data());
+    } catch (error) {
+        console.error('[API Error Profile]', error);
+        res.status(500).json({ error: "خطأ أثناء سحب البيانات" });
+    }
+});
+
 app.post('/sync', async (req, res) => {
     try {
         const profileData = req.body;
@@ -101,10 +122,6 @@ app.post('/api/referral', async (req, res) => {
             return res.status(400).json({ error: "بيانات غير مكتملة" });
         }
 
-        if (referralCode === newPlayerUsername) {
-            return res.status(400).json({ error: "لا يمكنك استخدام كود الدعوة الخاص بك!" });
-        }
-
         // 1. التحقق من بصمة الجهاز لمنع الاستغلال (Farming)
         const deviceRef = db.collection('used_referrals').doc(deviceId);
         const deviceDoc = await deviceRef.get();
@@ -113,12 +130,19 @@ app.post('/api/referral', async (req, res) => {
             return res.status(400).json({ error: "عذراً، هذا الجهاز استخدم كود دعوة مسبقاً." });
         }
 
-        // 2. التحقق من وجود حساب الداعي (صاحب الكود)
-        const inviterRef = db.collection('users').doc(referralCode);
-        const inviterDoc = await inviterRef.get();
+        // 2. البحث عن الداعي باستخدام الكود العشوائي (الاستعلام في الحقول بدلاً من معرف الوثيقة)
+        const inviterQuery = await db.collection('users').where('referralCode', '==', referralCode).limit(1).get();
 
-        if (!inviterDoc.exists) {
+        if (inviterQuery.empty) {
             return res.status(400).json({ error: "كود الدعوة غير صحيح أو اللاعب غير موجود." });
+        }
+
+        const inviterDoc = inviterQuery.docs[0];
+        const inviterRef = inviterDoc.ref;
+
+        // منع إدخال اللاعب لكوده الخاص
+        if (inviterDoc.id === newPlayerUsername) {
+            return res.status(400).json({ error: "لا يمكنك استخدام كود الدعوة الخاص بك!" });
         }
 
         const inviteeRef = db.collection('users').doc(newPlayerUsername);
@@ -277,7 +301,6 @@ io.on('connection', sock => {
     sock.emit('players:list', curr);
     sock.broadcast.emit('player:joined', { id: sock.id, data: p });
     
-    // تم التعديل الجذري لرسالة الترحيب لتعكس الشفافية والرؤية القادمة
     sock.emit('chat:message', { 
         id: 'SYSTEM', 
         name: 'النظام 🛡️',
