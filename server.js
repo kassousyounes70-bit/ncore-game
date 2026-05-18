@@ -91,6 +91,71 @@ app.post('/sync', async (req, res) => {
 });
 
 // ==========================================
+// نظام الدعوات المدرع (Referral API)
+// ==========================================
+app.post('/api/referral', async (req, res) => {
+    try {
+        const { deviceId, referralCode, newPlayerUsername } = req.body;
+
+        if (!deviceId || !referralCode || !newPlayerUsername) {
+            return res.status(400).json({ error: "بيانات غير مكتملة" });
+        }
+
+        if (referralCode === newPlayerUsername) {
+            return res.status(400).json({ error: "لا يمكنك استخدام كود الدعوة الخاص بك!" });
+        }
+
+        // 1. التحقق من بصمة الجهاز لمنع الاستغلال (Farming)
+        const deviceRef = db.collection('used_referrals').doc(deviceId);
+        const deviceDoc = await deviceRef.get();
+
+        if (deviceDoc.exists) {
+            return res.status(400).json({ error: "عذراً، هذا الجهاز استخدم كود دعوة مسبقاً." });
+        }
+
+        // 2. التحقق من وجود حساب الداعي (صاحب الكود)
+        const inviterRef = db.collection('users').doc(referralCode);
+        const inviterDoc = await inviterRef.get();
+
+        if (!inviterDoc.exists) {
+            return res.status(400).json({ error: "كود الدعوة غير صحيح أو اللاعب غير موجود." });
+        }
+
+        const inviteeRef = db.collection('users').doc(newPlayerUsername);
+
+        // 3. التنفيذ المجمع الآمن (Batch Transaction)
+        const batch = db.batch();
+
+        // ختم بصمة الجهاز
+        batch.set(deviceRef, { 
+            usedAt: admin.firestore.FieldValue.serverTimestamp(),
+            referredBy: referralCode,
+            newUser: newPlayerUsername
+        });
+
+        // إضافة 25 عملة للداعي
+        batch.update(inviterRef, {
+            coins: admin.firestore.FieldValue.increment(25)
+        });
+
+        // إضافة 10 عملات للمدعو
+        batch.set(inviteeRef, {
+            coins: admin.firestore.FieldValue.increment(10)
+        }, { merge: true });
+
+        // تنفيذ كل العمليات بضربة واحدة
+        await batch.commit();
+
+        res.status(200).json({ message: "تم تفعيل الكود بنجاح! حصلت على 10 عملات 🎁" });
+
+    } catch (error) {
+        console.error('[API Error Referral]', error);
+        res.status(500).json({ error: "خطأ في معالجة الدعوة." });
+    }
+});
+
+
+// ==========================================
 // الجسر البرمجي للألعاب والاتصالات الحية (Socket.io)
 // ==========================================
 
@@ -212,10 +277,11 @@ io.on('connection', sock => {
     sock.emit('players:list', curr);
     sock.broadcast.emit('player:joined', { id: sock.id, data: p });
     
+    // تم التعديل الجذري لرسالة الترحيب لتعكس الشفافية والرؤية القادمة
     sock.emit('chat:message', { 
         id: 'SYSTEM', 
         name: 'النظام 🛡️',
-        text: 'مرحباً بك في عالم N-CORE الافتراضي! 🌐 هذا العالم صُمم وهُندس بشغف، وبكم نرتقي. فضلاً ساعدونا في تطويره وبقاء الخوادم حية عبر مشاهدة الإعلانات 💖' 
+        text: 'مرحباً بك في عالم N-CORE الافتراضي! 🌐 خوادمنا الحالية في نسختها التجريبية الأولى وتدعم (50 لاعباً) كحد أقصى للحفاظ على استقرار اللعبة. نحن نعتمد على تفاعلكم ومشاهدتكم للإعلانات؛ فبكم نكبر، وهدفنا القادم هو ترقية العتاد لفتح خوادم عملاقة تسع الآلاف! شارك اللعبة، ادعُ أصدقاءك، وكن من المؤسسين الأوائل 🚀' 
     });
 
     _log();
