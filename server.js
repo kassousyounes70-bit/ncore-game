@@ -7,9 +7,25 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const admin = require('firebase-admin');
+const fs = require('fs');
 
-// 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري المرفق
-const serviceAccount = require('./n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json');
+// 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري
+let serviceAccount;
+const secretPath = '/etc/secrets/n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json';
+
+try {
+  // المحاولة الأولى: القراءة من الخزنة السرية في منصة Render
+  if (fs.existsSync(secretPath)) {
+    serviceAccount = require(secretPath);
+    console.log('✅ [Security] تم تحميل الملف النووي من الخزنة السرية لـ Render بنجاح');
+  } else {
+    // المحاولة الثانية: القراءة المحلية (مفيدة أثناء التطوير على الحاسوب الشخصي)
+    serviceAccount = require('./n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json');
+    console.log('⚠️ [Security] تم تحميل الملف النووي محلياً (بيئة التطوير)');
+  }
+} catch (error) {
+  console.error('❌ [Security] خطأ فادح: لم يتم العثور على الملف النووي أو فشل في قراءته!', error.message);
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -42,6 +58,10 @@ app.use('/updates', express.static(path.join(__dirname, 'updates')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/Avatar', express.static(path.join(__dirname, 'Avatar')));
+
+// المسار الجديد: السماح للتطبيق بسحب المقاطع الصوتية مباشرة
+app.use('/Song', express.static(path.join(__dirname, 'Song')));
+
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/styles', express.static(path.join(__dirname, 'styles')));
 app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
