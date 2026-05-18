@@ -3,6 +3,30 @@ const Game = (() => {
   const S={LOADING:'loading',SELECT:'select',PLAYING:'playing',PAUSED:'paused'};
   let _state=S.LOADING,_cvs=null,_ctx=null,_last=0,_raf=null,_debug=false;
 
+  // ==========================================
+  // نظام الراديو السحابي الجديد (Web HTML5 Audio)
+  // ==========================================
+  let _bgm = new Audio();
+  let _currentTrack = 1;
+  const _maxTracks = 3; // 🎵 قم بتغيير هذا الرقم حسب عدد الأغاني المتوفرة في مجلد Song بخادمك
+
+  function _playNextTrack() {
+    // تنسيق الرقم ليصبح 01, 02, 03...
+    const trackNumber = String(_currentTrack).padStart(2, '0');
+    _bgm.src = `/Song/title_${trackNumber}.mp3`;
+    _bgm.volume = 0.3; // مستوى الصوت (0.3 يعادل 30%)
+    
+    _bgm.play().catch(err => console.warn('[BGM] المتصفح منع التشغيل:', err));
+    
+    // الانتقال التلقائي للمسار التالي عند انتهاء الأغنية
+    _bgm.onended = () => {
+      _currentTrack++;
+      if (_currentTrack > _maxTracks) _currentTrack = 1;
+      _playNextTrack();
+    };
+  }
+  // ==========================================
+
   function init(){
     _cvs=Utils.$('game-canvas');_ctx=_cvs.getContext('2d');
     _ctx.imageSmoothingEnabled=false;
@@ -29,6 +53,10 @@ const Game = (() => {
     UI.showHUD(Player.getCharName());
     Joystick.show();_regInteract();
     Network.connect(charId,()=>UI.showToast('مرحباً بك في صالة الألعاب! 🎮',2500));
+    
+    // 🔥 تشغيل الراديو السحابي فور النقر والدخول للعبة
+    _playNextTrack();
+
     _state=S.PLAYING;_last=performance.now();_raf=requestAnimationFrame(_loop);
   }
 
@@ -45,7 +73,7 @@ const Game = (() => {
     if(!open){
       Player.update(delta);
       
-      // الخطأ كان هنا: نسينا تمرير الـ delta! يجب أن تكون 3 معاملات.
+      // تمرير الـ delta
       Camera.update(Player.getCenterX(), Player.getCenterY(), delta);
       
       Network.sendPosition(Player.getCenterX(),Player.getCenterY(),Player.getRect(),Joystick.getDirection());
@@ -110,8 +138,21 @@ const Game = (() => {
     if(_state===S.PLAYING)Camera.resize(_cvs.width,_cvs.height);
   }
 
-  function pause(){if(_state===S.PLAYING){_state=S.PAUSED;if(_raf)cancelAnimationFrame(_raf);}}
-  function resume(){if(_state===S.PAUSED){_state=S.PLAYING;_last=performance.now();_raf=requestAnimationFrame(_loop);}}
+  function pause(){
+    if(_state===S.PLAYING){
+      _state=S.PAUSED;
+      if(_raf)cancelAnimationFrame(_raf);
+      if(_bgm)_bgm.pause(); // 🔇 إيقاف الموسيقى عند الخروج من اللعبة
+    }
+  }
+  function resume(){
+    if(_state===S.PAUSED){
+      _state=S.PLAYING;
+      _last=performance.now();
+      _raf=requestAnimationFrame(_loop);
+      if(_bgm)_bgm.play().catch(e=>{}); // 🔊 تشغيل الموسيقى مجدداً عند العودة
+    }
+  }
 
   document.addEventListener('visibilitychange',()=>document.hidden?pause():resume());
   window.addEventListener('keydown',e=>{
