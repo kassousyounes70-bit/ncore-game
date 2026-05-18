@@ -9,7 +9,7 @@ const path = require('path');
 const admin = require('firebase-admin');
 
 // 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري المرفق
-const serviceAccount = require('./n-core-nostagames-firebase-adminsdk-fbsvc-395f77f4fa.json');
+const serviceAccount = require('./n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
