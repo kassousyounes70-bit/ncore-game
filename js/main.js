@@ -3,8 +3,6 @@
   document.addEventListener('contextmenu',e=>e.preventDefault());
   document.addEventListener('gesturestart',e=>e.preventDefault());
   document.addEventListener('touchmove',e=>{if(e.target.closest('#joystick-zone'))e.preventDefault();},{passive:false});
-  let lastTap=0;
-  document.addEventListener('touchend',e=>{const now=Date.now();if(now-lastTap<300)e.preventDefault();lastTap=now;},{passive:false});
 
   function _checkSupport(){
     const i=[];
