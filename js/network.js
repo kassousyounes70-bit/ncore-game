@@ -20,13 +20,25 @@ const Network = (() => {
       _onConn&&_onConn();
     });
     
-    _sock.on('players:list',players=>{
+    _sock.on('players:list', async players => {
       _players.clear();
-      for(const[id,d]of Object.entries(players))if(id!==_myId)_players.set(id,_mk(d));
+      for(const[id,d] of Object.entries(players)) {
+        if(id!==_myId) {
+            // تم التعديل: ننتظر تحميل الأفاتار الخاص باللاعب إذا لزم الأمر قبل إضافته للمشهد
+            if(d.charId === 0 && window.Player) {
+                await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
+            }
+            _players.set(id,_mk(d));
+        }
+      }
     });
     
-    _sock.on('player:joined',({id,data})=>{
-      if(id===_myId)return;
+    _sock.on('player:joined', async ({id,data}) => {
+      if(id===_myId) return;
+      // تم التعديل: التحميل المسبق (Asset Queueing) هنا لمنع المستطيل الأسود
+      if(data.charId === 0 && window.Player) {
+          await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
+      }
       _players.set(id,_mk(data));
       UI.showToast('لاعب جديد دخل الصالة 🎮',1800);
     });
@@ -36,11 +48,8 @@ const Network = (() => {
       p.tx=x;p.ty=y;p.dir=dir;p.moving=dir!=='idle';
     });
 
-    // استقبال رسالة دردشة من لاعب آخر
     _sock.on('chat:message',({id, text})=>{
-      if(window.Chat && id !== _myId) {
-         Chat.addBubble(id, text);
-      }
+      if(window.Chat && id !== _myId) Chat.addBubble(id, text);
     });
 
     _sock.on('player:left',id=>{_players.delete(id);});
@@ -67,7 +76,6 @@ const Network = (() => {
     _sock.emit('player:move',{x:Math.round(cx),y:Math.round(cy),dir});
   }
 
-  // إرسال رسالة دردشة للسيرفر
   function sendChat(text) {
      if(!_connected) return;
      _sock.emit('chat:message', text);
@@ -106,8 +114,6 @@ const Network = (() => {
   function getPlayerCount(){return _players.size;}
   function isConnected(){return _connected;}
   function getMyId(){return _myId;}
-  
-  // دالة لجلب قائمة اللاعبين (يحتاجها chat.js)
   function getPlayers(){return _players;}
 
   return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId, sendChat, getPlayers};
