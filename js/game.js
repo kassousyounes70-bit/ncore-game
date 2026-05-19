@@ -7,34 +7,30 @@ const Game = (() => {
     _cvs=Utils.$('game-canvas');_ctx=_cvs.getContext('2d');
     _ctx.imageSmoothingEnabled=false;
     _resize();window.addEventListener('resize',_resize);
-    UI.showLoading(()=>{_initSystems();UI.showCharacterSelect(_onChar);_state=S.SELECT;});
+    
+    // تم التعديل: الانتظار حتى اكتمال جميع التحميلات المسبقة قبل استدعاء UI
+    Player.preload();
+    UI.showLoading(()=>{
+        _initSystems();
+        UI.showCharacterSelect(_onChar);
+        _state=S.SELECT;
+    });
   }
 
   function _initSystems(){
     GameMap.init();
     Camera.init(_cvs.width,_cvs.height,2560,1920,0.12);
     Devices.init();Joystick.init();
-    
-    // تهيئة نظام المحادثة
     if(window.Chat) Chat.init();
   }
 
   function _onChar(charId){
     UI.stopPreviewAnimation();UI.showGame();
     Player.init(charId);NPC.init();
-    
-    // الحل: استخدام snapTo لانتقال الكاميرا فوراً في البداية بدون أنميشن
     Camera.snapTo(Player.getCenterX(), Player.getCenterY());
-
     UI.showHUD(Player.getCharName());
     Joystick.show();_regInteract();
     Network.connect(charId,()=>UI.showToast('مرحباً بك في صالة الألعاب! 🎮',2500));
-    
-    // 🔥 انطلاق الراديو السحابي المستقل فور إعطاء اللاعب إذن الدخول بنقرته على الزر
-    if (window.Sound) {
-      Sound.playNext();
-    }
-
     _state=S.PLAYING;_last=performance.now();_raf=requestAnimationFrame(_loop);
   }
 
@@ -50,21 +46,16 @@ const Game = (() => {
     
     if(!open){
       Player.update(delta);
-      
-      // تمرير الـ delta
       Camera.update(Player.getCenterX(), Player.getCenterY(), delta);
-      
       Network.sendPosition(Player.getCenterX(),Player.getCenterY(),Player.getRect(),Joystick.getDirection());
     }
     
     NPC.update(delta);Devices.update(delta);
     
-    // تحديث المحادثة المكانية
     if(window.Chat && Network.isConnected()) {
        Chat.update({x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
     }
 
-    // عداد اللاعبين
     const el=Utils.$('hud-players-count');
     if(el)el.textContent='👥 '+(Network.getPlayerCount()+1);
   }
@@ -78,12 +69,7 @@ const Game = (() => {
       NPC.draw(ctx);
       Network.drawOtherPlayers(ctx,Player.getAllChars());
       Player.draw(ctx);
-      
-      // رسم فقاعات الدردشة
-      if(window.Chat) {
-         Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
-      }
-
+      if(window.Chat) Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
       if(_debug)Collision.debugDraw(ctx,Camera.getOffset());
     Camera.endDraw(ctx);
     _vignette(ctx,cw,ch);
@@ -96,7 +82,6 @@ const Game = (() => {
   }
 
   function _regInteract(){
-    // ربط زر التفاعل الجديد
     const interactBtn = Utils.$('interact-btn');
     if (interactBtn) {
       const onInteract = (e) => {
@@ -116,24 +101,8 @@ const Game = (() => {
     if(_state===S.PLAYING)Camera.resize(_cvs.width,_cvs.height);
   }
 
-  function pause(){
-    if(_state===S.PLAYING){
-      _state=S.PAUSED;
-      if(_raf)cancelAnimationFrame(_raf);
-      // 🔇 إيقاف الموسيقى صامتاً عند الخروج من اللعبة أو تصغير التفرع لحماية المعالج
-      if(window.Sound) Sound.pause();
-    }
-  }
-  
-  function resume(){
-    if(_state===S.PAUSED){
-      _state=S.PLAYING;
-      _last=performance.now();
-      _raf=requestAnimationFrame(_loop);
-      // 🔊 إعادة استكمال الأغنية من مكانها فور عودة تركيز المستخدم على اللعبة
-      if(window.Sound) Sound.resume();
-    }
-  }
+  function pause(){if(_state===S.PLAYING){_state=S.PAUSED;if(_raf)cancelAnimationFrame(_raf);}}
+  function resume(){if(_state===S.PAUSED){_state=S.PLAYING;_last=performance.now();_raf=requestAnimationFrame(_loop);}}
 
   document.addEventListener('visibilitychange',()=>document.hidden?pause():resume());
   window.addEventListener('keydown',e=>{
