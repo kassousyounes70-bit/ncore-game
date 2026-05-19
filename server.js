@@ -9,30 +9,53 @@ const path = require('path');
 const admin = require('firebase-admin');
 const fs = require('fs');
 
-// 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري
-let serviceAccount;
-const secretPath = '/etc/secrets/n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json';
+// 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري (النسخة المدرعة)
+let serviceAccount = null;
+const secretFilename = 'n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json';
 
-try {
-  // المحاولة الأولى: القراءة من الخزنة السرية في منصة Render
-  if (fs.existsSync(secretPath)) {
-    serviceAccount = require(secretPath);
-    console.log('✅ [Security] تم تحميل الملف النووي من الخزنة السرية لـ Render بنجاح');
-  } else {
-    // المحاولة الثانية: القراءة المحلية (مفيدة أثناء التطوير على الحاسوب الشخصي)
-    serviceAccount = require('./n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json');
-    console.log('⚠️ [Security] تم تحميل الملف النووي محلياً (بيئة التطوير)');
+// منصة Render تضع الملفات السرية إما في مجلد /etc/secrets/ أو في جذر المشروع
+const possiblePaths = [
+  `/etc/secrets/${secretFilename}`,                     // مسار الخزنة السرية الافتراضي في Render
+  path.join('/opt/render/project/src', secretFilename), // مسار جذر المشروع في Render
+  path.join(__dirname, secretFilename)                  // المسار المحلي للكمبيوتر (أثناء التطوير)
+];
+
+for (const p of possiblePaths) {
+  if (fs.existsSync(p)) {
+    try {
+      // استخدام readFileSync بدلاً من require لتجنب مشاكل الذاكرة للملفات خارج المشروع
+      const rawData = fs.readFileSync(p, 'utf8');
+      serviceAccount = JSON.parse(rawData);
+      
+      // ⚠️ الضربة القاضية لمشكلة 500 UNAUTHENTICATED: 
+      // أحياناً عند قراءة الملف، يتم تحويل سطر النهاية (\n) إلى (\\n)، مما يفسد المفتاح!
+      if (serviceAccount && serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
+      
+      console.log(`✅ [Security] تم العثور على الملف السري وقراءته بنجاح من:\n 👉 ${p}`);
+      break; // نخرج من الحلقة لأننا وجدنا الملف
+    } catch (error) {
+      console.error(`❌ [Security] خطأ أثناء قراءة أو تحليل الملف من ${p}:`, error.message);
+    }
   }
-} catch (error) {
-  console.error('❌ [Security] خطأ فادح: لم يتم العثور على الملف النووي أو فشل في قراءته!', error.message);
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+if (!serviceAccount) {
+  console.error('❌ [Security] خطأ فادح: لم يتم العثور على ملف المفاتيح في أي مسار!');
+  console.error('الرجاء التأكد من اسم الملف في قسم Secret Files بمنصة Render.');
+} else {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('✅ [Database] متصل بمحرك Firebase Firestore بنجاح 🛡️');
+  } catch (initErr) {
+    console.error('❌ [Database] فشل في تهيئة Firebase Admin:', initErr.message);
+  }
+}
 
 const db = admin.firestore();
-console.log('✅ [Database] متصل بمحرك Firebase Firestore بنجاح');
 
 const app = express();
 const server = http.createServer(app);
@@ -150,7 +173,7 @@ app.post('/api/referral', async (req, res) => {
             return res.status(400).json({ error: "عذراً، هذا الجهاز استخدم كود دعوة مسبقاً." });
         }
 
-        // 2. البحث عن الداعي باستخدام الكود العشوائي (الاستعلام في الحقول بدلاً من معرف الوثيقة)
+        // 2. البحث عن الداعي باستخدام الكود العشوائي
         const inviterQuery = await db.collection('users').where('referralCode', '==', referralCode).limit(1).get();
 
         if (inviterQuery.empty) {
