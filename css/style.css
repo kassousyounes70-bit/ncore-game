@@ -12,6 +12,8 @@
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  /* 🔥 الضربة القاضية: إلغاء التكبير المزدوج (Double-Tap Zoom) أصلياً على الهواتف دون إفساد إشارات الصوت */
+  touch-action: manipulation; 
 }
 
 :root {
@@ -150,7 +152,7 @@ html, body {
   transition: width 0.1s linear;
 }
 
-.loading-percent {
+.pixel-font, .loading-percent {
   font-family: var(--pixel-font);
   font-size: 11px;
   color: var(--color-green);
@@ -211,7 +213,7 @@ html, body {
 }
 
 /* ==============================
-   أزرار التمرير والأسهم البكسلية
+   Scroll Controls
    ============================== */
 #scroll-controls {
   position: fixed; left: 20px; top: 50%;
@@ -254,7 +256,7 @@ html, body {
 /* ==============================
    HUD
    ============================== */
-#hud {
+#grid-layout, #hud {
   position: fixed; top: 8px; left: 50%;
   transform: translateX(-50%);
   z-index: 20;
@@ -272,7 +274,7 @@ html, body {
 }
 
 /* ==============================
-   Joystick (المشي في الصالة)
+   Joystick
    ============================== */
 #joystick-zone {
   position: fixed; bottom: 24px; left: 24px;
@@ -302,7 +304,7 @@ html, body {
 }
 
 /* ==============================
-   نظام المحادثة والتفاعل
+   Chat & Interaction
    ============================== */
 #chat-action-btn {
   position: fixed;
@@ -315,10 +317,9 @@ html, body {
   animation: pulse 1.5s infinite;
 }
 
-/* تنسيق زر التفاعل الجديد */
 #interact-btn {
   position: fixed;
-  bottom: 74px; /* فوق زر الدردشة */
+  bottom: 74px;
   right: 24px;
   z-index: 40;
   padding: 12px 18px;
@@ -422,7 +423,7 @@ html, body {
 }
 
 /* ==============================
-   نظام التحكم الذكي للألعاب (Gamepad Zone)
+   Gamepad Zone
    ============================== */
 #gamepad-zone {
   position: fixed;
@@ -439,7 +440,6 @@ html, body {
   pointer-events: auto;
 }
 
-/* تصحيح أدوات التعديل لأنها أصبحت داخل الـ Header */
 #gamepad-edit-tools {
   display: flex;
   gap: 8px;
@@ -510,7 +510,7 @@ html, body {
 }
 
 /* ==============================
-   عصا التحكم الخاصة بالألعاب (Gamepad Joystick)
+   Gamepad Joystick
    ============================== */
 #gamepad-joystick-base {
   position: absolute;
