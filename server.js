@@ -9,32 +9,30 @@ const path = require('path');
 const admin = require('firebase-admin');
 const fs = require('fs');
 
-// 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري (النسخة المدرعة)
+// 1. تهيئة محرك Firebase Admin باستخدام المفتاح السري الجديد
 let serviceAccount = null;
-const secretFilename = 'n-core-nostagames-firebase-adminsdk-fbsvc-9b06143653.json';
+const secretFilename = 'n-core-nostagames-firebase-adminsdk-fbsvc-ca3de8c2ce.json';
 
-// منصة Render تضع الملفات السرية إما في مجلد /etc/secrets/ أو في جذر المشروع
+// نظام الرادار للبحث عن المفتاح في مسارات ريندر السرية والمحلية
 const possiblePaths = [
-  `/etc/secrets/${secretFilename}`,                     // مسار الخزنة السرية الافتراضي في Render
+  `/etc/secrets/${secretFilename}`,                     // مسار الخزنة السرية في Render
   path.join('/opt/render/project/src', secretFilename), // مسار جذر المشروع في Render
-  path.join(__dirname, secretFilename)                  // المسار المحلي للكمبيوتر (أثناء التطوير)
+  path.join(__dirname, secretFilename)                  // المسار المحلي أثناء التطوير
 ];
 
 for (const p of possiblePaths) {
   if (fs.existsSync(p)) {
     try {
-      // استخدام readFileSync بدلاً من require لتجنب مشاكل الذاكرة للملفات خارج المشروع
       const rawData = fs.readFileSync(p, 'utf8');
       serviceAccount = JSON.parse(rawData);
       
-      // ⚠️ الضربة القاضية لمشكلة 500 UNAUTHENTICATED: 
-      // أحياناً عند قراءة الملف، يتم تحويل سطر النهاية (\n) إلى (\\n)، مما يفسد المفتاح!
+      // إصلاح فواصل الأسطر التلقائي لضمان سلامة التشفير الرقمي للمفتاح
       if (serviceAccount && serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
       }
       
-      console.log(`✅ [Security] تم العثور على الملف السري وقراءته بنجاح من:\n 👉 ${p}`);
-      break; // نخرج من الحلقة لأننا وجدنا الملف
+      console.log(`✅ [Security] تم العثور على الملف السري الجديد وقراءته بنجاح من:\n 👉 ${p}`);
+      break;
     } catch (error) {
       console.error(`❌ [Security] خطأ أثناء قراءة أو تحليل الملف من ${p}:`, error.message);
     }
@@ -42,8 +40,8 @@ for (const p of possiblePaths) {
 }
 
 if (!serviceAccount) {
-  console.error('❌ [Security] خطأ فادح: لم يتم العثور على ملف المفاتيح في أي مسار!');
-  console.error('الرجاء التأكد من اسم الملف في قسم Secret Files بمنصة Render.');
+  console.error('❌ [Security] خطأ فادح: لم يتم العثور على ملف المفاتيح الجديد في أي مسار!');
+  console.error('الرجاء التأكد من مطابقة اسم الملف تماماً في إعدادات Secret Files على Render.');
 } else {
   try {
     admin.initializeApp({
@@ -81,10 +79,7 @@ app.use('/updates', express.static(path.join(__dirname, 'updates')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/Avatar', express.static(path.join(__dirname, 'Avatar')));
-
-// المسار الجديد: السماح للتطبيق بسحب المقاطع الصوتية مباشرة
 app.use('/Song', express.static(path.join(__dirname, 'Song')));
-
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/styles', express.static(path.join(__dirname, 'styles')));
 app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
@@ -118,7 +113,6 @@ app.get('/api/check-username', async (req, res) => {
     }
 });
 
-// المسار الهندسي الجديد: سحب بيانات اللاعب المحدثة (Pull Sync)
 app.get('/api/profile', async (req, res) => {
     try {
         const username = req.query.user;
@@ -165,7 +159,6 @@ app.post('/api/referral', async (req, res) => {
             return res.status(400).json({ error: "بيانات غير مكتملة" });
         }
 
-        // 1. التحقق من بصمة الجهاز لمنع الاستغلال (Farming)
         const deviceRef = db.collection('used_referrals').doc(deviceId);
         const deviceDoc = await deviceRef.get();
 
@@ -173,7 +166,6 @@ app.post('/api/referral', async (req, res) => {
             return res.status(400).json({ error: "عذراً، هذا الجهاز استخدم كود دعوة مسبقاً." });
         }
 
-        // 2. البحث عن الداعي باستخدام الكود العشوائي
         const inviterQuery = await db.collection('users').where('referralCode', '==', referralCode).limit(1).get();
 
         if (inviterQuery.empty) {
@@ -183,36 +175,28 @@ app.post('/api/referral', async (req, res) => {
         const inviterDoc = inviterQuery.docs[0];
         const inviterRef = inviterDoc.ref;
 
-        // منع إدخال اللاعب لكوده الخاص
         if (inviterDoc.id === newPlayerUsername) {
             return res.status(400).json({ error: "لا يمكنك استخدام كود الدعوة الخاص بك!" });
         }
 
         const inviteeRef = db.collection('users').doc(newPlayerUsername);
-
-        // 3. التنفيذ المجمع الآمن (Batch Transaction)
         const batch = db.batch();
 
-        // ختم بصمة الجهاز
         batch.set(deviceRef, { 
             usedAt: admin.firestore.FieldValue.serverTimestamp(),
             referredBy: referralCode,
             newUser: newPlayerUsername
         });
 
-        // إضافة 25 عملة للداعي
         batch.update(inviterRef, {
             coins: admin.firestore.FieldValue.increment(25)
         });
 
-        // إضافة 10 عملات للمدعو
         batch.set(inviteeRef, {
             coins: admin.firestore.FieldValue.increment(10)
         }, { merge: true });
 
-        // تنفيذ كل العمليات بضربة واحدة
         await batch.commit();
-
         res.status(200).json({ message: "تم تفعيل الكود بنجاح! حصلت على 10 عملات 🎁" });
 
     } catch (error) {
@@ -220,7 +204,6 @@ app.post('/api/referral', async (req, res) => {
         res.status(500).json({ error: "خطأ في معالجة الدعوة." });
     }
 });
-
 
 // ==========================================
 // الجسر البرمجي للألعاب والاتصالات الحية (Socket.io)
