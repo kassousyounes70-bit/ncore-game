@@ -43,11 +43,7 @@
       </div>
     </div>
 
-    <!-- نظام التحكم بالألعاب (Gamepad) -->
     <div id="gamepad-zone" class="hidden">
-      <!-- تمت إزالة أدوات التعديل من هنا ونقلها إلى شريط الحاسوب (device-header) -->
-
-      <!-- عصا التحكم الخاصة بالألعاب (مختلفة عن عصا الصالة) -->
       <div id="gamepad-joystick-base" class="gamepad-joystick-draggable hidden" data-key="joystick">
         <div id="gamepad-joystick-thumb"></div>
       </div>
@@ -112,13 +108,11 @@
       <span id="hud-players-count"></span>
     </div>
 
-    <!-- زر التفاعل الجديد لفتح الحواسيب -->
     <button id="interact-btn" class="pixel-btn hidden" style="position: fixed; bottom: 74px; right: 24px; z-index: 40; background: var(--color-primary); box-shadow: 4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3), 0 0 15px rgba(240,192,64,0.6); animation: pulse 1.5s infinite;">🕹️ تفاعل</button>
     
     <button id="chat-action-btn" class="pixel-btn hidden">💬 تحدث</button>
 
     <div id="device-popup" class="hidden">
-      <!-- تم نقل أزرار التعديل لتكون في المنتصف بين التكبير والإغلاق -->
       <div id="device-header" style="display: flex; gap: 8px; width: 100%; justify-content: space-between; align-items: center; margin-bottom: 5px; z-index: 101;">
         <button id="device-fs-btn" class="pixel-btn" style="background: var(--color-secondary); padding: 8px 12px; font-size: 8px;">⛶ تكبير</button>
         
@@ -177,6 +171,9 @@
   <script src="js/ui.js"></script>
   <script src="js/chat.js"></script>
   <script src="js/network.js"></script>
+  
+  <script src="js/sound.js"></script>
+  
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>
 
