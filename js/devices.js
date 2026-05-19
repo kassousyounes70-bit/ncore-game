@@ -46,7 +46,6 @@ const Devices = (() => {
     _promptT+=delta*3;
     _promptA=(_near&&!_active)?0.6+Math.sin(_promptT)*0.4:0;
     
-    // --- إصلاح الذكاء الاصطناعي لزر التفاعل ---
     if (_interactBtn) {
         if (_near && !_active) {
             _interactBtn.classList.remove('hidden');
@@ -80,33 +79,27 @@ const Devices = (() => {
     const devs = GameMap.getDevices();
     const devId = devs.indexOf(dev);
 
+    // 🔇 كتم موسيقى العالم الافتراضي فور فتح أي حاسوب عبر الجسر البرمجي
+    if (window.AndroidApp && window.AndroidApp.pauseMusic) {
+        window.AndroidApp.pauseMusic();
+    }
+
     if (typeof GamesData !== 'undefined' && GamesData[devId]) {
         
-        // =========================================
-        // 🚀 الجولة الأخيرة: تفعيل الاستحواذ الأصلي (Native Takeover)
-        // =========================================
         if (window.AndroidApp && window.AndroidApp.triggerNativeTakeover) {
-            // 📱 التطبيق متصل: نرسل الرابط والأزرار دون استخدام Iframe!
             
-            // الوضع الافتراضي: عصا تحكم بالأسهم
             let requiredKeys = "JOYSTICK_ARROWS,Z,A,ENTER";
-            
-            // مثال لبرمجة ذكية: إذا كانت اللعبة رقم 2 أو 5 تحتاج حروف WASD
             if (devId === 2 || devId === 5) {
                 requiredKeys = "JOYSTICK_WASD,J,K,SPACE";
             }
             
-            // نداء لتطبيق الأندرويد ليقوم هو بفتح الشاشة بملء الشاشة ورسم الأزرار
             window.AndroidApp.triggerNativeTakeover(GamesData[devId], requiredKeys);
             
-            // إغلاق نافذة الحاسوب فوراً لكي يعود اللاعب للعالم مباشرة بعد إنهاء اللعبة
-            close();
-            
-            // 🛑 مهم جداً: إنهاء الدالة هنا لكي لا يقوم الكود في الأسفل بإخفاء أزرار التحكم الخاصة بالعالم
+            // 🛑 إغلاق النافذة الوهمية، مع إرسال 'true' لمنع إعادة تشغيل الموسيقى (لأن اللعبة Native ستتكفل بالباقي)
+            close(true);
             return;
             
         } else {
-            // 🌐 اللاعب داخل متصفح ويب عادي: نفتح اللعبة في الـ Iframe الكلاسيكي
             Utils.hide('device-canvas');
             Utils.show('device-iframe');
             _iframe.src = GamesData[devId];
@@ -116,7 +109,6 @@ const Devices = (() => {
                 _iframe.contentWindow.focus();
             };
 
-            // إظهار الأزرار المخصصة للمتصفح إن وجدت
             if (typeof GamepadUI !== 'undefined') {
                 GamepadUI.showForGame(devId);
             }
@@ -131,15 +123,20 @@ const Devices = (() => {
     Joystick.hide();Joystick.reset();
   }
 
-  function close(){
+  // أضفنا متغير skipResumeMusic لمنع تداخل الصوت مع الاستحواذ الأصلي
+  function close(skipResumeMusic = false){
     _active=null;
     Utils.hide('device-popup');
     _iframe.src = ''; 
     if(_isFullscreen) toggleFullscreen();
     
-    // 🛑 إرسال إشارة إغلاق في حال احتجناها لاحقاً
     if (window.AndroidApp && window.AndroidApp.onGameScreenClosed) {
         window.AndroidApp.onGameScreenClosed();
+    }
+
+    // 🔊 إعادة تشغيل موسيقى العالم فور إغلاق الحاسوب (إلا إذا كان الانتقال للـ Native هو سبب الإغلاق)
+    if (skipResumeMusic !== true && window.AndroidApp && window.AndroidApp.resumeMusic) {
+        window.AndroidApp.resumeMusic();
     }
 
     if (typeof GamepadUI !== 'undefined') {
