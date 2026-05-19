@@ -4,28 +4,79 @@ const Player = (() => {
   const SCOLS=6,SROWS=6,SFRAMES=36;
   let _x=0,_y=0,_dir='down',_frame=0,_ft=0,_moving=false,_charId=0;
   const _sprites={};
+  const _loadingQueue = new Set(); // طابور لتتبع التحميلات الجارية
 
-  /* ====== PRELOAD ====== */
-  function preload(){_loadChar(0,'assets/sprites/characters/heads/troll.png');}
-
-  function _loadChar(id,headPath){
-    const e={down:[],up:[],left:[],right:[],loaded:false,head:null};
-    _sprites[id]=e;
-    const h=new Image();h.crossOrigin='anonymous';h.src=headPath;
-    h.onload=()=>{e.head=h;_loadDirs(id,e);};
-    h.onerror=()=>{e.head=null;_loadDirs(id,e);};
+  // تم التعديل: تحميل مسبق فقط للموارد الأساسية المشتركة
+  function preload(){
+    _loadChar(0,'assets/sprites/characters/heads/troll.png').catch(err => console.warn('[Preload Error]', err));
   }
 
-  function _loadDirs(id,e){
-    const dirs=['down','up','left','right'];let done=0;
-    dirs.forEach(d=>{
-      const img=new Image();img.crossOrigin='anonymous';
-      img.src=`assets/sprites/characters/char_${id}_${d}.png`;
-      img.onload=()=>{
-        try{e[d]=_process(img,e.head);}catch(err){console.warn('[Sprites]',err);}
-        if(++done===4){e.loaded=true;console.log(`[Sprites] char_${id} ✅`);}
+  // تم التعديل: تحويل دالة التحميل إلى Promise لدعم الـ Async
+  function _loadChar(id, headPath){
+    return new Promise((resolve, reject) => {
+      if(_sprites[id] && _sprites[id].loaded) return resolve();
+      if(_loadingQueue.has(id)) {
+          // إذا كان قيد التحميل حالياً، ننتظر عبر setInterval
+          const check = setInterval(() => {
+              if(_sprites[id] && _sprites[id].loaded) {
+                  clearInterval(check);
+                  resolve();
+              }
+          }, 50);
+          return;
+      }
+      _loadingQueue.add(id);
+
+      const e={down:[],up:[],left:[],right:[],loaded:false,head:null};
+      _sprites[id]=e;
+      const h=new Image();
+      h.crossOrigin='anonymous';
+      h.src=headPath;
+      
+      h.onload=()=>{
+        e.head=h;
+        _loadDirs(id,e).then(resolve).catch(reject);
       };
-      img.onerror=()=>{if(++done===4)e.loaded=false;};
+      h.onerror=()=>{
+        e.head=null;
+        _loadDirs(id,e).then(resolve).catch(reject);
+      };
+    });
+  }
+
+  // تم التعديل: تحويل تحميل الاتجاهات لـ Promise
+  function _loadDirs(id,e){
+    return new Promise((resolve, reject) => {
+      const dirs=['down','up','left','right'];
+      let done=0;
+      let hasError = false;
+      
+      dirs.forEach(d=>{
+        const img=new Image();
+        img.crossOrigin='anonymous';
+        img.src=`assets/sprites/characters/char_${id}_${d}.png`;
+        img.onload=()=>{
+          try{
+              e[d]=_process(img,e.head);
+          }catch(err){
+              console.warn('[Sprites Process]',err);
+          }
+          if(++done===4 && !hasError){
+              e.loaded=true;
+              _loadingQueue.delete(id);
+              console.log(`[Sprites] char_${id} ✅ Async Ready`);
+              resolve();
+          }
+        };
+        img.onerror=()=>{
+            hasError = true;
+            if(++done===4) {
+                e.loaded=false;
+                _loadingQueue.delete(id);
+                reject(new Error(`Failed to load char_${id} ${d}`));
+            }
+        };
+      });
     });
   }
 
@@ -58,9 +109,12 @@ const Player = (() => {
 
   function _drawSprite(ctx,id,x,y,dir,frame,moving){
     const sp=_sprites[id];
+    // المستطيل الأسود المخيف تم تغييره إلى رسم مؤقت صامت وشفاف
     if(!sp?.loaded||!sp[dir]?.length){
-      ctx.fillStyle='rgba(120,120,120,0.5)';ctx.fillRect(x,y,W,H);
-      Utils.drawPixelText(ctx,'...',x+W/2,y+H/2-4,{font:'5px "Press Start 2P"',color:'#fff',align:'center'});
+      ctx.fillStyle='rgba(0,0,0,0.1)';
+      ctx.beginPath();
+      ctx.ellipse(x+W/2,y+H,W/3,3,0,0,Math.PI*2);
+      ctx.fill();
       return;
     }
     ctx.imageSmoothingEnabled=false;
@@ -69,7 +123,6 @@ const Player = (() => {
     ctx.beginPath();ctx.ellipse(x+W/2,y+H+2,W/3,3,0,0,Math.PI*2);ctx.fill();
   }
 
-  /* ====== INIT ====== */
   function init(charId){
     _charId=charId;
     const s=GameMap.getSpawnPoint();
@@ -77,7 +130,6 @@ const Player = (() => {
     Camera.snapTo(_x+W/2,_y+H/2);
   }
 
-  /* ====== UPDATE ====== */
   function update(delta){
     const dx=Joystick.getDx(),dy=Joystick.getDy(),mag=Joystick.getMagnitude();
     _moving=mag>0.05;
@@ -93,17 +145,13 @@ const Player = (() => {
       _ft+=delta;if(_ft>=ft){_ft-=ft;_frame=(_frame+1)%mf;}
     } else {_frame=0;_ft=0;}
     Camera.update(_x+W/2,_y+H/2,delta);
-    // تم إزالة السطر المسبب للمشكلة هنا!
   }
 
-  /* ====== DRAW ====== */
   function draw(ctx){
     if(_charId===0){_drawSprite(ctx,0,_x,_y,_dir,_frame,_moving);}
     else{const c=CHARS[_charId-1];if(c)c.draw(ctx,_x,_y,_dir,_frame,_moving);}
-    // تم إزالة السطر المسبب للمشكلة هنا أيضاً!
   }
 
-  /* ====== CHARACTERS 1-10 ====== */
   const CHARS=[
     { name:'فتى النار',
       draw(ctx,x,y,dir,frame,moving){
@@ -270,5 +318,7 @@ const Player = (() => {
   function getCharId(){return _charId;}
   function getCharName(){return getAllChars()[_charId]?.name||'';}
 
-  return{preload,init,update,draw,getRect,getCenterX,getCenterY,getCharId,getCharName,getAllChars};
+  // كشف الدوال الضرورية للتحميل المسبق
+  return{preload,init,update,draw,getRect,getCenterX,getCenterY,getCharId,getCharName,getAllChars, loadCharAsync: _loadChar};
 })();
+  
