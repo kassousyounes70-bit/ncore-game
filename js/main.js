@@ -33,9 +33,6 @@
     if(label) label.textContent = 'جارِ فك تشفير الموارد والشخصيات...';
 
     try {
-        // الشخصيات من 1 إلى 10 ترسم برمجياً عبر الكود، لذا لا تحتاج تحميل شبكي.
-        // الشخصية الوحيدة التي تحتاج تحميل شبكي مكثف هي الشخصية صفر.
-        // ✅ إصلاح: تم تغيير الامتداد من .png إلى .webp
         if(window.Player && Player.loadCharAsync) {
             await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.webp');
         }
@@ -43,7 +40,6 @@
         if(loadingPercent) loadingPercent.textContent = '100%';
         if(loadingBar) loadingBar.style.width = '100%';
 
-        // إعطاء فرصة صغيرة للمتصفح لتحديث واجهة شريط التحميل قبل الانتقال
         await new Promise(r => setTimeout(r, 200));
 
     } catch (e) {
@@ -61,6 +57,15 @@
       await _preloadAllAssets();
 
       Game.init();
+      
+      // ✅ إضافة استدعاء تهيئة الدردشة
+      if (typeof Chat !== 'undefined' && Chat.init) {
+        Chat.init();
+        console.log('[Chat] تم تهيئة نظام الدردشة ✅');
+      } else {
+        console.warn('[Chat] Chat غير معرف أو لا يحتوي على init()');
+      }
+
       console.log('%c🎮 NCORE GAME ✅','color:#f0c040;font-size:14px;');
       console.log('%c🌐 ncore-mmo-server.onrender.com','color:#40c0f0;font-size:11px;');
     }catch(err){
