@@ -1,146 +1,10 @@
 'use strict';
 const Player = (() => {
   const SPEED=160,W=24,H=28,FRAME_TIME=0.14;
-  const SCOLS=6,SROWS=6,SFRAMES=36;
   let _x=0,_y=0,_dir='down',_frame=0,_ft=0,_moving=false,_charId=0;
-  const _sprites={};
-  const _loadingQueue = new Set();
 
   function preload(){
-    _loadChar(0,'assets/sprites/characters/heads/troll.webp').catch(err => console.warn('[Preload Error]', err));
-  }
-
-  function _loadChar(id, headPath){
-    return new Promise((resolve, reject) => {
-      if(_sprites[id] && _sprites[id].loaded) return resolve();
-      if(_loadingQueue.has(id)) {
-          const check = setInterval(() => {
-              if(_sprites[id] && _sprites[id].loaded) {
-                  clearInterval(check);
-                  resolve();
-              }
-          }, 50);
-          return;
-      }
-      _loadingQueue.add(id);
-
-      const e={down:[],up:[],left:[],right:[],loaded:false,head:null};
-      _sprites[id]=e;
-      const h=new Image();
-      h.crossOrigin='anonymous';
-      // كاسر الكاش لمنع المتصفح من استخدام صور مدمرة بالذاكرة
-      h.src=headPath + '?cb=' + Date.now(); 
-      
-      h.onload=()=>{
-        e.head=h;
-        _loadDirs(id,e).then(resolve).catch(reject);
-      };
-      h.onerror=()=>{
-        e.head=null;
-        _loadDirs(id,e).then(resolve).catch(reject);
-      };
-    });
-  }
-
-  function _loadDirs(id,e){
-    return new Promise((resolve, reject) => {
-      const dirs=['down','up','left','right'];
-      let done=0;
-      let hasError = false;
-      
-      dirs.forEach(d=>{
-        const img=new Image();
-        img.crossOrigin='anonymous';
-        // كاسر الكاش لصور الشخصيات
-        img.src=`assets/sprites/characters/char_${id}_${d}.webp?cb=${Date.now()}`;
-        
-        img.onload=()=>{
-          const processImg = () => {
-              try{
-                  e[d]=_process(img,e.head);
-              }catch(err){
-                  console.warn('[Sprites Process]',err);
-              }
-              if(++done===4 && !hasError){
-                  e.loaded=true;
-                  _loadingQueue.delete(id);
-                  console.log(`[Sprites] char_${id} ✅ Async Ready (WEBP)`);
-                  resolve();
-              }
-          };
-          
-          // إجبار المتصفح على بناء بكسلات الصورة في الذاكرة لتفادي الخطأ
-          if(img.decode) {
-              img.decode().then(processImg).catch(processImg);
-          } else {
-              processImg();
-          }
-        };
-        
-        img.onerror=()=>{
-            hasError = true;
-            if(++done===4) {
-                e.loaded=false;
-                _loadingQueue.delete(id);
-                reject(new Error(`Failed to load char_${id} ${d}.webp`));
-            }
-        };
-      });
-    });
-  }
-
-  function _process(sheet,head){
-    const fw=Math.floor(sheet.width/SCOLS),fh=Math.floor(sheet.height/SROWS);
-    return Array.from({length:SFRAMES},(_,i)=>{
-      const col=i%SCOLS,row=Math.floor(i/SCOLS);
-      const c=Utils.createCanvas(fw,fh),ctx=c.getContext('2d');
-      ctx.imageSmoothingEnabled=false;
-      
-      // شبكة أمان: تأكد أن الصورة كائن حقيقي وعرضها أكبر من الصفر
-      if (sheet && sheet instanceof HTMLImageElement && sheet.width > 0) {
-          ctx.drawImage(sheet,col*fw,row*fh,fw,fh,0,0,fw,fh);
-      }
-      _chroma(ctx,fw,fh,head);
-      return c;
-    });
-  }
-
-  function _chroma(ctx,w,h,head){
-    const d=ctx.getImageData(0,0,w,h),px=d.data;
-    let x0=w,y0=h,x1=0,y1=0,found=false;
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-      const i=(y*w+x)*4;
-      if(px[i+3]>100&&px[i]>180&&px[i+1]<80&&px[i+2]>180){
-        px[i+3]=0;found=true;
-        if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
-      }
-    }
-    ctx.putImageData(d,0,0);
-    // شبكة أمان للرأس
-    if(found && head && head instanceof HTMLImageElement && head.complete && head.naturalWidth>0) {
-      ctx.drawImage(head,x0,y0,x1-x0+1,y1-y0+1);
-    }
-  }
-
-  function _drawSprite(ctx,id,x,y,dir,frame,moving){
-    const sp=_sprites[id];
-    if(!sp?.loaded||!sp[dir]?.length){
-      ctx.fillStyle='rgba(0,0,0,0.1)';
-      ctx.beginPath();
-      ctx.ellipse(x+W/2,y+H,W/3,3,0,0,Math.PI*2);
-      ctx.fill();
-      return;
-    }
-    ctx.imageSmoothingEnabled=false;
-    
-    const frameCanvas = sp[dir][moving?frame%sp[dir].length:0];
-    // شبكة أمان أخيرة قبل الرسم
-    if (frameCanvas) {
-        ctx.drawImage(frameCanvas,x,y,W,H);
-    }
-    
-    ctx.fillStyle='rgba(0,0,0,0.2)';
-    ctx.beginPath();ctx.ellipse(x+W/2,y+H+2,W/3,3,0,0,Math.PI*2);ctx.fill();
+    // تم إزالة تحميل الصور الخارجية، الكود الآن يعتمد حصرياً على الرسم البرمجي السريع
   }
 
   function init(charId){
@@ -160,16 +24,14 @@ const Player = (() => {
       const res=Collision.resolveMovement(r,dx*spd,dy*spd);
       const cl=Collision.clampToWorld({x:res.x,y:res.y,w:W,h:H},GameMap.getWorldSize());
       _x=cl.x;_y=cl.y;
-      const ft=_charId===0?0.055:FRAME_TIME;
-      const mf=_charId===0?SFRAMES:3;
-      _ft+=delta;if(_ft>=ft){_ft-=ft;_frame=(_frame+1)%mf;}
+      _ft+=delta;if(_ft>=FRAME_TIME){_ft-=FRAME_TIME;_frame=(_frame+1)%3;}
     } else {_frame=0;_ft=0;}
     Camera.update(_x+W/2,_y+H/2,delta);
   }
 
   function draw(ctx){
-    if(_charId===0){_drawSprite(ctx,0,_x,_y,_dir,_frame,_moving);}
-    else{const c=CHARS[_charId-1];if(c)c.draw(ctx,_x,_y,_dir,_frame,_moving);}
+    const c=CHARS[_charId];
+    if(c) c.draw(ctx,_x,_y,_dir,_frame,_moving);
   }
 
   const CHARS=[
@@ -329,14 +191,14 @@ const Player = (() => {
   }
 
   function getAllChars(){
-    return [{name:'Troll Man',draw(ctx,x,y,dir,frame,moving){_drawSprite(ctx,0,x,y,dir,frame,moving);}},...CHARS];
+    return CHARS;
   }
 
   function getRect(){return{x:_x,y:_y,w:W,h:H};}
   function getCenterX(){return _x+W/2;}
   function getCenterY(){return _y+H/2;}
   function getCharId(){return _charId;}
-  function getCharName(){return getAllChars()[_charId]?.name||'';}
+  function getCharName(){return CHARS[_charId]?.name||'';}
 
-  return{preload,init,update,draw,getRect,getCenterX,getCenterY,getCharId,getCharName,getAllChars, loadCharAsync: _loadChar};
+  return{preload,init,update,draw,getRect,getCenterX,getCenterY,getCharId,getCharName,getAllChars};
 })();
