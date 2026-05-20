@@ -185,6 +185,15 @@ const Devices = (() => {
       // وضع أندرويد الأصلي: إيقاف الموسيقى تماماً أثناء اللعب
       if(window.AndroidApp.pauseMusic) window.AndroidApp.pauseMusic();
 
+      // [تعديل جديد] الاستماع لعودة التركيز للمتصفح بعد إغلاق اللعبة من نظام أندرويد
+      const onReturnFocus = () => {
+        if(_gameLaunched && window.AndroidApp && window.AndroidApp.resumeMusic){
+          window.AndroidApp.resumeMusic(); // استئناف الصوت بمستوى منخفض
+        }
+        window.removeEventListener('focus', onReturnFocus);
+      };
+      window.addEventListener('focus', onReturnFocus);
+
       let requiredKeys="JOYSTICK_ARROWS,Z,A,ENTER";
       if(devId===2||devId===5) requiredKeys="JOYSTICK_WASD,J,K,SPACE";
       window.AndroidApp.triggerNativeTakeover(gameUrl, requiredKeys);
@@ -221,7 +230,7 @@ const Devices = (() => {
 
     // 🔊 رفع الصوت تدريجياً عند الإغلاق مهما كان نوع الحاسوب
     if(skipResumeMusic!==true){
-      // الإصلاح: تغيير الاسم ليتطابق مع واجهة الأندرويد restoreMusic()
+      // يتم الاعتماد على الكود الذي تم التعديل عليه في ملف الكوتلن
       if(window.AndroidApp && window.AndroidApp.restoreMusic){
         window.AndroidApp.restoreMusic();
       }
