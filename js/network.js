@@ -14,38 +14,36 @@ const Network = (() => {
   function _reg(){
     _sock.on('connect',()=>{
       _connected=true;_myId=_sock.id;
-      console.log('[Net] متصل ✅',_myId);
       const sp=GameMap.getSpawnPoint();
       _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:'لاعب'});
       _onConn&&_onConn();
     });
-
+    
     _sock.on('players:list', async players => {
       _players.clear();
       for(const[id,d] of Object.entries(players)) {
         if(id!==_myId) {
-            // ✅ إصلاح: تم تغيير الامتداد من .png إلى .webp
             if(d.charId === 0 && window.Player) {
-                await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.webp').catch(()=>{});
+                await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
             }
             _players.set(id,_mk(d));
         }
       }
     });
-
+    
     _sock.on('player:joined', async ({id,data}) => {
       if(id===_myId) return;
-      // ✅ إصلاح: تم تغيير الامتداد من .png إلى .webp
       if(data.charId === 0 && window.Player) {
-          await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.webp').catch(()=>{});
+          await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
       }
       _players.set(id,_mk(data));
       UI.showToast('لاعب جديد دخل الصالة 🎮',1800);
     });
-
+    
     _sock.on('player:moved',({id,x,y,dir})=>{
       const p=_players.get(id);if(!p)return;
-      p.tx=x;p.ty=y;p.dir=dir;p.moving=dir!=='idle';
+      if(p.tx!==x||p.ty!==y)p.lastMove=performance.now();
+      p.tx=x;p.ty=y;p.dir=dir;
     });
 
     _sock.on('chat:message',({id, text})=>{
@@ -53,20 +51,20 @@ const Network = (() => {
     });
 
     _sock.on('player:left',id=>{_players.delete(id);});
-    _sock.on('disconnect',r=>{_connected=false;console.warn('[Net] انقطع:',r);UI.showToast('جارِ إعادة الاتصال ⏳',2000);});
+    _sock.on('disconnect',()=>{_connected=false;UI.showToast('جارِ إعادة الاتصال ⏳',2000);});
     _sock.on('reconnect',()=>{
       _connected=true;
       const sp=GameMap.getSpawnPoint();
       _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:'لاعب'});
       UI.showToast('تمت إعادة الاتصال ✅',1500);
     });
-    _sock.on('connect_error',e=>console.error('[Net] خطأ:',e.message));
+    _sock.on('connect_error',()=>{});
     _sock.on('error:full',()=>UI.showToast('الصالة ممتلئة! حاول لاحقاً 😅',3000));
   }
 
   function _mk(d){
     return{x:d.x,y:d.y,tx:d.x,ty:d.y,charId:d.charId||0,dir:d.dir||'down',
-      frame:0,ft:0,moving:false,name:d.name||'لاعب'};
+      frame:0,ft:0,moving:false,name:d.name||'لاعب',lastMove:0};
   }
 
   function sendPosition(cx,cy,rect,dir){
@@ -83,9 +81,10 @@ const Network = (() => {
 
   function _interp(){
     const FT=0.16;
+    const now=performance.now();
     for(const p of _players.values()){
       p.x=Utils.lerp(p.x,p.tx,INTERP);p.y=Utils.lerp(p.y,p.ty,INTERP);
-      p.moving=Utils.distance(p.x,p.y,p.tx,p.ty)>2;
+      p.moving=(now-p.lastMove)<150;
       if(p.moving){p.ft+=0.016;if(p.ft>=FT){p.ft-=FT;p.frame=(p.frame+1)%3;}}
       else{p.frame=0;p.ft=0;}
     }
@@ -96,7 +95,7 @@ const Network = (() => {
     for(const p of _players.values()){
       if(!Camera.isVisible({x:p.x-20,y:p.y-20,w:PW+40,h:PH+40}))continue;
       const char=allChars[p.charId];if(!char)continue;
-
+      
       ctx.fillStyle='rgba(0,0,0,0.22)';
       ctx.beginPath();ctx.ellipse(p.x,p.y+PH/2+4,10,4,0,0,Math.PI*2);ctx.fill();
       char.draw(ctx,p.x-PW/2,p.y-PH/2,p.dir,p.frame,p.moving);
@@ -116,5 +115,5 @@ const Network = (() => {
   function getMyId(){return _myId;}
   function getPlayers(){return _players;}
 
-  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId,sendChat,getPlayers};
+  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId, sendChat, getPlayers};
 })();
