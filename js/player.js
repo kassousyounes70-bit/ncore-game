@@ -4,19 +4,16 @@ const Player = (() => {
   const SCOLS=6,SROWS=6,SFRAMES=36;
   let _x=0,_y=0,_dir='down',_frame=0,_ft=0,_moving=false,_charId=0;
   const _sprites={};
-  const _loadingQueue = new Set(); // طابور لتتبع التحميلات الجارية
+  const _loadingQueue = new Set();
 
-  // تم التعديل: تحميل مسبق فقط للموارد الأساسية المشتركة
   function preload(){
-    _loadChar(0,'assets/sprites/characters/heads/troll.png').catch(err => console.warn('[Preload Error]', err));
+    _loadChar(0,'assets/sprites/characters/heads/troll.webp').catch(err => console.warn('[Preload Error]', err));
   }
 
-  // تم التعديل: تحويل دالة التحميل إلى Promise لدعم الـ Async
   function _loadChar(id, headPath){
     return new Promise((resolve, reject) => {
       if(_sprites[id] && _sprites[id].loaded) return resolve();
       if(_loadingQueue.has(id)) {
-          // إذا كان قيد التحميل حالياً، ننتظر عبر setInterval
           const check = setInterval(() => {
               if(_sprites[id] && _sprites[id].loaded) {
                   clearInterval(check);
@@ -44,7 +41,6 @@ const Player = (() => {
     });
   }
 
-  // تم التعديل: تحويل تحميل الاتجاهات لـ Promise
   function _loadDirs(id,e){
     return new Promise((resolve, reject) => {
       const dirs=['down','up','left','right'];
@@ -54,7 +50,7 @@ const Player = (() => {
       dirs.forEach(d=>{
         const img=new Image();
         img.crossOrigin='anonymous';
-        img.src=`assets/sprites/characters/char_${id}_${d}.png`;
+        img.src=`assets/sprites/characters/char_${id}_${d}.webp`;
         img.onload=()=>{
           try{
               e[d]=_process(img,e.head);
@@ -64,7 +60,7 @@ const Player = (() => {
           if(++done===4 && !hasError){
               e.loaded=true;
               _loadingQueue.delete(id);
-              console.log(`[Sprites] char_${id} ✅ Async Ready`);
+              console.log(`[Sprites] char_${id} ✅ Async Ready (WEBP)`);
               resolve();
           }
         };
@@ -73,7 +69,7 @@ const Player = (() => {
             if(++done===4) {
                 e.loaded=false;
                 _loadingQueue.delete(id);
-                reject(new Error(`Failed to load char_${id} ${d}`));
+                reject(new Error(`Failed to load char_${id} ${d}.webp`));
             }
         };
       });
@@ -109,7 +105,6 @@ const Player = (() => {
 
   function _drawSprite(ctx,id,x,y,dir,frame,moving){
     const sp=_sprites[id];
-    // المستطيل الأسود المخيف تم تغييره إلى رسم مؤقت صامت وشفاف
     if(!sp?.loaded||!sp[dir]?.length){
       ctx.fillStyle='rgba(0,0,0,0.1)';
       ctx.beginPath();
@@ -318,6 +313,5 @@ const Player = (() => {
   function getCharId(){return _charId;}
   function getCharName(){return getAllChars()[_charId]?.name||'';}
 
-  // كشف الدوال الضرورية للتحميل المسبق
   return{preload,init,update,draw,getRect,getCenterX,getCenterY,getCharId,getCharName,getAllChars, loadCharAsync: _loadChar};
 })();
