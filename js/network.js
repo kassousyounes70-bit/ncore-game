@@ -19,23 +19,17 @@ const Network = (() => {
       _onConn&&_onConn();
     });
     
-    _sock.on('players:list', async players => {
+    _sock.on('players:list', players => {
       _players.clear();
       for(const[id,d] of Object.entries(players)) {
         if(id!==_myId) {
-            if(d.charId === 0 && window.Player) {
-                await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
-            }
             _players.set(id,_mk(d));
         }
       }
     });
     
-    _sock.on('player:joined', async ({id,data}) => {
+    _sock.on('player:joined', ({id,data}) => {
       if(id===_myId) return;
-      if(data.charId === 0 && window.Player) {
-          await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
-      }
       _players.set(id,_mk(data));
       UI.showToast('لاعب جديد دخل الصالة 🎮',1800);
     });
