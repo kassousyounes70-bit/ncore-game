@@ -28,7 +28,8 @@ const Player = (() => {
       _sprites[id]=e;
       const h=new Image();
       h.crossOrigin='anonymous';
-      h.src=headPath;
+      // كاسر الكاش لمنع المتصفح من استخدام صور مدمرة بالذاكرة
+      h.src=headPath + '?cb=' + Date.now(); 
       
       h.onload=()=>{
         e.head=h;
@@ -50,20 +51,32 @@ const Player = (() => {
       dirs.forEach(d=>{
         const img=new Image();
         img.crossOrigin='anonymous';
-        img.src=`assets/sprites/characters/char_${id}_${d}.webp`;
+        // كاسر الكاش لصور الشخصيات
+        img.src=`assets/sprites/characters/char_${id}_${d}.webp?cb=${Date.now()}`;
+        
         img.onload=()=>{
-          try{
-              e[d]=_process(img,e.head);
-          }catch(err){
-              console.warn('[Sprites Process]',err);
-          }
-          if(++done===4 && !hasError){
-              e.loaded=true;
-              _loadingQueue.delete(id);
-              console.log(`[Sprites] char_${id} ✅ Async Ready (WEBP)`);
-              resolve();
+          const processImg = () => {
+              try{
+                  e[d]=_process(img,e.head);
+              }catch(err){
+                  console.warn('[Sprites Process]',err);
+              }
+              if(++done===4 && !hasError){
+                  e.loaded=true;
+                  _loadingQueue.delete(id);
+                  console.log(`[Sprites] char_${id} ✅ Async Ready (WEBP)`);
+                  resolve();
+              }
+          };
+          
+          // إجبار المتصفح على بناء بكسلات الصورة في الذاكرة لتفادي الخطأ
+          if(img.decode) {
+              img.decode().then(processImg).catch(processImg);
+          } else {
+              processImg();
           }
         };
+        
         img.onerror=()=>{
             hasError = true;
             if(++done===4) {
@@ -82,7 +95,11 @@ const Player = (() => {
       const col=i%SCOLS,row=Math.floor(i/SCOLS);
       const c=Utils.createCanvas(fw,fh),ctx=c.getContext('2d');
       ctx.imageSmoothingEnabled=false;
-      ctx.drawImage(sheet,col*fw,row*fh,fw,fh,0,0,fw,fh);
+      
+      // شبكة أمان: تأكد أن الصورة كائن حقيقي وعرضها أكبر من الصفر
+      if (sheet && sheet instanceof HTMLImageElement && sheet.width > 0) {
+          ctx.drawImage(sheet,col*fw,row*fh,fw,fh,0,0,fw,fh);
+      }
       _chroma(ctx,fw,fh,head);
       return c;
     });
@@ -99,8 +116,10 @@ const Player = (() => {
       }
     }
     ctx.putImageData(d,0,0);
-    if(found&&head&&head.complete&&head.naturalWidth>0)
+    // شبكة أمان للرأس
+    if(found && head && head instanceof HTMLImageElement && head.complete && head.naturalWidth>0) {
       ctx.drawImage(head,x0,y0,x1-x0+1,y1-y0+1);
+    }
   }
 
   function _drawSprite(ctx,id,x,y,dir,frame,moving){
@@ -113,7 +132,13 @@ const Player = (() => {
       return;
     }
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(sp[dir][moving?frame%sp[dir].length:0],x,y,W,H);
+    
+    const frameCanvas = sp[dir][moving?frame%sp[dir].length:0];
+    // شبكة أمان أخيرة قبل الرسم
+    if (frameCanvas) {
+        ctx.drawImage(frameCanvas,x,y,W,H);
+    }
+    
     ctx.fillStyle='rgba(0,0,0,0.2)';
     ctx.beginPath();ctx.ellipse(x+W/2,y+H+2,W/3,3,0,0,Math.PI*2);ctx.fill();
   }
