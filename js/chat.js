@@ -112,12 +112,16 @@ const Chat = (() => {
   function openChat() {
     if(!chatModal) return;
     chatModal.style.display = 'flex';
+    chatModal.classList.remove('hidden');
     if(chatBtn){ chatBtn.classList.add('hidden'); chatBtn.style.display='none'; }
     if(chatInput){ chatInput.value=''; chatInput.focus(); }
   }
 
   function closeChat() {
-    if(chatModal) chatModal.style.display = 'none';
+    if(chatModal) {
+        chatModal.style.display = 'none';
+        chatModal.classList.add('hidden');
+    }
     if(chatBtn){ chatBtn.classList.remove('hidden'); chatBtn.style.display='block'; }
   }
 
