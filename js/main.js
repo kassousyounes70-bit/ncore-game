@@ -35,32 +35,31 @@
     try {
         // الشخصيات من 1 إلى 10 ترسم برمجياً عبر الكود، لذا لا تحتاج تحميل شبكي.
         // الشخصية الوحيدة التي تحتاج تحميل شبكي مكثف هي الشخصية صفر.
-        // الكود أدناه يوقف شريط التحميل حتى تنتهي هذه الشخصية تماماً.
+        // ✅ إصلاح: تم تغيير الامتداد من .png إلى .webp
         if(window.Player && Player.loadCharAsync) {
-            await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png');
+            await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.webp');
         }
-        
+
         if(loadingPercent) loadingPercent.textContent = '100%';
         if(loadingBar) loadingBar.style.width = '100%';
-        
-        // إعطاء فرصة صغيرة للمتصفح لتحديث واجهة شريط التحميل لـ 100% قبل الانتقال لكي لا يبدو الانتقال حاداً
+
+        // إعطاء فرصة صغيرة للمتصفح لتحديث واجهة شريط التحميل قبل الانتقال
         await new Promise(r => setTimeout(r, 200));
 
     } catch (e) {
         console.error('[Preload Error]', e);
         if(label) label.textContent = 'حدث خطأ في تحميل بعض الموارد، قد تظهر عيوب بصرية.';
-        await new Promise(r => setTimeout(r, 1000)); // ننتظر قليلاً ليقرأ الخطأ ثم نكمل
+        await new Promise(r => setTimeout(r, 1000));
     }
   }
 
   async function _start(){
     const issues=_checkSupport();
     if(issues.length>0){_showError(issues.join('<br>'));return;}
-    
+
     try{
-      // تجميد إقلاع اللعبة بالكامل حتى ينتهي الـ Preloader
       await _preloadAllAssets();
-      
+
       Game.init();
       console.log('%c🎮 NCORE GAME ✅','color:#f0c040;font-size:14px;');
       console.log('%c🌐 ncore-mmo-server.onrender.com','color:#40c0f0;font-size:11px;');

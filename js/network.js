@@ -19,30 +19,30 @@ const Network = (() => {
       _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:'لاعب'});
       _onConn&&_onConn();
     });
-    
+
     _sock.on('players:list', async players => {
       _players.clear();
       for(const[id,d] of Object.entries(players)) {
         if(id!==_myId) {
-            // تم التعديل: ننتظر تحميل الأفاتار الخاص باللاعب إذا لزم الأمر قبل إضافته للمشهد
+            // ✅ إصلاح: تم تغيير الامتداد من .png إلى .webp
             if(d.charId === 0 && window.Player) {
-                await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
+                await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.webp').catch(()=>{});
             }
             _players.set(id,_mk(d));
         }
       }
     });
-    
+
     _sock.on('player:joined', async ({id,data}) => {
       if(id===_myId) return;
-      // تم التعديل: التحميل المسبق (Asset Queueing) هنا لمنع المستطيل الأسود
+      // ✅ إصلاح: تم تغيير الامتداد من .png إلى .webp
       if(data.charId === 0 && window.Player) {
-          await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.png').catch(()=>{});
+          await Player.loadCharAsync(0, 'assets/sprites/characters/heads/troll.webp').catch(()=>{});
       }
       _players.set(id,_mk(data));
       UI.showToast('لاعب جديد دخل الصالة 🎮',1800);
     });
-    
+
     _sock.on('player:moved',({id,x,y,dir})=>{
       const p=_players.get(id);if(!p)return;
       p.tx=x;p.ty=y;p.dir=dir;p.moving=dir!=='idle';
@@ -96,7 +96,7 @@ const Network = (() => {
     for(const p of _players.values()){
       if(!Camera.isVisible({x:p.x-20,y:p.y-20,w:PW+40,h:PH+40}))continue;
       const char=allChars[p.charId];if(!char)continue;
-      
+
       ctx.fillStyle='rgba(0,0,0,0.22)';
       ctx.beginPath();ctx.ellipse(p.x,p.y+PH/2+4,10,4,0,0,Math.PI*2);ctx.fill();
       char.draw(ctx,p.x-PW/2,p.y-PH/2,p.dir,p.frame,p.moving);
@@ -116,5 +116,5 @@ const Network = (() => {
   function getMyId(){return _myId;}
   function getPlayers(){return _players;}
 
-  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId, sendChat, getPlayers};
+  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId,sendChat,getPlayers};
 })();
