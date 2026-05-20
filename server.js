@@ -25,23 +25,15 @@ for (const p of possiblePaths) {
       if (serviceAccount && serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
       }
-      console.log(`✅ [Security] Key loaded from: ${p}`);
       break;
-    } catch (error) {
-      console.error(`❌ [Security] Error reading key from ${p}:`, error.message);
-    }
+    } catch (error) {}
   }
 }
 
-if (!serviceAccount) {
-  console.error('❌ [Security] FATAL: Secret key file not found!');
-} else {
+if (serviceAccount) {
   try {
     admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-    console.log('✅ [Database] Firestore Connected 🛡️');
-  } catch (initErr) {
-    console.error('❌ [Database] Firebase Admin Init Failed:', initErr.message);
-  }
+  } catch (initErr) {}
 }
 
 const db = admin.firestore();
@@ -194,7 +186,7 @@ io.on('connection', sock => {
       id: sock.id,
       x: _clamp(data.x || 2400, 60, 2500), y: _clamp(data.y || 960, 60, 1860),
       dir: _dir(data.dir),
-      avatarId: _clamp(data.avatarId || 0, 0, 1000),
+      charId: _clamp(data.charId || 0, 0, 1000),
       isBoy: data.isBoy !== undefined ? data.isBoy : true,
       name: _clean(data.name || 'لاعب'),
       joinedAt: Date.now()
@@ -206,7 +198,6 @@ io.on('connection', sock => {
     sock.emit('players:list', curr);
     sock.broadcast.emit('player:joined', { id: sock.id, data: p });
     sock.emit('chat:message', { id: 'SYSTEM', name: 'النظام 🛡️', text: 'مرحباً بك في عالم N-CORE الافتراضي!' });
-    _log();
   });
 
   sock.on('player:move', data => {
@@ -227,7 +218,6 @@ io.on('connection', sock => {
     if (players.has(sock.id)) {
       players.delete(sock.id);
       io.emit('player:left', sock.id);
-      _log();
     }
   });
 });
@@ -248,8 +238,5 @@ setInterval(() => {
 function _clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, Number(v) || 0)); }
 function _clean(s) { return String(s).replace(/[<>"'&]/g, '').trim().slice(0, 16) || 'لاعب'; }
 function _dir(d) { return ['up','down','left','right','idle'].includes(d) ? d : 'idle'; }
-function _log() { console.log(`[Stats] Players: ${players.size}/${MAX}`); }
 
-server.listen(PORT, () => {
-  console.log(`🎮 NCore Server v4 | Port: ${PORT} | Max: ${MAX}`);
-});
+server.listen(PORT, () => {});
