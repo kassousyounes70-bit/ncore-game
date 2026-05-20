@@ -8,7 +8,6 @@ const Game = (() => {
     _ctx.imageSmoothingEnabled=false;
     _resize();window.addEventListener('resize',_resize);
     
-    // تم التعديل: الانتظار حتى اكتمال جميع التحميلات المسبقة قبل استدعاء UI
     Player.preload();
     UI.showLoading(()=>{
         _initSystems();
@@ -52,8 +51,9 @@ const Game = (() => {
     
     NPC.update(delta);Devices.update(delta);
     
+    // ✅ التعديل هنا: نمرر delta فقط
     if(window.Chat && Network.isConnected()) {
-       Chat.update({x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
+       Chat.update(delta);
     }
 
     const el=Utils.$('hud-players-count');
@@ -61,7 +61,7 @@ const Game = (() => {
   }
 
   function _draw(){
-    const ctx=_ctx,cw=_cvs.width,ch=_cvs.height;
+    const ctx=_cvs,cw=_cvs.width,ch=_cvs.height;
     ctx.fillStyle='#050510';ctx.fillRect(0,0,cw,ch);
     Camera.beginDraw(ctx);
       GameMap.draw(ctx);
