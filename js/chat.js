@@ -16,25 +16,19 @@ const Chat = (() => {
     // دعم Enter للإرسال
     chatInput.addEventListener('keypress', e => { if(e.key==='Enter') sendChat(); });
 
-    if(chatBtn)      { chatBtn.onclick = openChat; chatBtn.ontouchstart = e=>{ e.preventDefault(); openChat(); }; }
+    if(chatBtn) { 
+      chatBtn.onclick = openChat; 
+      chatBtn.ontouchstart = e=>{ e.preventDefault(); openChat(); };
+      // الزر ظاهر بشكل دائم فور تهيئة الدردشة (دخول العالم)
+      chatBtn.classList.remove('hidden');
+      chatBtn.style.display = 'block';
+    }
     if(chatCloseBtn) { chatCloseBtn.onclick = closeChat; }
     if(chatSendBtn)  { chatSendBtn.onclick  = sendChat;  }
   }
 
-  function update(myPlayer, otherPlayers) {
-    if(!myPlayer) return;
-    let isNear = false;
-    const DIST = 220;
-    if(otherPlayers) {
-      for(const [, p] of otherPlayers.entries()) {
-        if(Math.hypot(myPlayer.x - p.x, myPlayer.y - p.y) < DIST){ isNear=true; break; }
-      }
-    }
-    if(chatBtn && chatModal) {
-      const open = chatModal.style.display === 'flex';
-      if(isNear && !open)    { chatBtn.classList.remove('hidden'); chatBtn.style.display='block'; }
-      else if(!isNear)       { chatBtn.classList.add('hidden'); chatBtn.style.display='none'; if(open) closeChat(); }
-    }
+  function update() {
+    // لم نعد بحاجة لاختبار المسافة، نكتفي بتحديث وقت عرض الفقاعات
     const delta = 16.6;
     for(const [id, b] of activeBubbles.entries()) {
       b.timer -= delta;
@@ -124,6 +118,7 @@ const Chat = (() => {
 
   function closeChat() {
     if(chatModal) chatModal.style.display = 'none';
+    if(chatBtn){ chatBtn.classList.remove('hidden'); chatBtn.style.display='block'; }
   }
 
   function sendChat() {
