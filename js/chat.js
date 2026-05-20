@@ -25,7 +25,6 @@ const Chat = (() => {
     if(chatSendBtn)  { chatSendBtn.onclick  = sendChat;  }
   }
 
-  // ✅ التعديل: الآن تستقبل delta الفعلية من اللعبة
   function update(delta = 16.6) {
     for(const [id, b] of activeBubbles.entries()) {
       b.timer -= delta;
@@ -34,11 +33,19 @@ const Chat = (() => {
   }
 
   function drawBubbles(ctx, myPlayer, otherPlayers) {
-    if(myPlayer && activeBubbles.has('me'))
+    // ✅ رسالة تشخيصية: معرفة عدد الفقاعات
+    console.log('[Chat] drawBubbles called, activeBubbles size =', activeBubbles.size);
+    
+    if(myPlayer && activeBubbles.has('me')) {
+      console.log('[Chat] رسم فقاعة اللاعب الأساسي');
       _drawBubble(ctx, myPlayer.x, myPlayer.y, activeBubbles.get('me'));
+    }
     if(otherPlayers) {
       for(const [id, p] of otherPlayers.entries()) {
-        if(activeBubbles.has(id)) _drawBubble(ctx, p.x, p.y, activeBubbles.get(id));
+        if(activeBubbles.has(id)) {
+          console.log('[Chat] رسم فقاعة لاعب آخر:', id);
+          _drawBubble(ctx, p.x, p.y, activeBubbles.get(id));
+        }
       }
     }
   }
@@ -58,6 +65,9 @@ const Chat = (() => {
     const th = FONT_SIZE + 20;
     const bx = x;
     const by = y - 55;
+
+    // ✅ رسالة تشخيصية: موقع الفقاعة
+    console.log('[Chat] رسم فقاعة عند:', bx, by, 'نص:', text);
 
     let alpha = 1;
     if(bubble.timer < 600) alpha = bubble.timer / 600;
@@ -127,8 +137,11 @@ const Chat = (() => {
   }
 
   function addBubble(playerId, text) {
+    // ✅ رسالة تشخيصية
+    console.log('[Chat] addBubble called - playerId:', playerId, 'text:', text);
     const duration = Math.min(2000 + text.length * 80, 6000);
     activeBubbles.set(playerId, { text, timer: duration });
+    console.log('[Chat] activeBubbles size after add:', activeBubbles.size);
   }
 
   return { init, update, drawBubbles, addBubble };
