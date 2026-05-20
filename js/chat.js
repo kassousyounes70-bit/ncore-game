@@ -13,13 +13,11 @@ const Chat = (() => {
     if(!chatInput) return;
 
     chatInput.maxLength = MAX_CHARS;
-    // دعم Enter للإرسال
     chatInput.addEventListener('keypress', e => { if(e.key==='Enter') sendChat(); });
 
     if(chatBtn) { 
       chatBtn.onclick = openChat; 
       chatBtn.ontouchstart = e=>{ e.preventDefault(); openChat(); };
-      // إظهار الزر بشكل دائم فور تفعيل الدردشة (بعد الدخول للخريطة)
       chatBtn.classList.remove('hidden'); 
       chatBtn.style.display = 'block'; 
     }
@@ -27,16 +25,14 @@ const Chat = (() => {
     if(chatSendBtn)  { chatSendBtn.onclick  = sendChat;  }
   }
 
-  function update() {
-    // تم إزالة خوارزمية المسافة والتخفي، نكتفي بتحديث وقت بقاء الفقاعات
-    const delta = 16.6;
+  // ✅ التعديل: الآن تستقبل delta الفعلية من اللعبة
+  function update(delta = 16.6) {
     for(const [id, b] of activeBubbles.entries()) {
       b.timer -= delta;
       if(b.timer <= 0) activeBubbles.delete(id);
     }
   }
 
-  /* ====== رسم الفقاعات ====== */
   function drawBubbles(ctx, myPlayer, otherPlayers) {
     if(myPlayer && activeBubbles.has('me'))
       _drawBubble(ctx, myPlayer.x, myPlayer.y, activeBubbles.get('me'));
@@ -50,7 +46,6 @@ const Chat = (() => {
   function _drawBubble(ctx, x, y, bubble) {
     ctx.save();
 
-    // ---- خط بمقاس 20 يدعم العربية والإنجليزية والإيموجي ----
     const FONT_SIZE = 20;
     ctx.font = `${FONT_SIZE}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Arial, sans-serif`;
     ctx.textAlign    = 'center';
@@ -68,14 +63,12 @@ const Chat = (() => {
     if(bubble.timer < 600) alpha = bubble.timer / 600;
     ctx.globalAlpha = Math.max(0, alpha);
 
-    // خلفية الفقاعة
     ctx.fillStyle   = 'rgba(255,255,255,0.96)';
     ctx.strokeStyle = '#0a0a0f';
     ctx.lineWidth   = 2.5;
     _roundRect(ctx, bx - tw/2, by - th/2, tw, th, 8);
     ctx.fill(); ctx.stroke();
 
-    // ذيل الفقاعة
     ctx.beginPath();
     ctx.moveTo(bx-7, by + th/2);
     ctx.lineTo(bx+7, by + th/2);
@@ -89,7 +82,6 @@ const Chat = (() => {
     ctx.lineTo(bx+7, by + th/2 + 1);
     ctx.stroke();
 
-    // نص الرسالة
     ctx.fillStyle   = '#0a0a0f';
     ctx.globalAlpha = Math.max(0, alpha);
     ctx.fillText(text, bx, by);
@@ -97,7 +89,6 @@ const Chat = (() => {
     ctx.restore();
   }
 
-  // مستطيل بزوايا دائرية
   function _roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x+r, y);
@@ -108,7 +99,6 @@ const Chat = (() => {
     ctx.closePath();
   }
 
-  /* ====== فتح / إغلاق / إرسال ====== */
   function openChat() {
     if(!chatModal) return;
     chatModal.style.display = 'flex';
