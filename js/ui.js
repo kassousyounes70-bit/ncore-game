@@ -40,7 +40,6 @@ const UI = (() => {
     const upBtn = Utils.$('scroll-up-btn');
     const downBtn = Utils.$('scroll-down-btn');
     
-    // إصلاح الأزرار لتعمل بقوة على الهواتف (Touch + Click)
     function scrollUp(e) {
         if(e) e.preventDefault();
         if(scrollContainer.scrollBy) scrollContainer.scrollBy({ top: -180, behavior: 'smooth' });
@@ -66,8 +65,10 @@ const UI = (() => {
     const grid=Utils.$('character-grid');grid.innerHTML='';_prevCvs=[];
     Player.getAllChars().forEach((char,i)=>{
       const card=document.createElement('div');card.className='char-card';card.dataset.id=i;
-      const cvs=document.createElement('canvas');cvs.width=56;cvs.height=64;
-      cvs.style.width='56px';cvs.style.height='64px';_prevCvs.push(cvs);
+      const cvs=document.createElement('canvas');
+      cvs.width=168;cvs.height=192;
+      cvs.style.width='168px';cvs.style.height='192px';
+      _prevCvs.push(cvs);
       const lbl=document.createElement('div');lbl.className='char-name';lbl.textContent=char.name;
       card.appendChild(cvs);card.appendChild(lbl);grid.appendChild(card);
       card.addEventListener('click',()=>_select(i));
@@ -92,12 +93,23 @@ const UI = (() => {
         const ctx=cvs.getContext('2d');
         ctx.imageSmoothingEnabled=false;
         ctx.fillStyle='#0e0e1e';ctx.fillRect(0,0,cvs.width,cvs.height);
+        
         ctx.fillStyle='rgba(0,0,0,0.28)';
-        ctx.beginPath();ctx.ellipse(cvs.width/2,cvs.height-4,13,4,0,0,Math.PI*2);ctx.fill();
-        ctx.save();ctx.translate(cvs.width/2-12,cvs.height/2-18);
+        ctx.beginPath();
+        ctx.ellipse(cvs.width/2,cvs.height-12,39,12,0,0,Math.PI*2);
+        ctx.fill();
+        
+        ctx.save();
+        ctx.scale(3,3);
+        ctx.translate((cvs.width/6)-12,(cvs.height/6)-18);
         Player.getAllChars()[i].draw(ctx,0,0,'down',frame,true);
         ctx.restore();
-        if(i===_sel){ctx.strokeStyle='rgba(64,240,128,0.85)';ctx.lineWidth=2;ctx.strokeRect(1,1,cvs.width-2,cvs.height-2);}
+        
+        if(i===_sel){
+            ctx.strokeStyle='rgba(64,240,128,0.85)';
+            ctx.lineWidth=4;
+            ctx.strokeRect(2,2,cvs.width-4,cvs.height-4);
+        }
       });
       _raf=requestAnimationFrame(loop);
     }
