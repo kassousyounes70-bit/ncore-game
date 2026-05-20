@@ -19,16 +19,16 @@ const Chat = (() => {
     if(chatBtn) { 
       chatBtn.onclick = openChat; 
       chatBtn.ontouchstart = e=>{ e.preventDefault(); openChat(); };
-      // الزر ظاهر بشكل دائم فور تهيئة الدردشة (دخول العالم)
-      chatBtn.classList.remove('hidden');
-      chatBtn.style.display = 'block';
+      // إظهار الزر بشكل دائم فور تفعيل الدردشة (بعد الدخول للخريطة)
+      chatBtn.classList.remove('hidden'); 
+      chatBtn.style.display = 'block'; 
     }
     if(chatCloseBtn) { chatCloseBtn.onclick = closeChat; }
     if(chatSendBtn)  { chatSendBtn.onclick  = sendChat;  }
   }
 
   function update() {
-    // لم نعد بحاجة لاختبار المسافة، نكتفي بتحديث وقت عرض الفقاعات
+    // تم إزالة خوارزمية المسافة والتخفي، نكتفي بتحديث وقت بقاء الفقاعات
     const delta = 16.6;
     for(const [id, b] of activeBubbles.entries()) {
       b.timer -= delta;
@@ -50,7 +50,7 @@ const Chat = (() => {
   function _drawBubble(ctx, x, y, bubble) {
     ctx.save();
 
-    // ---- خط يدعم العربية والإنجليزية والإيموجي ----
+    // ---- خط بمقاس 20 يدعم العربية والإنجليزية والإيموجي ----
     const FONT_SIZE = 20;
     ctx.font = `${FONT_SIZE}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Arial, sans-serif`;
     ctx.textAlign    = 'center';
