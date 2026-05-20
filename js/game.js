@@ -51,7 +51,6 @@ const Game = (() => {
     
     NPC.update(delta);Devices.update(delta);
     
-    // ✅ التعديل هنا: نمرر delta فقط
     if(window.Chat && Network.isConnected()) {
        Chat.update(delta);
     }
@@ -61,8 +60,12 @@ const Game = (() => {
   }
 
   function _draw(){
-    const ctx=_cvs,cw=_cvs.width,ch=_cvs.height;
-    ctx.fillStyle='#050510';ctx.fillRect(0,0,cw,ch);
+    // ✅ التصحيح: استخدم _ctx وليس _cvs
+    const ctx = _ctx;
+    const cw = _cvs.width, ch = _cvs.height;
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, cw, ch);
+    
     Camera.beginDraw(ctx);
       GameMap.draw(ctx);
       Devices.drawPrompt(ctx);
@@ -72,7 +75,7 @@ const Game = (() => {
       if(window.Chat) Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
       if(_debug)Collision.debugDraw(ctx,Camera.getOffset());
     Camera.endDraw(ctx);
-    _vignette(ctx,cw,ch);
+    _vignette(ctx, cw, ch);
   }
 
   function _vignette(ctx,w,h){
@@ -97,7 +100,7 @@ const Game = (() => {
   function _resize(){
     if(!_cvs)return;
     _cvs.width=window.innerWidth;_cvs.height=window.innerHeight;
-    _ctx.imageSmoothingEnabled=false;
+    if(_ctx) _ctx.imageSmoothingEnabled=false;
     if(_state===S.PLAYING)Camera.resize(_cvs.width,_cvs.height);
   }
 
