@@ -321,4 +321,3 @@ const Player = (() => {
   // كشف الدوال الضرورية للتحميل المسبق
   return{preload,init,update,draw,getRect,getCenterX,getCenterY,getCharId,getCharName,getAllChars, loadCharAsync: _loadChar};
 })();
-  
