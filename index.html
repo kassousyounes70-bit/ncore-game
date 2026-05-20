@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>eruda.init();</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0a0a0a" />
@@ -109,13 +111,13 @@
     </div>
 
     <button id="interact-btn" class="pixel-btn hidden" style="position: fixed; bottom: 74px; right: 24px; z-index: 40; background: var(--color-primary); box-shadow: 4px 4px 0 #a07000, inset -2px -2px 0 rgba(0,0,0,0.3), 0 0 15px rgba(240,192,64,0.6); animation: pulse 1.5s infinite;">🕹️ تفاعل</button>
-
+    
     <button id="chat-action-btn" class="pixel-btn hidden">💬 تحدث</button>
 
     <div id="device-popup" class="hidden">
       <div id="device-header" style="display: flex; gap: 8px; width: 100%; justify-content: space-between; align-items: center; margin-bottom: 5px; z-index: 101;">
         <button id="device-fs-btn" class="pixel-btn" style="background: var(--color-secondary); padding: 8px 12px; font-size: 8px;">⛶ تكبير</button>
-
+        
         <div id="gamepad-edit-tools" style="display: flex; gap: 5px; pointer-events: auto;">
           <button id="edit-layout-btn" class="pixel-btn" style="background: var(--color-primary); padding: 8px 10px; font-size: 8px;">تعديل 🛠️</button>
           <button id="save-layout-btn" class="pixel-btn hidden" style="background: var(--color-green); padding: 8px 10px; font-size: 8px;">حفظ ✅</button>
@@ -124,7 +126,7 @@
 
         <button id="device-close-btn" class="pixel-btn" style="background: var(--color-accent); padding: 8px 12px; font-size: 8px;">✖ إغلاق</button>
       </div>
-
+      
       <canvas id="device-canvas"></canvas>
       <iframe id="device-iframe" class="hidden" src="" frameborder="0" allowfullscreen></iframe>
     </div>
@@ -141,18 +143,7 @@
     </div>
   </div>
 
-  <!-- ✅ تسجيل Service Worker لتخزين الملفات محلياً وتسريع التحميل -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .then(reg => console.log('[SW] مسجّل ✅', reg.scope))
-          .catch(err => console.warn('[SW] فشل التسجيل:', err));
-      });
-    }
-  </script>
-
-  <!-- Keep-Alive لإبقاء الخادم مستيقظاً -->
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
   <script>
     const KEEP_ALIVE_URL      = 'https://ncore-mmo-server.onrender.com/ping';
     const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000;
@@ -165,7 +156,6 @@
     setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
   </script>
 
-  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/collision.js"></script>
   <script src="js/camera.js"></script>
@@ -174,14 +164,18 @@
   <script src="js/player.js"></script>
   <script src="js/npc.js"></script>
   <script src="js/games_data.js"></script>
+  
   <script src="js/game_controls.js"></script>
   <script src="js/gamepad.js"></script>
+  
   <script src="js/devices.js"></script>
   <script src="js/minigames.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/chat.js"></script>
   <script src="js/network.js"></script>
+  
   <script src="js/sound.js"></script>
+  
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>
 
