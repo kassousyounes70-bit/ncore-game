@@ -221,8 +221,9 @@ const Devices = (() => {
 
     // 🔊 رفع الصوت تدريجياً عند الإغلاق مهما كان نوع الحاسوب
     if(skipResumeMusic!==true){
-      if(window.AndroidApp && window.AndroidApp.fadeRestoreMusic){
-        window.AndroidApp.fadeRestoreMusic();
+      // الإصلاح: تغيير الاسم ليتطابق مع واجهة الأندرويد restoreMusic()
+      if(window.AndroidApp && window.AndroidApp.restoreMusic){
+        window.AndroidApp.restoreMusic();
       }
     }
 
