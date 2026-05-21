@@ -60,7 +60,7 @@ const Game = (() => {
   }
 
   function _draw(){
-    console.log('[Game] _draw is running (v3)'); // ✅ رسالة تأكيد
+    console.log('[Game] _draw running');
     const ctx = _ctx;
     const cw = _cvs.width, ch = _cvs.height;
     ctx.fillStyle = '#050510';
@@ -72,11 +72,19 @@ const Game = (() => {
       NPC.draw(ctx);
       Network.drawOtherPlayers(ctx,Player.getAllChars());
       Player.draw(ctx);
-      if(window.Chat && typeof Chat.drawBubbles === 'function') {
-        Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
+      
+      // استدعاء آمن لفقاعات الدردشة
+      if(window.Chat) {
+        if(typeof Chat.drawBubbles === 'function') {
+          Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
+        } else {
+          console.error('[Game] Chat موجود لكن drawBubbles ليست دالة!');
+          console.log('محتويات Chat:', Object.keys(window.Chat));
+        }
       } else {
-        console.warn('[Game] Chat.drawBubbles not available');
+        console.warn('[Game] Chat غير معرف');
       }
+      
       if(_debug)Collision.debugDraw(ctx,Camera.getOffset());
     Camera.endDraw(ctx);
     _vignette(ctx, cw, ch);
