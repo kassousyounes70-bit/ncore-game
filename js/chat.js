@@ -33,49 +33,41 @@ const Chat = (() => {
   }
 
   function drawBubbles(ctx, myPlayer, otherPlayers) {
-    // ✅ رسالة تشخيصية: معرفة عدد الفقاعات
-    console.log('[Chat] drawBubbles called, activeBubbles size =', activeBubbles.size);
-    
+    console.log('[Chat] drawBubbles called, size=', activeBubbles.size);
+    if(!ctx) { console.error('[Chat] ctx is undefined'); return; }
     if(myPlayer && activeBubbles.has('me')) {
-      console.log('[Chat] رسم فقاعة اللاعب الأساسي');
       _drawBubble(ctx, myPlayer.x, myPlayer.y, activeBubbles.get('me'));
     }
     if(otherPlayers) {
       for(const [id, p] of otherPlayers.entries()) {
-        if(activeBubbles.has(id)) {
-          console.log('[Chat] رسم فقاعة لاعب آخر:', id);
-          _drawBubble(ctx, p.x, p.y, activeBubbles.get(id));
-        }
+        if(activeBubbles.has(id)) _drawBubble(ctx, p.x, p.y, activeBubbles.get(id));
       }
     }
   }
 
   function _drawBubble(ctx, x, y, bubble) {
+    if(!ctx || !bubble) return;
     ctx.save();
-
     const FONT_SIZE = 20;
     ctx.font = `${FONT_SIZE}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Arial, sans-serif`;
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.direction    = 'rtl';
+    ctx.direction = 'rtl';
 
-    const text    = bubble.text;
+    const text = bubble.text;
     const metrics = ctx.measureText(text);
     const tw = Math.max(metrics.width + 28, 70);
     const th = FONT_SIZE + 20;
     const bx = x;
     const by = y - 55;
 
-    // ✅ رسالة تشخيصية: موقع الفقاعة
-    console.log('[Chat] رسم فقاعة عند:', bx, by, 'نص:', text);
-
     let alpha = 1;
     if(bubble.timer < 600) alpha = bubble.timer / 600;
     ctx.globalAlpha = Math.max(0, alpha);
 
-    ctx.fillStyle   = 'rgba(255,255,255,0.96)';
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
     ctx.strokeStyle = '#0a0a0f';
-    ctx.lineWidth   = 2.5;
+    ctx.lineWidth = 2.5;
     _roundRect(ctx, bx - tw/2, by - th/2, tw, th, 8);
     ctx.fill(); ctx.stroke();
 
@@ -92,10 +84,9 @@ const Chat = (() => {
     ctx.lineTo(bx+7, by + th/2 + 1);
     ctx.stroke();
 
-    ctx.fillStyle   = '#0a0a0f';
+    ctx.fillStyle = '#0a0a0f';
     ctx.globalAlpha = Math.max(0, alpha);
     ctx.fillText(text, bx, by);
-
     ctx.restore();
   }
 
@@ -137,12 +128,14 @@ const Chat = (() => {
   }
 
   function addBubble(playerId, text) {
-    // ✅ رسالة تشخيصية
-    console.log('[Chat] addBubble called - playerId:', playerId, 'text:', text);
+    console.log('[Chat] addBubble:', playerId, text);
     const duration = Math.min(2000 + text.length * 80, 6000);
     activeBubbles.set(playerId, { text, timer: duration });
-    console.log('[Chat] activeBubbles size after add:', activeBubbles.size);
   }
 
-  return { init, update, drawBubbles, addBubble };
+  // تصدير الكائن
+  const exported = { init, update, drawBubbles, addBubble };
+  // تعيينه على النافذة أيضاً كضمان (للوصول العمومي)
+  if (typeof window !== 'undefined') window.Chat = exported;
+  return exported;
 })();
