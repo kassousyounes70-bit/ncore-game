@@ -25,9 +25,11 @@ const Chat = (() => {
     if(chatSendBtn)  { chatSendBtn.onclick  = sendChat;  }
   }
 
-  function update(delta = 16.6) {
+  function update(delta = 0.016) {
+    // تحويل delta من ثوانٍ إلى ملي ثانية ليتوافق مع مؤقت النظام الداخلي
+    const deltaMs = delta * 1000;
     for(const [id, b] of activeBubbles.entries()) {
-      b.timer -= delta;
+      b.timer -= deltaMs;
       if(b.timer <= 0) activeBubbles.delete(id);
     }
   }
@@ -129,7 +131,7 @@ const Chat = (() => {
 
   function addBubble(playerId, text) {
     console.log('[Chat] addBubble:', playerId, text);
-    // ✅ المدة: 1 ثانية + 70 مللي لكل حرف، بحد أقصى 8 ثوانٍ
+    // المدة: 1 ثانية + 70 مللي لكل حرف، بحد أقصى 8 ثوانٍ
     const duration = Math.min(1000 + text.length * 70, 8000);
     activeBubbles.set(playerId, { text, timer: duration });
   }
