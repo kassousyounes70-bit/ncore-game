@@ -129,13 +129,13 @@ const Chat = (() => {
 
   function addBubble(playerId, text) {
     console.log('[Chat] addBubble:', playerId, text);
-    const duration = Math.min(2000 + text.length * 80, 6000);
+    // ✅ المدة: 1 ثانية + 70 مللي لكل حرف، بحد أقصى 8 ثوانٍ
+    const duration = Math.min(1000 + text.length * 70, 8000);
     activeBubbles.set(playerId, { text, timer: duration });
   }
 
   // تصدير الكائن
   const exported = { init, update, drawBubbles, addBubble };
-  // تعيينه على النافذة أيضاً كضمان (للوصول العمومي)
   if (typeof window !== 'undefined') window.Chat = exported;
   return exported;
 })();
