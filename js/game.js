@@ -60,7 +60,7 @@ const Game = (() => {
   }
 
   function _draw(){
-    // ✅ التصحيح: استخدم _ctx وليس _cvs
+    console.log('[Game] _draw is running (v3)'); // ✅ رسالة تأكيد
     const ctx = _ctx;
     const cw = _cvs.width, ch = _cvs.height;
     ctx.fillStyle = '#050510';
@@ -72,7 +72,11 @@ const Game = (() => {
       NPC.draw(ctx);
       Network.drawOtherPlayers(ctx,Player.getAllChars());
       Player.draw(ctx);
-      if(window.Chat) Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
+      if(window.Chat && typeof Chat.drawBubbles === 'function') {
+        Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
+      } else {
+        console.warn('[Game] Chat.drawBubbles not available');
+      }
       if(_debug)Collision.debugDraw(ctx,Camera.getOffset());
     Camera.endDraw(ctx);
     _vignette(ctx, cw, ch);
