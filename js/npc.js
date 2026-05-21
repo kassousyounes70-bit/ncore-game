@@ -570,4 +570,65 @@ const NPC = (() => {
     ctx.fillStyle=p.skin;ctx.fillRect(x,y+18+as,4,3);ctx.fillRect(x+16,y+18-as,4,3);
     // شارة ذهبية
     ctx.fillStyle=p.badge||'#f0d020';ctx.fillRect(x+7,y+13,4,3);
-    /
+    // رأس
+    ctx.fillStyle=p.skin;ctx.fillRect(x+4,y+1,12,11);
+    // قبعة شرطة
+    ctx.fillStyle='#1a3a6a';ctx.fillRect(x+3,y,14,5);
+    ctx.fillRect(x+2,y+3,16,2);
+    ctx.fillStyle='#f0d020';ctx.fillRect(x+7,y+1,6,3);
+    _simpleEyes(ctx,x,y,dir,p.hair||'#1a1a1a');
+  }
+
+  // --- هاتف ---
+  function _drawPhone(ctx,x,y,p,dir,frame,moving,mouthOpen){
+    _drawWalk(ctx,x,y,p,dir,frame,moving,mouthOpen);
+    // هاتف في يد اليمين
+    ctx.fillStyle='#1a1a1a';ctx.fillRect(x+17,y+13,4,7);
+    ctx.fillStyle='#4090ff';ctx.fillRect(x+18,y+14,2,4);
+    // نظرة للأسفل (عيون تتجه لليمين نحو الهاتف)
+    ctx.fillStyle=p.hair||'#1a1a1a';
+    ctx.fillRect(x+7,y+7,2,2);ctx.fillRect(x+12,y+7,2,2);
+  }
+
+  // --- قهوة ---
+  function _drawCoffee(ctx,x,y,p,dir,sip,mouthOpen){
+    _drawWalk(ctx,x,y,p,dir,0,false,mouthOpen);
+    // كوب في يد اليمين
+    const sipOff=sip?-3:0;
+    ctx.fillStyle='#c8a060';ctx.fillRect(x+17,y+14+sipOff,5,7);
+    ctx.fillStyle='#3a1a00';ctx.fillRect(x+18,y+15+sipOff,3,3);
+    // بخار القهوة
+    if(!sip){
+      ctx.strokeStyle='rgba(200,200,200,0.6)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x+19,y+13);
+      ctx.quadraticCurveTo(x+22,y+9,x+19,y+6);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x+21,y+12);
+      ctx.quadraticCurveTo(x+24,y+8,x+21,y+5);ctx.stroke();
+    }
+  }
+
+  // ============================================================
+  //  SHARED DRAW HELPERS
+  // ============================================================
+  function _simpleEyes(ctx,x,y,dir,color){
+    ctx.fillStyle='#fff';ctx.fillRect(x+6,y+5,3,3);ctx.fillRect(x+11,y+5,3,3);
+    ctx.fillStyle=color;
+    const ox=dir==='right'?1:dir==='left'?0:0,oy=dir==='down'?1:dir==='up'?0:1;
+    ctx.fillRect(x+6+ox,y+5+oy,2,2);ctx.fillRect(x+11+ox,y+5+oy,2,2);
+  }
+
+  function _npcMouth(ctx,x,y,dir,open,skinColor){
+    if(dir==='up')return;
+    const mx=x+(dir==='right'?8:dir==='left'?6:7);
+    const my=y+10;
+    if(open){
+      ctx.fillStyle='#3a1a0a';ctx.fillRect(mx,my,3,2);
+      ctx.fillStyle=skinColor||'#c8785a';
+      ctx.fillRect(mx-1,my-1,5,1);ctx.fillRect(mx-1,my+2,5,1);
+    } else {
+      ctx.fillStyle='#9a5040';ctx.fillRect(mx,my,3,1);
+    }
+  }
+
+  return{init,update,draw};
+})();
