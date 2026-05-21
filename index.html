@@ -2,7 +2,76 @@
 <html lang="ar" dir="rtl">
 <head>
   <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-  <script>eruda.init();</script>
+  <script>
+    // تهيئة Eruda مع خيارات السحب والمظهر
+    eruda.init({
+      tool: ['console', 'elements', 'network', 'resources', 'sources', 'info'],
+      displaySize: 70, // حجم النافذة بالنسبة للشاشة (70%)
+      defaults: { console: { showUncalled: true } }
+    });
+    
+    // تأخير بسيط للتأكد من تحميل Eruda بالكامل ثم إضافة زر النسخ المخصص
+    setTimeout(() => {
+      try {
+        // الحصول على شريط الأدوات الرئيسي
+        const toolbar = document.querySelector('.eruda-toolbar');
+        if (toolbar) {
+          // إنشاء زر نسخ مخصص
+          const copyBtn = document.createElement('button');
+          copyBtn.innerHTML = '📋 نسخ الكل';
+          copyBtn.style.cssText = `
+            background: #2a2a2e;
+            border: none;
+            color: #f0c040;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 6px 12px;
+            margin: 0 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            touch-action: manipulation;
+          `;
+          
+          // وظيفة النسخ: تجميع كل نصوص الـ Console
+          copyBtn.onclick = () => {
+            // محاولة الحصول على محتوى الـ Console من Eruda
+            const consolePanel = document.querySelector('.eruda-console');
+            if (consolePanel) {
+              // استخراج جميع الأسطر المعروضة
+              const lines = consolePanel.innerText || '';
+              if (lines) {
+                navigator.clipboard.writeText(lines).then(() => {
+                  alert('✅ تم نسخ كل محتوى Console بنجاح!');
+                }).catch(() => {
+                  alert('❌ فشل النسخ، حاول يدوياً.');
+                });
+              } else {
+                alert('لا يوجد نص في الـ Console لنسخه.');
+              }
+            } else {
+              // بديل: استخدام الـ Console الحقيقي (النظام)
+              alert('لا يمكن الوصول إلى نصوص الـ Console بهذه الطريقة، لكن يمكنك فتح Eruda ثم الضغط على زر "نسخ" الأصلي.');
+            }
+          };
+          
+          // إضافة الزر إلى شريط الأدوات
+          toolbar.appendChild(copyBtn);
+        }
+        
+        // تحسين إمكانية السحب (جعل النافذة قابلة للسحب بسهولة)
+        const erudaContainer = document.querySelector('.eruda-container');
+        if (erudaContainer) {
+          erudaContainer.style.touchAction = 'none'; // تسهيل السحب
+          // يمكن سحب النافذة من أعلى شريط العنوان
+          const header = document.querySelector('.eruda-header');
+          if (header) {
+            header.style.cursor = 'grab';
+            header.style.touchAction = 'pan-y'; // السماح بالسحب العمودي
+          }
+        }
+      } catch(e) { console.warn("خطأ في تحسين Eruda:", e); }
+    }, 500);
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0a0a0a" />
