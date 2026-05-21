@@ -36,12 +36,36 @@ const NPC = (() => {
   function _mk({x,y,state,pal,dir}){
     return{x,y,state,pal,dir,frame:0,ft:0,moving:false,
       tx:x,ty:y,wt:Utils.randFloat(1,3),waiting:true,
-      sitAnim:0,sitT:0};
+      sitAnim:0,sitT:0,
+      // ✅ حركة الفم للـ NPC
+      mouthOpen:false,mouthT:0,
+      talkTimer:0,talkInterval:Utils.randFloat(3,8)
+    };
   }
 
   function update(delta){
     for(const n of _npcs){
       n.state==='sit'?_sit(n,delta):_wander(n,delta);
+      _updateMouth(n,delta); // ✅
+    }
+  }
+
+  // ✅ تحديث حركة الفم للـ NPC
+  function _updateMouth(n,delta){
+    n.talkTimer+=delta;
+    if(n.talkTimer>=n.talkInterval){
+      // بدء دورة كلام جديدة (مدتها 1.5-3 ثانية)
+      n.talkTimer=0;
+      n.talkInterval=Utils.randFloat(3,8);
+      n.talkDuration=Utils.randFloat(1.5,3.0);
+      n.talkElapsed=0;
+      n.talking=true;
+    }
+    if(n.talking){
+      n.talkElapsed=(n.talkElapsed||0)+delta;
+      if(n.talkElapsed>=n.talkDuration){n.talking=false;n.mouthOpen=false;return;}
+      n.mouthT+=delta;
+      if(n.mouthT>=0.1){n.mouthT=0;n.mouthOpen=!n.mouthOpen;}
     }
   }
 
@@ -82,14 +106,14 @@ const NPC = (() => {
   }
 
   function _draw(ctx,n){
-    const{x,y,pal:p,dir,frame,moving,state,sitAnim}=n;
+    const{x,y,pal:p,dir,frame,moving,state,sitAnim,mouthOpen}=n;
     // ظل
     ctx.fillStyle='rgba(0,0,0,0.22)';
     ctx.beginPath();ctx.ellipse(x+NW/2,y+NH+2,9,3,0,0,Math.PI*2);ctx.fill();
-    state==='sit'?_drawSit(ctx,x,y,p,dir,sitAnim):_drawWalk(ctx,x,y,p,dir,frame,moving);
+    state==='sit'?_drawSit(ctx,x,y,p,dir,sitAnim,mouthOpen):_drawWalk(ctx,x,y,p,dir,frame,moving,mouthOpen);
   }
 
-  function _drawSit(ctx,x,y,p,dir,anim){
+  function _drawSit(ctx,x,y,p,dir,anim,mouthOpen){
     const by=anim===1?-1:0;
     // أرجل
     ctx.fillStyle=p.body;ctx.fillRect(x+4,y+18,5,6);ctx.fillRect(x+11,y+18,5,6);
@@ -103,9 +127,10 @@ const NPC = (() => {
     ctx.fillStyle=p.skin;ctx.fillRect(x+4,y+1+by,12,11);
     ctx.fillStyle=p.hair;ctx.fillRect(x+4,y+1+by,12,4);
     _simpleEyes(ctx,x,y+by,dir,p.hair);
+    _npcMouth(ctx,x,y+by,dir,mouthOpen,p.skin); // ✅
   }
 
-  function _drawWalk(ctx,x,y,p,dir,frame,moving){
+  function _drawWalk(ctx,x,y,p,dir,frame,moving,mouthOpen){
     const sw=moving?(frame===1?3:frame===2?-3:0):0;
     ctx.fillStyle=p.body;ctx.fillRect(x+4,y+18,5,6+sw);ctx.fillRect(x+11,y+18,5,6-sw);
     ctx.fillStyle='#111';ctx.fillRect(x+3,y+23+sw,7,3);ctx.fillRect(x+10,y+23-sw,7,3);
@@ -116,6 +141,7 @@ const NPC = (() => {
     ctx.fillStyle=p.skin;ctx.fillRect(x+4,y+1,12,11);
     ctx.fillStyle=p.hair;ctx.fillRect(x+4,y+1,12,4);
     _simpleEyes(ctx,x,y,dir,p.hair);
+    _npcMouth(ctx,x,y,dir,mouthOpen,p.skin); // ✅
   }
 
   function _simpleEyes(ctx,x,y,dir,color){
@@ -123,6 +149,23 @@ const NPC = (() => {
     ctx.fillStyle=color;
     const ox=dir==='right'?1:dir==='left'?0:0,oy=dir==='down'?1:dir==='up'?0:1;
     ctx.fillRect(x+6+ox,y+5+oy,2,2);ctx.fillRect(x+11+ox,y+5+oy,2,2);
+  }
+
+  // ✅ رسم فم الـ NPC — بسيط ومتناسب مع حجمهم الأصغر
+  function _npcMouth(ctx,x,y,dir,open,skinColor){
+    if(dir==='up') return;
+    const mx=x+(dir==='right'?8:dir==='left'?6:7);
+    const my=y+10;
+    if(open){
+      ctx.fillStyle='#3a1a0a';
+      ctx.fillRect(mx,my,3,2);
+      ctx.fillStyle=skinColor||'#c8785a';
+      ctx.fillRect(mx-1,my-1,5,1);
+      ctx.fillRect(mx-1,my+2,5,1);
+    } else {
+      ctx.fillStyle='#9a5040';
+      ctx.fillRect(mx,my,3,1);
+    }
   }
 
   return{init,update,draw};

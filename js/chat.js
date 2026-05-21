@@ -33,6 +33,11 @@ const Chat = (() => {
     }
   }
 
+  // ✅ جديد: هل يوجد فقاعة نشطة لهذا الـ id؟
+  function hasBubble(id) {
+    return activeBubbles.has(id);
+  }
+
   function drawBubbles(ctx, myPlayer, otherPlayers) {
     if(!ctx) return;
     if(myPlayer && activeBubbles.has('me')) {
@@ -182,7 +187,7 @@ const Chat = (() => {
     activeBubbles.set(playerId, { text, timer: duration });
   }
 
-  const exported = { init, update, drawBubbles, addBubble };
+  const exported = { init, update, drawBubbles, addBubble, hasBubble };
   if (typeof window !== 'undefined') window.Chat = exported;
   return exported;
 })();
