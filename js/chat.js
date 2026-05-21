@@ -26,7 +26,6 @@ const Chat = (() => {
   }
 
   function update(delta = 0.016) {
-    // تحويل delta من ثوانٍ إلى ملي ثانية ليتوافق مع مؤقت النظام الداخلي
     const deltaMs = delta * 1000;
     for(const [id, b] of activeBubbles.entries()) {
       b.timer -= deltaMs;
@@ -35,8 +34,7 @@ const Chat = (() => {
   }
 
   function drawBubbles(ctx, myPlayer, otherPlayers) {
-    console.log('[Chat] drawBubbles called, size=', activeBubbles.size);
-    if(!ctx) { console.error('[Chat] ctx is undefined'); return; }
+    if(!ctx) return;
     if(myPlayer && activeBubbles.has('me')) {
       _drawBubble(ctx, myPlayer.x, myPlayer.y, activeBubbles.get('me'));
     }
@@ -50,18 +48,62 @@ const Chat = (() => {
   function _drawBubble(ctx, x, y, bubble) {
     if(!ctx || !bubble) return;
     ctx.save();
-    const FONT_SIZE = 20;
+    
+    const FONT_SIZE = 16;
+    const LINE_HEIGHT = FONT_SIZE * 1.4;
     ctx.font = `${FONT_SIZE}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.direction = 'rtl';
 
     const text = bubble.text;
-    const metrics = ctx.measureText(text);
-    const tw = Math.max(metrics.width + 28, 70);
-    const th = FONT_SIZE + 20;
+    const MAX_BUBBLE_WIDTH = 220;
+
+    const lines = [];
+    const words = text.split(' ');
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const width = ctx.measureText(currentLine + " " + word).width;
+      if (width < MAX_BUBBLE_WIDTH) {
+        currentLine += " " + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    lines.push(currentLine);
+
+    const finalLines = [];
+    for (const line of lines) {
+      if (ctx.measureText(line).width > MAX_BUBBLE_WIDTH) {
+        let tempLine = '';
+        for (const char of line) {
+          if (ctx.measureText(tempLine + char).width > MAX_BUBBLE_WIDTH) {
+            finalLines.push(tempLine);
+            tempLine = char;
+          } else {
+            tempLine += char;
+          }
+        }
+        if (tempLine) finalLines.push(tempLine);
+      } else {
+        finalLines.push(line);
+      }
+    }
+
+    let maxLineWidth = 0;
+    for(const line of finalLines) {
+       maxLineWidth = Math.max(maxLineWidth, ctx.measureText(line).width);
+    }
+
+    const tw = Math.max(maxLineWidth + 28, 70);
+    const th = (finalLines.length * LINE_HEIGHT) + 16;
     const bx = x;
-    const by = y - 55;
+
+    const tailTipY = y - 25;
+    const tailBaseY = tailTipY - 10;
 
     let alpha = 1;
     if(bubble.timer < 600) alpha = bubble.timer / 600;
@@ -70,25 +112,31 @@ const Chat = (() => {
     ctx.fillStyle = 'rgba(255,255,255,0.96)';
     ctx.strokeStyle = '#0a0a0f';
     ctx.lineWidth = 2.5;
-    _roundRect(ctx, bx - tw/2, by - th/2, tw, th, 8);
+    _roundRect(ctx, bx - tw/2, tailBaseY - th, tw, th, 8);
     ctx.fill(); ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(bx-7, by + th/2);
-    ctx.lineTo(bx+7, by + th/2);
-    ctx.lineTo(bx,   by + th/2 + 10);
+    ctx.moveTo(bx-7, tailBaseY);
+    ctx.lineTo(bx+7, tailBaseY);
+    ctx.lineTo(bx,   tailTipY);
     ctx.closePath();
     ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.fill();
     ctx.strokeStyle = '#0a0a0f'; ctx.lineWidth = 2;
+    
     ctx.beginPath();
-    ctx.moveTo(bx-7, by + th/2 + 1);
-    ctx.lineTo(bx,   by + th/2 + 10);
-    ctx.lineTo(bx+7, by + th/2 + 1);
+    ctx.moveTo(bx-7, tailBaseY + 1);
+    ctx.lineTo(bx,   tailTipY);
+    ctx.lineTo(bx+7, tailBaseY + 1);
     ctx.stroke();
 
     ctx.fillStyle = '#0a0a0f';
     ctx.globalAlpha = Math.max(0, alpha);
-    ctx.fillText(text, bx, by);
+    let textY = (tailBaseY - th) + 8 + (LINE_HEIGHT / 2);
+    for (const line of finalLines) {
+      ctx.fillText(line, bx, textY);
+      textY += LINE_HEIGHT;
+    }
+    
     ctx.restore();
   }
 
@@ -130,13 +178,10 @@ const Chat = (() => {
   }
 
   function addBubble(playerId, text) {
-    console.log('[Chat] addBubble:', playerId, text);
-    // المدة: 1 ثانية + 70 مللي لكل حرف، بحد أقصى 8 ثوانٍ
     const duration = Math.min(1000 + text.length * 70, 8000);
     activeBubbles.set(playerId, { text, timer: duration });
   }
 
-  // تصدير الكائن
   const exported = { init, update, drawBubbles, addBubble };
   if (typeof window !== 'undefined') window.Chat = exported;
   return exported;
