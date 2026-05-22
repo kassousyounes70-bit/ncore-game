@@ -3,13 +3,37 @@ const GameMap = (() => {
   const WORLD_W=2560,WORLD_H=1920,T=32;
   const DOOR_X=WORLD_W-T,DOOR_Y=WORLD_H/2-80,DOOR_H=160;
   const SPAWN_X=WORLD_W-T-70,SPAWN_Y=WORLD_H/2-14;
-  let _obs=[],_devs=[],_chairs=[];
 
+  // منطقة البناء — الزاوية اليمنى العلوية
+  const BX=WORLD_W-440, BY=T+20, BW=380, BH=300;
+  // كشك التذاكر داخل منطقة البناء
+  const BOOTH_X=BX+30, BOOTH_Y=BY+60, BOOTH_W=100, BOOTH_H=80;
+  // طاولة الجوائز
+  const TROPHY_X=180, TROPHY_Y=WORLD_H-T-160, TROPHY_W=130, TROPHY_H=60;
+  // لوحة الإعلانات (على الجدار الأيسر)
+  const BOARD_X=T, BOARD_Y=600, BOARD_W=26, BOARD_H=180;
+  // شاشة العرض الكبيرة
+  const SCREEN_X=900, SCREEN_Y=T, SCREEN_W=200, SCREEN_H=20;
+  // باب Staff Only
+  const STAFF_X=60, STAFF_Y=WORLD_H-T-120;
+  // آلة البيع
+  const VEND_X=2020, VEND_Y=48, VEND_W=64, VEND_H=130;
+
+  let _obs=[],_devs=[],_chairs=[];
+  let _t=0; // مؤقت للرسوم المتحركة
+
+  // ============================================================
+  //  INIT
+  // ============================================================
   function init(){
     _obs=[];_devs=[];_chairs=[];
-    _buildWalls();_placeComputers();
+    _buildWalls();
+    _placeComputers();
+    _placeSceneryObstacles();
     Collision.setObstacles(_obs);
   }
+
+  function update(delta){ _t+=delta; }
 
   function _buildWalls(){
     const W=WORLD_W,H=WORLD_H;
@@ -20,17 +44,13 @@ const GameMap = (() => {
   function _w(x,y,w,h){_obs.push({x,y,w,h,type:'wall'});}
 
   function _placeComputers(){
-    // ---- جدار يسار (5 حواسيب) ----
     for(let i=0;i<5;i++) _addPC(T+8,220+i*330,'right');
-    // ---- جزيرة صف 1 — 5 أزواج ظهر لظهر (10 حواسيب) ----
     [300,620,940,1260,1580].forEach(x=>{
       _addPC(x,320,'down'); _addPC(x,460,'up');
     });
-    // ---- جزيرة صف 2 — 5 أزواج ظهر لظهر (10 حواسيب) ----
     [400,720,1040,1360,1680].forEach(x=>{
       _addPC(x,820,'down'); _addPC(x,960,'up');
     });
-    // ---- جدار سفلي (5 حواسيب) ----
     [250,600,950,1300,1650].forEach(x=>_addPC(x,WORLD_H-T-100,'up'));
   }
 
@@ -39,16 +59,51 @@ const GameMap = (() => {
     _devs.push({x,y,w,h,type:'pc',label:'Computer',facing});
     _obs.push({x,y,w,h,type:'device'});
     let cx=x+w/2-10,cy=y;
-    if(facing==='down') cy=y+h+8;
-    else if(facing==='up') cy=y-36;
+    if(facing==='down')      cy=y+h+8;
+    else if(facing==='up')   cy=y-36;
     else if(facing==='right'){cx=x+w+8;cy=y+h/2-10;}
-    else{cx=x-36;cy=y+h/2-10;}
+    else                     {cx=x-36; cy=y+h/2-10;}
     _chairs.push({x:cx,y:cy,w:20,h:20});
   }
 
+  // عوائق الديكور الجديد
+  function _placeSceneryObstacles(){
+    // كشك التذاكر
+    _obs.push({x:BOOTH_X,  y:BOOTH_Y,  w:BOOTH_W,  h:BOOTH_H,  type:'wall'});
+    // طاولة الجوائز
+    _obs.push({x:TROPHY_X, y:TROPHY_Y, w:TROPHY_W, h:TROPHY_H, type:'wall'});
+    // لوحة الإعلانات
+    _obs.push({x:BOARD_X,  y:BOARD_Y,  w:BOARD_W,  h:BOARD_H,  type:'wall'});
+    // شاشة العرض (إطارها فقط)
+    _obs.push({x:SCREEN_X, y:SCREEN_Y, w:SCREEN_W, h:SCREEN_H, type:'wall'});
+    // باب Staff Only (حاجز رفيع)
+    _obs.push({x:STAFF_X,  y:STAFF_Y-60,  w:60,  h:4,  type:'wall'});
+    // آلة البيع
+    _obs.push({x:VEND_X,   y:VEND_Y,   w:VEND_W,   h:VEND_H,   type:'wall'});
+    // سقالة البناء
+    _obs.push({x:BX+180,   y:BY+20,    w:90,   h:BH-60,type:'wall'});
+    // حدود منطقة البناء (شريط التحذير — عائق مؤقت)
+    _obs.push({x:BX-8,y:BY-8,w:BW+16,h:8,   type:'wall'});
+    _obs.push({x:BX-8,y:BY+BH,w:BW+16,h:8,  type:'wall'});
+    _obs.push({x:BX-8,y:BY,   w:8,h:BH,     type:'wall'});
+  }
+
+  // ============================================================
+  //  DRAW
+  // ============================================================
   function draw(ctx){
-    _drawFloor(ctx);_drawWalls(ctx);_drawDecorations(ctx);
-    _drawAllPCs(ctx);_drawDoor(ctx);_drawCeilingLights(ctx);
+    _drawFloor(ctx);
+    _drawWalls(ctx);
+    _drawDecorations(ctx);
+    _drawAllPCs(ctx);
+    _drawDoor(ctx);
+    _drawCeilingLights(ctx);
+    // إضافات جديدة
+    _drawBigScreen(ctx);
+    _drawTrophyTable(ctx);
+    _drawStaffDoor(ctx);
+    _drawNoticeboard(ctx);
+    _drawConstructionZone(ctx);
   }
 
   /* ======================== FLOOR ======================== */
@@ -62,10 +117,9 @@ const GameMap = (() => {
     ctx.strokeStyle='rgba(255,255,255,0.025)';ctx.lineWidth=1;
     for(let x=0;x<=WORLD_W;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,WORLD_H);ctx.stroke();}
     for(let y=0;y<=WORLD_H;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(WORLD_W,y);ctx.stroke();}
-    // سجادات تحت الجزر
     _carpet(ctx,240,260,1440,320);
     _carpet(ctx,340,760,1440,320);
-    // بقع مشروبات
+    _carpet(ctx,TROPHY_X-20,TROPHY_Y-40,180,120);
     _spill(ctx,470,640,'#8b2500',0.45);
     _spill(ctx,1120,480,'#1a6fb5',0.4);
     _spill(ctx,790,1080,'#1a8c1a',0.35);
@@ -78,7 +132,6 @@ const GameMap = (() => {
     ctx.strokeRect(x+6,y+6,w-12,h-12);
     ctx.strokeStyle='rgba(160,90,255,0.09)';
     ctx.strokeRect(x+14,y+14,w-28,h-28);
-    // نقش هندسي بسيط وسط السجادة
     ctx.strokeStyle='rgba(160,90,255,0.12)';ctx.lineWidth=1;
     const cx=x+w/2,cy=y+h/2;
     ctx.strokeRect(cx-40,cy-20,80,40);
@@ -111,7 +164,6 @@ const GameMap = (() => {
       ctx.strokeStyle='rgba(130,60,220,0.45)';ctx.lineWidth=2;
       ctx.strokeRect(s.x+2,s.y+2,s.w-4,s.h-4);
     }
-    // LED شريط الجدار العلوي
     for(let lx=T+12;lx<W-T;lx+=52){
       const hue=(lx/W)*360;
       ctx.fillStyle=`hsl(${hue},95%,62%)`;ctx.fillRect(lx,3,12,4);
@@ -119,7 +171,6 @@ const GameMap = (() => {
       gr.addColorStop(0,`hsla(${hue},95%,62%,0.35)`);gr.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=gr;ctx.fillRect(lx-16,0,44,30);
     }
-    // ملصقات الجدران
     const posters=[
       {x:120,y:4,w:52,h:26,c1:'#ff4400',c2:'#ff8800',t:'PACMAN'},
       {x:300,y:4,w:52,h:26,c1:'#0044ff',c2:'#00ccff',t:'MARIO'},
@@ -129,7 +180,6 @@ const GameMap = (() => {
       {x:1200,y:4,w:52,h:26,c1:'#004488',c2:'#0088ff',t:'SF2'},
       {x:1500,y:4,w:52,h:26,c1:'#880000',c2:'#ff4444',t:'DOOM'},
       {x:1800,y:4,w:52,h:26,c1:'#448800',c2:'#aaff00',t:'GTA'},
-      // جدار يسار
       {x:4,y:200,w:26,h:52,c1:'#ff4400',c2:'#ffcc00',t:'NFS',side:true},
       {x:4,y:500,w:26,h:52,c1:'#0044ff',c2:'#00ffcc',t:'FIFA',side:true},
       {x:4,y:900,w:26,h:52,c1:'#008800',c2:'#88ff00',t:'PES',side:true},
@@ -141,9 +191,7 @@ const GameMap = (() => {
     ctx.fillStyle='rgba(255,255,255,0.035)';
     for(let r=0;r*12<wh;r++){
       const off=r%2===0?0:12;
-      for(let c=-1;c*24<ww+24;c++){
-        ctx.fillRect(wx+c*24+off+1,wy+r*12+1,22,10);
-      }
+      for(let c=-1;c*24<ww+24;c++)ctx.fillRect(wx+c*24+off+1,wy+r*12+1,22,10);
     }
   }
 
@@ -162,10 +210,15 @@ const GameMap = (() => {
 
   /* ======================== DECORATIONS ======================== */
   function _drawDecorations(ctx){
-    _vendingMachine(ctx,2020,48);
-    _trashBin(ctx,190,190);_trashBin(ctx,1760,520);_trashBin(ctx,960,1220);_trashBin(ctx,500,1600);
+    _vendingMachine(ctx,VEND_X,VEND_Y);
+    _trashBin(ctx,190,190);_trashBin(ctx,1760,520);
+    _trashBin(ctx,960,1220);_trashBin(ctx,500,1600);
     _plant(ctx,110,420,false);_plant(ctx,2060,310,true);
-    _plant(ctx,110,1250,false);_plant(ctx,2160,920,false);_plant(ctx,1800,1750,true);
+    _plant(ctx,110,1250,false);_plant(ctx,2160,920,false);
+    _plant(ctx,1800,1750,true);
+    // نباتات جديدة
+    _plant(ctx,TROPHY_X+140,TROPHY_Y-30,false);
+    _plant(ctx,STAFF_X-30,STAFF_Y-80,false);
     _cables(ctx);
   }
 
@@ -182,12 +235,13 @@ const GameMap = (() => {
     const cans=[['#cc0000','#ff0000'],['#0055cc','#0088ff'],['#008800','#00cc00'],
                 ['#cc8800','#ffcc00'],['#880088','#cc44cc'],['#004488','#0088cc']];
     for(let r=0;r<3;r++)for(let c=0;c<2;c++){
-      const [b,t]=cans[r*2+c];
+      const[b,t]=cans[r*2+c];
       ctx.fillStyle=b;ctx.fillRect(x+10+c*24,y+52+r*20,20,16);
       ctx.fillStyle=t;ctx.fillRect(x+10+c*24,y+52+r*20,20,5);
       ctx.fillStyle='rgba(255,255,255,0.2)';ctx.fillRect(x+11+c*24,y+52+r*20,8,4);
     }
-    ctx.fillStyle='#666';ctx.fillRect(x+18,y+118,28,6);ctx.fillStyle='#444';ctx.fillRect(x+26,y+119,12,4);
+    ctx.fillStyle='#666';ctx.fillRect(x+18,y+118,28,6);
+    ctx.fillStyle='#444';ctx.fillRect(x+26,y+119,12,4);
     ctx.strokeStyle='#330800';ctx.lineWidth=2;ctx.strokeRect(x,y,64,130);
     const gr=ctx.createRadialGradient(x+32,y+25,4,x+32,y+25,45);
     gr.addColorStop(0,'rgba(0,68,204,0.2)');gr.addColorStop(1,'rgba(0,0,0,0)');
@@ -238,31 +292,289 @@ const GameMap = (() => {
     ctx.setLineDash([]);ctx.restore();
   }
 
-  /* ======================== PC STATION ======================== */
-  function _drawAllPCs(ctx){
-    for(let i=0; i<_devs.length; i++){
-      const d = _devs[i];
-      if(!Camera.isVisible(d))continue;
-      _drawPC(ctx, d.x, d.y, d.facing||'down', i);
+  /* ======================== شاشة العرض الكبيرة ======================== */
+  function _drawBigScreen(ctx){
+    const sx=SCREEN_X,sy=SCREEN_Y+4,sw=SCREEN_W,sh=100;
+    if(!Camera.isVisible({x:sx,y:sy,w:sw,h:sh}))return;
+    ctx.fillStyle='#0a0a1a';ctx.fillRect(sx-4,sy-2,sw+8,sh+8);
+    ctx.strokeStyle='#6030c0';ctx.lineWidth=3;ctx.strokeRect(sx-4,sy-2,sw+8,sh+8);
+    const pulse=0.7+Math.sin(_t*2)*0.3;
+    const bg=ctx.createLinearGradient(sx,sy,sx,sy+sh);
+    bg.addColorStop(0,`rgba(0,10,40,${pulse})`);
+    bg.addColorStop(1,`rgba(10,0,40,${pulse})`);
+    ctx.fillStyle=bg;ctx.fillRect(sx,sy,sw,sh);
+    ctx.save();
+    ctx.shadowColor='#8040ff';ctx.shadowBlur=12*pulse;
+    Utils.drawPixelText(ctx,'NCORE ARENA',sx+sw/2,sy+18,
+      {font:'8px "Press Start 2P"',color:'#c080ff',shadow:'#4000a0',align:'center'});
+    const alpha=0.5+Math.sin(_t*3)*0.5;
+    ctx.globalAlpha=alpha;
+    Utils.drawPixelText(ctx,'LIVE TOURNAMENT',sx+sw/2,sy+42,
+      {font:'5px "Press Start 2P"',color:'#f0c040',shadow:'#806000',align:'center'});
+    ctx.globalAlpha=1;
+    ctx.fillStyle=`rgba(240,192,64,${alpha})`;
+    ctx.beginPath();ctx.moveTo(sx+sw/2-6,sy+62);
+    ctx.lineTo(sx+sw/2+6,sy+62);
+    ctx.lineTo(sx+sw/2,sy+72);ctx.closePath();ctx.fill();
+    ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(sx,sy,sw,4);
+    ctx.fillStyle='#1a1a2a';
+    ctx.fillRect(sx+sw/2-15,sy+sh+6,30,10);
+    ctx.fillRect(sx+sw/2-25,sy+sh+14,50,6);
+  }
+
+  /* ======================== طاولة الجوائز ======================== */
+  function _drawTrophyTable(ctx){
+    const tx=TROPHY_X,ty=TROPHY_Y;
+    if(!Camera.isVisible({x:tx,y:ty,w:TROPHY_W,h:TROPHY_H+40}))return;
+    ctx.fillStyle='#5c3d1e';ctx.fillRect(tx,ty+40,TROPHY_W,20);
+    ctx.fillStyle='#3a2010';
+    ctx.fillRect(tx+10,ty+58,20,30);ctx.fillRect(tx+100,ty+58,20,30);
+    ctx.strokeStyle='#2a1408';ctx.lineWidth=2;ctx.strokeRect(tx,ty+40,TROPHY_W,20);
+    ctx.fillStyle='#1a5a1a';ctx.fillRect(tx+5,ty+38,TROPHY_W-10,5);
+    _trophy(ctx,tx+50,ty,24,28,'#f0d020','#c8a000');
+    _trophy(ctx,tx+15,ty+8,18,22,'#d0d0d0','#a0a0a0');
+    _trophy(ctx,tx+90,ty+8,18,22,'#c87820','#a05010');
+    ctx.fillStyle='#0a0a1a';ctx.fillRect(tx+25,ty-20,80,18);
+    ctx.strokeStyle='#f0c040';ctx.lineWidth=1;ctx.strokeRect(tx+25,ty-20,80,18);
+    Utils.drawPixelText(ctx,'CHAMPIONS',tx+65,ty-14,
+      {font:'4px "Press Start 2P"',color:'#f0c040',align:'center'});
+  }
+
+  function _trophy(ctx,x,y,w,h,c1,c2){
+    ctx.fillStyle=c1;
+    ctx.fillRect(x,y+h*0.2,w,h*0.5);
+    ctx.fillRect(x-w*0.15,y,w*1.3,h*0.25);
+    ctx.fillRect(x-w*0.2,y+h*0.2,w*0.2,h*0.25);
+    ctx.fillRect(x+w,y+h*0.2,w*0.2,h*0.25);
+    ctx.fillStyle=c2;
+    ctx.fillRect(x+w*0.35,y+h*0.7,w*0.3,h*0.15);
+    ctx.fillRect(x+w*0.1,y+h*0.85,w*0.8,h*0.15);
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillRect(x+w*0.2,y+h*0.05,w*0.3,h*0.15);
+  }
+
+  /* ======================== باب Staff Only ======================== */
+  function _drawStaffDoor(ctx){
+    const dx=STAFF_X,dy=STAFF_Y;
+    if(!Camera.isVisible({x:dx,y:dy-80,w:70,h:100}))return;
+    ctx.fillStyle='#2a0a4a';ctx.fillRect(dx,dy-60,60,64);
+    ctx.strokeStyle='#8040c0';ctx.lineWidth=2;ctx.strokeRect(dx,dy-60,60,64);
+    ctx.fillStyle='#1a0530';ctx.fillRect(dx+3,dy-57,54,58);
+    ctx.strokeStyle='#4a1a8a';ctx.lineWidth=1;
+    ctx.strokeRect(dx+8,dy-52,20,24);ctx.strokeRect(dx+32,dy-52,18,24);
+    ctx.strokeRect(dx+8,dy-24,42,18);
+    ctx.fillStyle='#c8a020';ctx.fillRect(dx+46,dy-38,6,10);
+    ctx.beginPath();ctx.arc(dx+49,dy-33,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a0a00';ctx.fillRect(dx-5,dy-80,72,18);
+    ctx.strokeStyle='#ff4400';ctx.lineWidth=1;ctx.strokeRect(dx-5,dy-80,72,18);
+    Utils.drawPixelText(ctx,'STAFF ONLY',dx+31,dy-74,
+      {font:'4px "Press Start 2P"',color:'#ff4400',align:'center'});
+    const blink=Math.sin(_t*3)>0;
+    ctx.fillStyle=blink?'#ff2200':'#440000';
+    ctx.save();
+    if(blink){ctx.shadowColor='#ff2200';ctx.shadowBlur=10;}
+    ctx.beginPath();ctx.arc(dx+30,dy-65,5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  /* ======================== لوحة الإعلانات ======================== */
+  function _drawNoticeboard(ctx){
+    const bx=BOARD_X,by=BOARD_Y;
+    if(!Camera.isVisible({x:bx,y:by,w:BOARD_W,h:BOARD_H}))return;
+    ctx.fillStyle='#3a2010';ctx.fillRect(bx,by,26,180);
+    ctx.strokeStyle='#7a5030';ctx.lineWidth=2;ctx.strokeRect(bx,by,26,180);
+    ctx.fillStyle='#c8a060';ctx.fillRect(bx+2,by+4,22,172);
+    const notices=[
+      {y:by+8, c:'#ffeeaa',tc:'#330000'},
+      {y:by+48,c:'#aaffaa',tc:'#003300'},
+      {y:by+88,c:'#aaaaff',tc:'#000033'},
+      {y:by+128,c:'#ffaaaa',tc:'#330000'},
+    ];
+    for(const n of notices){
+      ctx.fillStyle=n.c;ctx.fillRect(bx+3,n.y,20,34);
+      ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=1;ctx.strokeRect(bx+3,n.y,20,34);
+      ctx.fillStyle=n.tc;
+      ctx.fillRect(bx+5,n.y+4,16,2);ctx.fillRect(bx+5,n.y+9,14,2);
+      ctx.fillRect(bx+5,n.y+14,16,2);ctx.fillRect(bx+5,n.y+19,10,2);
+      ctx.fillStyle='#cc0000';
+      ctx.beginPath();ctx.arc(bx+13,n.y+1,3,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.beginPath();ctx.arc(bx+12,n.y,1,0,Math.PI*2);ctx.fill();
     }
   }
 
-  function _drawPC(ctx,x,y,facing, devId){
-    _desk(ctx,x,y);
-    _monitor(ctx,x,y, devId);
-    _keyboard(ctx,x,y);
-    _chair(ctx,x,y,facing);
-    _accessories(ctx,x,y);
+  /* ======================== منطقة البناء ======================== */
+  function _drawConstructionZone(ctx){
+    if(!Camera.isVisible({x:BX,y:BY,w:BW,h:BH+40}))return;
+    // أرضية بيتون
+    ctx.fillStyle='#2a2a2a';ctx.fillRect(BX,BY,BW,BH);
+    ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;
+    for(let x=BX;x<BX+BW;x+=24){ctx.beginPath();ctx.moveTo(x,BY);ctx.lineTo(x,BY+BH);ctx.stroke();}
+    for(let y=BY;y<BY+BH;y+=24){ctx.beginPath();ctx.moveTo(BX,y);ctx.lineTo(BX+BW,y);ctx.stroke();}
+    // الشريط الأصفر/الأسود
+    _drawBarricade(ctx,BX-8,BY-8,BW+16,BH+16);
+    // الكشك
+    _drawTicketBooth(ctx,BOOTH_X,BOOTH_Y);
+    // السقالة
+    _drawScaffolding(ctx,BX+180,BY+20);
+    // لافتة تحت البناء
+    _drawComingSoon(ctx,BX+BW/2,BY+BH-20);
+  }
+
+  function _drawBarricade(ctx,x,y,w,h){
+    ctx.save();
+    const sw=18;
+    // أعلى
+    for(let i=0;i<w;i+=sw*2){
+      ctx.fillStyle='#f0c000';ctx.fillRect(x+i,y,sw,5);
+      ctx.fillStyle='#111';   ctx.fillRect(x+i+sw,y,sw,5);
+    }
+    // أسفل
+    for(let i=0;i<w;i+=sw*2){
+      ctx.fillStyle='#f0c000';ctx.fillRect(x+i,y+h-5,sw,5);
+      ctx.fillStyle='#111';   ctx.fillRect(x+i+sw,y+h-5,sw,5);
+    }
+    // يسار
+    for(let i=0;i<h;i+=sw*2){
+      ctx.fillStyle='#f0c000';ctx.fillRect(x,y+i,5,sw);
+      ctx.fillStyle='#111';   ctx.fillRect(x,y+i+sw,5,sw);
+    }
+    // يمين
+    for(let i=0;i<h;i+=sw*2){
+      ctx.fillStyle='#f0c000';ctx.fillRect(x+w-5,y+i,5,sw);
+      ctx.fillStyle='#111';   ctx.fillRect(x+w-5,y+i+sw,5,sw);
+    }
+    // مخاريط تحذير
+    const cones=[x+20,x+w/3,x+w/2,x+w*0.7,x+w-30];
+    for(const cx of cones){
+      ctx.fillStyle='#ff6600';
+      ctx.beginPath();ctx.moveTo(cx,y+h+4);
+      ctx.lineTo(cx-8,y+h+24);ctx.lineTo(cx+8,y+h+24);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#fff';ctx.fillRect(cx-8,y+h+12,16,4);
+      ctx.fillStyle='#333';ctx.fillRect(cx-10,y+h+22,20,4);
+    }
+    ctx.restore();
+  }
+
+  function _drawTicketBooth(ctx,x,y){
+    // جدران
+    ctx.fillStyle='#3a2060';ctx.fillRect(x,y,BOOTH_W,BOOTH_H);
+    // سقف مائل
+    ctx.fillStyle='#5030a0';
+    ctx.beginPath();ctx.moveTo(x-5,y);ctx.lineTo(x+BOOTH_W+5,y);
+    ctx.lineTo(x+BOOTH_W-5,y-20);ctx.lineTo(x+5,y-20);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#8060d0';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x-5,y);ctx.lineTo(x+BOOTH_W+5,y);
+    ctx.lineTo(x+BOOTH_W-5,y-20);ctx.lineTo(x+5,y-20);ctx.closePath();ctx.stroke();
+    // نافذة
+    ctx.fillStyle='#000820';ctx.fillRect(x+15,y+10,70,35);
+    ctx.strokeStyle='#8060d0';ctx.lineWidth=2;ctx.strokeRect(x+15,y+10,70,35);
+    ctx.fillStyle='rgba(100,100,255,0.1)';ctx.fillRect(x+16,y+11,68,33);
+    // شق التذاكر
+    ctx.fillStyle='#1a0a30';ctx.fillRect(x+25,y+45,50,6);
+    ctx.strokeStyle='#6040a0';ctx.lineWidth=1;ctx.strokeRect(x+25,y+45,50,6);
+    // رف
+    ctx.fillStyle='#5030a0';ctx.fillRect(x+5,y+55,BOOTH_W-10,6);
+    // باب
+    ctx.fillStyle='#2a1050';ctx.fillRect(x+35,y+58,30,22);
+    ctx.strokeStyle='#6040a0';ctx.lineWidth=1;ctx.strokeRect(x+35,y+58,30,22);
+    ctx.fillStyle='#c8a020';ctx.fillRect(x+60,y+67,4,6);
+    // لافتة التذاكر
+    ctx.fillStyle='#0a0520';ctx.fillRect(x+5,y-42,BOOTH_W-10,20);
+    ctx.strokeStyle='#f0c040';ctx.lineWidth=2;ctx.strokeRect(x+5,y-42,BOOTH_W-10,20);
+    ctx.fillStyle='#f0e060';ctx.fillRect(x+10,y-40,16,16);
+    ctx.fillStyle='#c8a000';ctx.fillRect(x+12,y-38,12,12);
+    ctx.fillStyle='#f0e060';ctx.fillRect(x+16,y-35,4,6);
+    Utils.drawPixelText(ctx,'TICKETS',x+BOOTH_W/2+10,y-34,
+      {font:'5px "Press Start 2P"',color:'#f0c040',align:'center'});
+    // غطاء "قريباً" على النافذة
+    ctx.fillStyle='rgba(10,5,30,0.92)';ctx.fillRect(x+18,y+14,66,27);
+    Utils.drawPixelText(ctx,'COMING',x+51,y+22,
+      {font:'4px "Press Start 2P"',color:'#a080ff',align:'center'});
+    Utils.drawPixelText(ctx,'SOON!',x+51,y+31,
+      {font:'4px "Press Start 2P"',color:'#f0c040',align:'center'});
+    // ضوء يومض
+    const p=0.5+Math.sin(_t*2.5)*0.5;
+    ctx.save();ctx.globalAlpha=p;
+    ctx.shadowColor='#f0c040';ctx.shadowBlur=15;
+    ctx.fillStyle='#f0c040';
+    ctx.beginPath();ctx.arc(x+BOOTH_W/2,y-50,5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  function _drawScaffolding(ctx,x,y){
+    ctx.fillStyle='#808080';
+    ctx.fillRect(x,  y,6,BH-40);
+    ctx.fillRect(x+80,y,6,BH-40);
+    for(let fy=y+20;fy<y+BH-60;fy+=50){
+      ctx.fillStyle='#707070';ctx.fillRect(x,fy,86,5);
+      if(fy===y+20){
+        ctx.fillStyle='#8b5a20';ctx.fillRect(x+2,fy-6,82,8);
+        ctx.fillStyle='#7a4a10';
+        for(let bx=x+4;bx<x+82;bx+=14)ctx.fillRect(bx,fy-5,12,6);
+      }
+    }
+    ctx.strokeStyle='#606060';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(x+6,y);ctx.lineTo(x+80,y+50);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+80,y);ctx.lineTo(x+6,y+50);ctx.stroke();
+    // رافعة
+    ctx.fillStyle='#505050';ctx.fillRect(x+38,y-40,10,50);
+    ctx.fillRect(x+38,y-40,50,8);
+    ctx.strokeStyle='#303030';ctx.lineWidth=2;ctx.setLineDash([3,2]);
+    ctx.beginPath();ctx.moveTo(x+84,y-35);ctx.lineTo(x+84,y+20);ctx.stroke();
+    ctx.setLineDash([]);
+    // صندوق يتأرجح
+    const hookY=y+10+Math.sin(_t*0.5)*20;
+    ctx.fillStyle='#804000';ctx.fillRect(x+76,hookY,18,14);
+    ctx.strokeStyle='#402000';ctx.lineWidth=1;ctx.strokeRect(x+76,hookY,18,14);
+    ctx.fillStyle='#c06000';ctx.fillRect(x+78,hookY+2,14,5);
+    // كومة رمل
+    ctx.fillStyle='#c8a840';
+    ctx.beginPath();ctx.ellipse(x+110,y+BH-60,25,12,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#e0c060';
+    ctx.beginPath();ctx.ellipse(x+110,y+BH-64,18,8,0,0,Math.PI);ctx.fill();
+    // طوب
+    for(let bi=0;bi<3;bi++){
+      ctx.fillStyle=bi%2===0?'#c05030':'#a04020';
+      ctx.fillRect(x+140+bi*20,y+BH-60,18,12);
+      ctx.strokeStyle='#802010';ctx.lineWidth=1;
+      ctx.strokeRect(x+140+bi*20,y+BH-60,18,12);
+    }
+  }
+
+  function _drawComingSoon(ctx,cx,y){
+    ctx.save();
+    const pulse=0.6+Math.sin(_t*1.5)*0.4;
+    ctx.globalAlpha=pulse;
+    ctx.shadowColor='#f0c040';ctx.shadowBlur=20*pulse;
+    ctx.fillStyle='rgba(10,5,20,0.85)';ctx.fillRect(cx-100,y-12,200,22);
+    ctx.strokeStyle='#f0c040';ctx.lineWidth=1;ctx.strokeRect(cx-100,y-12,200,22);
+    Utils.drawPixelText(ctx,'UNDER CONSTRUCTION',cx,y,
+      {font:'5px "Press Start 2P"',color:'#f0c040',align:'center'});
+    ctx.restore();
+  }
+
+  /* ======================== PC STATIONS ======================== */
+  function _drawAllPCs(ctx){
+    for(let i=0;i<_devs.length;i++){
+      const d=_devs[i];
+      if(!Camera.isVisible(d))continue;
+      _drawPC(ctx,d.x,d.y,d.facing||'down',i);
+    }
+  }
+
+  function _drawPC(ctx,x,y,facing,devId){
+    _desk(ctx,x,y);_monitor(ctx,x,y,devId);
+    _keyboard(ctx,x,y);_chair(ctx,x,y,facing);_accessories(ctx,x,y);
   }
 
   function _desk(ctx,x,y){
-    // سطح الطاولة
     ctx.fillStyle='#5c3d1e';ctx.fillRect(x,y,96,72);
     ctx.fillStyle='#4a3016';
     for(let g=0;g<5;g++)ctx.fillRect(x+4+g*18,y+2,2,68);
     ctx.fillStyle='#7a5232';ctx.fillRect(x,y,96,3);ctx.fillRect(x,y,3,72);
     ctx.fillStyle='#2c180a';ctx.fillRect(x+93,y,3,72);ctx.fillRect(x,y+69,96,3);
-    // أرجل
     ctx.fillStyle='#3a2010';
     ctx.fillRect(x+4,y+72,8,10);ctx.fillRect(x+84,y+72,8,10);
     ctx.fillStyle='#2a1408';
@@ -270,43 +582,33 @@ const GameMap = (() => {
     ctx.strokeStyle='#180a00';ctx.lineWidth=2;ctx.strokeRect(x,y,96,72);
   }
 
-  function _monitor(ctx,x,y, devId){
+  function _monitor(ctx,x,y,devId){
     const mx=x+20,my=y+4,mw=58,mh=44;
-    // إطار الشاشة
     ctx.fillStyle='#1c1c1c';ctx.fillRect(mx,my,mw,mh);
     ctx.fillStyle='#282828';ctx.fillRect(mx,my,mw,3);ctx.fillRect(mx,my,3,mh);
     ctx.fillStyle='#101010';ctx.fillRect(mx+mw-3,my,3,mh);ctx.fillRect(mx,my+mh-3,mw,3);
-    // الشاشة
     const sx=mx+5,sy=my+5,sw=mw-10,sh=mh-14;
     const sg=ctx.createLinearGradient(sx,sy,sx,sy+sh);
     sg.addColorStop(0,'#000880');sg.addColorStop(0.5,'#000560');sg.addColorStop(1,'#000340');
     ctx.fillStyle=sg;ctx.fillRect(sx,sy,sw,sh);
-    // سطح المكتب (Windows 98 نمط)
     ctx.fillStyle='#008080';ctx.fillRect(sx,sy,sw,sh*0.7);
     ctx.fillStyle='#c0c0c0';ctx.fillRect(sx,sy+sh-7,sw,7);
     ctx.fillStyle='#000080';ctx.fillRect(sx,sy+sh-6,18,5);
     ctx.fillStyle='#00aa00';ctx.fillRect(sx+1,sy+sh-5,14,4);
     Utils.drawPixelText(ctx,'Start',sx+2,sy+sh-5,{font:'3px "Press Start 2P"',color:'#fff'});
-    // أيقونات
     ctx.fillStyle='#ffff40';ctx.fillRect(sx+3,sy+3,6,6);
     ctx.fillStyle='#40ffff';ctx.fillRect(sx+3,sy+11,6,6);
     ctx.fillStyle='#ff8040';ctx.fillRect(sx+13,sy+3,6,6);
-    // بريق الشاشة
     ctx.fillStyle='rgba(255,255,255,0.07)';ctx.fillRect(sx,sy,sw,3);ctx.fillRect(sx,sy,3,sh);
-    // LED أخضر
     ctx.fillStyle='#00ff44';ctx.fillRect(mx+mw-7,my+mh-6,4,4);
-    // عنق الشاشة
-    ctx.fillStyle='#1c1c1c';ctx.fillRect(mx+mw/2-4,my+mh,8,6);ctx.fillRect(mx+mw/2-14,my+mh+4,28,4);
+    ctx.fillStyle='#1c1c1c';
+    ctx.fillRect(mx+mw/2-4,my+mh,8,6);ctx.fillRect(mx+mw/2-14,my+mh+4,28,4);
     ctx.strokeStyle='#0a0a0a';ctx.lineWidth=1;
     ctx.strokeRect(mx+mw/2-4,my+mh,8,6);ctx.strokeRect(mx+mw/2-14,my+mh+4,28,4);
-    // إطار الشاشة الكلي
     ctx.strokeStyle='#080808';ctx.lineWidth=2;ctx.strokeRect(mx,my,mw,mh);
-
-    // رسم الرقم التعريفي للحاسوب
-    if (devId != null) {
-      Utils.drawPixelText(ctx, devId.toString(), mx+mw-6, my+14, {
-        font:'6px "Press Start 2P"', color:'#fff', align:'right', shadow:'#000'
-      });
+    if(devId!=null){
+      Utils.drawPixelText(ctx,devId.toString(),mx+mw-6,my+14,
+        {font:'6px "Press Start 2P"',color:'#fff',align:'right',shadow:'#000'});
     }
   }
 
@@ -319,39 +621,32 @@ const GameMap = (() => {
     ctx.fillStyle='#b8b098';ctx.fillRect(kx,ky,kw,2);ctx.fillRect(kx,ky,2,kh);
     ctx.fillStyle='#888070';ctx.fillRect(kx+kw-2,ky,2,kh);ctx.fillRect(kx,ky+kh-2,kw,2);
     ctx.strokeStyle='#808070';ctx.lineWidth=1;ctx.strokeRect(kx,ky,kw,kh);
-    // الفأرة
     ctx.fillStyle='#1a1a1a';ctx.fillRect(x+80,y+46,16,22);
     ctx.fillStyle='#c8c0a8';
     Utils.drawPixelRect(ctx,x+81,y+47,14,20,3,'#c8c0a8','#808070',1);
     ctx.strokeStyle='#808070';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(x+88,y+47);ctx.lineTo(x+88,y+55);ctx.stroke();
-    // لوحة الفأرة
     ctx.fillStyle='#111';ctx.fillRect(x+77,y+43,22,28);
     ctx.fillStyle='#1a1a1a';ctx.fillRect(x+78,y+44,20,26);
   }
 
   function _chair(ctx,x,y,facing){
     let cx,cy;
-    if(facing==='down'){cx=x+38;cy=y+82;}
-    else if(facing==='up'){cx=x+38;cy=y-32;}
+    if(facing==='down')      {cx=x+38;cy=y+82;}
+    else if(facing==='up')   {cx=x+38;cy=y-32;}
     else if(facing==='right'){cx=x+106;cy=y+26;}
-    else{cx=x-30;cy=y+26;}
-    // عجلات
+    else                     {cx=x-30; cy=y+26;}
     ctx.fillStyle='#111';
     [[cx-14,cy+22],[cx+9,cy+22],[cx-14,cy+30],[cx+9,cy+30]].forEach(([wx,wy])=>{
       ctx.fillRect(wx,wy,6,4);
     });
-    // القاعدة
     ctx.fillStyle='#2a2a2a';ctx.fillRect(cx-2,cy+8,5,18);ctx.fillRect(cx-11,cy+22,24,4);
-    // المقعد
     ctx.fillStyle='#10104a';ctx.fillRect(cx-15,cy-4,31,15);
     ctx.fillStyle='#18186a';ctx.fillRect(cx-13,cy-3,27,9);
     ctx.fillStyle='#2020a0';ctx.fillRect(cx-11,cy-2,23,4);
-    // الظهر
     ctx.fillStyle='#10104a';ctx.fillRect(cx-11,cy-24,23,22);
     ctx.fillStyle='#18186a';ctx.fillRect(cx-9,cy-22,19,18);
     ctx.fillStyle='#2020a0';ctx.fillRect(cx-7,cy-20,15,6);
-    // مساند الذراعين
     ctx.fillStyle='#1a1a1a';
     ctx.fillRect(cx-17,cy-9,4,13);ctx.fillRect(cx+14,cy-9,4,13);
     ctx.fillStyle='#222';ctx.fillRect(cx-17,cy-10,4,4);ctx.fillRect(cx+14,cy-10,4,4);
@@ -364,7 +659,6 @@ const GameMap = (() => {
       const cx=x+10+(seed*9)%55,cy=y+6;
       const cols=['#cc1a00','#0044cc','#008800','#cc7700','#880088','#006688','#cc0044'];
       const c=cols[seed%cols.length];
-      // علبة عصير
       ctx.fillStyle=c;ctx.fillRect(cx,cy,10,18);
       ctx.fillStyle='#aaa';ctx.fillRect(cx-1,cy,12,2);ctx.fillRect(cx-1,cy+16,12,2);
       ctx.fillStyle='#888';ctx.fillRect(cx+3,cy-2,4,3);ctx.fillRect(cx+4,cy-4,2,3);
@@ -372,7 +666,6 @@ const GameMap = (() => {
       ctx.fillStyle='rgba(255,255,255,0.15)';ctx.fillRect(cx+1,cy+1,3,15);
       ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1;ctx.strokeRect(cx,cy,10,18);
     }
-    // سماعات رأس (20% فرصة)
     if(seed<2){
       const hx=x+74,hy=y+8;
       ctx.strokeStyle='#111';ctx.lineWidth=3;
@@ -388,12 +681,10 @@ const GameMap = (() => {
     ctx.fillStyle='#050510';ctx.fillRect(DOOR_X,DOOR_Y,T+6,DOOR_H);
     ctx.strokeStyle='#f0c040';ctx.lineWidth=3;
     ctx.strokeRect(DOOR_X-2,DOOR_Y-4,T+6,DOOR_H+8);
-    // سهم دخول
     ctx.fillStyle='rgba(240,192,64,0.75)';
     ctx.beginPath();ctx.moveTo(DOOR_X+16,DOOR_Y+DOOR_H/2);
     ctx.lineTo(DOOR_X+2,DOOR_Y+DOOR_H/2-14);
     ctx.lineTo(DOOR_X+2,DOOR_Y+DOOR_H/2+14);ctx.closePath();ctx.fill();
-    // لافتة نيون
     _neon(ctx,DOOR_X-90,DOOR_Y-56,'ENTER');
   }
 
@@ -401,7 +692,8 @@ const GameMap = (() => {
     ctx.save();ctx.shadowColor='#f0c040';ctx.shadowBlur=18;
     ctx.fillStyle='rgba(8,8,18,0.92)';ctx.fillRect(x,y,130,32);
     ctx.strokeStyle='#f0c040';ctx.lineWidth=2;ctx.strokeRect(x,y,130,32);
-    Utils.drawPixelText(ctx,text,x+65,y+7,{font:'10px "Press Start 2P"',color:'#f0c040',shadow:'#a07000',align:'center'});
+    Utils.drawPixelText(ctx,text,x+65,y+7,
+      {font:'10px "Press Start 2P"',color:'#f0c040',shadow:'#a07000',align:'center'});
     ctx.restore();
   }
 
@@ -418,10 +710,11 @@ const GameMap = (() => {
     }
   }
 
+  /* ======================== EXPORTS ======================== */
   function getWorldSize(){return{w:WORLD_W,h:WORLD_H};}
   function getDevices(){return _devs;}
   function getChairs(){return _chairs;}
   function getSpawnPoint(){return{x:SPAWN_X,y:SPAWN_Y};}
   function getDoorRect(){return{x:DOOR_X,y:DOOR_Y,w:T,h:DOOR_H};}
-  return{init,draw,getWorldSize,getDevices,getChairs,getSpawnPoint,getDoorRect};
+  return{init,update,draw,getWorldSize,getDevices,getChairs,getSpawnPoint,getDoorRect};
 })();
