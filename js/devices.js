@@ -3,10 +3,10 @@ const Devices = (() => {
   let _active=null,_near=null;
   let _pCvs=null,_pCtx=null,_pEl=null,_closeBtn=null,_fsBtn=null,_iframe=null;
   let _interactBtn=null;
-  let _playBtn=null;          // زر بدء اللعبة للحواسيب التي لديها رابط
-  let _isGameDevice=false;    // هل الحاسوب المفتوح حالياً لديه لعبة؟
-  let _gameLaunched=false;    // هل انطلقت اللعبة عبر triggerNativeTakeover؟
-  let _gamePreviewImg=null;   // صورة غلاف اللعبة (محمّلة مسبقاً)
+  let _playBtn=null;          
+  let _isGameDevice=false;    
+  let _gameLaunched=false;    
+  let _gamePreviewImg=null;   
   let _anim=0,_promptA=0,_promptT=0;
   let _isFullscreen=false;
   const RANGE=68;
@@ -26,11 +26,9 @@ const Devices = (() => {
     _fsBtn.addEventListener('touchend',e=>{e.preventDefault();toggleFullscreen();});
     _pEl.addEventListener('click',e=>{if(e.target===_pEl)close();});
 
-    // إنشاء كائن الصورة مسبقاً (سيُحدَّث src عند فتح الحاسوب)
     _gamePreviewImg = new Image();
     _gamePreviewImg.onerror = () => { _gamePreviewImg._failed = true; };
 
-    // إنشاء زر بدء اللعبة ديناميكياً فوق الـ canvas
     _playBtn = document.createElement('button');
     _playBtn.id = 'device-play-btn';
     _playBtn.innerHTML = '&#9654;&nbsp; ابدأ اللعبة';
@@ -106,14 +104,11 @@ const Devices = (() => {
 
     if(_active && _iframe.classList.contains('hidden')){
       if(!_isGameDevice){
-        // حواسيب الميني جيمز: رسم مستمر
         _render(_active);
       } else if(!_gameLaunched){
-        // شاشة معاينة اللعبة: رسم مستمر لتحديث أثر الوميض
         const devId=GameMap.getDevices().indexOf(_active);
         _renderGamePreview(devId);
       }
-      // بعد إطلاق اللعبة: canvas ثابت (رُسم مرة واحدة في _renderGameLaunched)
     }
   }
 
@@ -137,13 +132,11 @@ const Devices = (() => {
     const gameEntry = (typeof GamesData!=='undefined') ? GamesData[devId] : null;
     _isGameDevice = !!gameEntry;
 
-    // 🔉 خفض الصوت على جميع الحواسيب بدون استثناء
     if(window.AndroidApp && window.AndroidApp.lowerMusic){
       window.AndroidApp.lowerMusic();
     }
 
     if(_isGameDevice){
-      // تحميل صورة الغلاف إذا تغيّرت
       const imgUrl = (typeof gameEntry==='object') ? gameEntry.image : null;
       if(imgUrl && _gamePreviewImg.src !== imgUrl){
         _gamePreviewImg._failed = false;
@@ -170,7 +163,6 @@ const Devices = (() => {
     Joystick.hide();Joystick.reset();
   }
 
-  // تشغيل اللعبة عند الضغط على زر البدء
   function _launchGame(devId){
     if(!_active) return;
     const gameEntry = GamesData[devId];
@@ -182,23 +174,34 @@ const Devices = (() => {
     }
 
     if(window.AndroidApp && window.AndroidApp.triggerNativeTakeover){
-      // وضع أندرويد الأصلي: إيقاف الموسيقى تماماً أثناء اللعب
       if(window.AndroidApp.pauseMusic) window.AndroidApp.pauseMusic();
 
-      // [تعديل جديد] الاستماع لعودة التركيز للمتصفح بعد إغلاق اللعبة من نظام أندرويد
       const onReturnFocus = () => {
         if(_gameLaunched && window.AndroidApp && window.AndroidApp.resumeMusic){
-          window.AndroidApp.resumeMusic(); // استئناف الصوت بمستوى منخفض
+          window.AndroidApp.resumeMusic(); 
         }
         window.removeEventListener('focus', onReturnFocus);
       };
       window.addEventListener('focus', onReturnFocus);
 
-      let requiredKeys="JOYSTICK_ARROWS,Z,A,ENTER";
-      if(devId===2||devId===5) requiredKeys="JOYSTICK_WASD,J,K,SPACE";
+      // بناء نص الأزرار بشكل استعلامي صارم دون تخمين
+      let requiredKeys = ""; 
+      
+      if (typeof GameControls !== 'undefined' && GameControls[devId]) {
+          const config = GameControls[devId];
+          const joyType = config.joystick ? config.joystick.toUpperCase() : 'ARROWS';
+          const btnsStr = (config.buttons && config.buttons.length > 0) 
+                          ? ',' + config.buttons.map(b => b.toUpperCase()).join(',') 
+                          : '';
+          requiredKeys = `JOYSTICK_${joyType}${btnsStr}`;
+      } else {
+          // إذا لم يجد إعدادات لهذا الحاسوب، يرسل عصا التحكم فقط لتجنب الأخطاء
+          console.warn("No controls configured for devId: " + devId);
+          requiredKeys = "JOYSTICK_ARROWS";
+      }
+
       window.AndroidApp.triggerNativeTakeover(gameUrl, requiredKeys);
 
-      // النافذة تبقى مفتوحة — المستخدم يضغط إغلاق عند عودته
       _gameLaunched=true;
       _renderGameLaunched();
       if(_playBtn){
@@ -207,7 +210,6 @@ const Devices = (() => {
       }
 
     } else {
-      // وضع الويب: عرض اللعبة داخل الـ iframe في النافذة المصغرة
       Utils.hide('device-canvas');
       Utils.show('device-iframe');
       if(_playBtn) _playBtn.style.display='none';
@@ -228,9 +230,7 @@ const Devices = (() => {
       window.AndroidApp.onGameScreenClosed();
     }
 
-    // 🔊 رفع الصوت تدريجياً عند الإغلاق مهما كان نوع الحاسوب
     if(skipResumeMusic!==true){
-      // يتم الاعتماد على الكود الذي تم التعديل عليه في ملف الكوتلن
       if(window.AndroidApp && window.AndroidApp.restoreMusic){
         window.AndroidApp.restoreMusic();
       }
@@ -245,7 +245,6 @@ const Devices = (() => {
     MiniGames.stop();
   }
 
-  // ─── رسم شاشة الميني جيمز (الحواسيب بدون رابط لعبة) ───
   function _render(dev){
     const ctx=_pCtx,w=400,h=300;
     ctx.clearRect(0,0,w,h);
@@ -274,7 +273,6 @@ const Devices = (() => {
     ctx.fillStyle=gr;ctx.fillRect(0,0,w,12);
   }
 
-  // ─── رسم شاشة معاينة اللعبة (صورة الغلاف + وميض) ───
   function _renderGamePreview(devId){
     const ctx=_pCtx, w=400, h=300;
     ctx.clearRect(0,0,w,h);
@@ -285,7 +283,6 @@ const Devices = (() => {
                      !_gamePreviewImg._failed;
 
     if(imgReady){
-      // رسم الصورة بحيث تغطي الـ canvas بالكامل بدون حدود سوداء
       const iw=_gamePreviewImg.naturalWidth;
       const ih=_gamePreviewImg.naturalHeight;
       const scale=Math.max(w/iw, h/ih);
@@ -293,11 +290,9 @@ const Devices = (() => {
       const sx=(w-sw)/2, sy=(h-sh)/2;
       ctx.drawImage(_gamePreviewImg, sx, sy, sw, sh);
 
-      // طبقة شفافة داكنة لتحسين وضوح الزر
       ctx.fillStyle='rgba(0,0,0,0.38)';
       ctx.fillRect(0,0,w,h);
     } else {
-      // شاشة تحميل ريثما تُحمَّل الصورة
       ctx.fillStyle='#0a0a18';
       ctx.fillRect(0,0,w,h);
       ctx.strokeStyle='#40f080';ctx.lineWidth=2;ctx.strokeRect(2,2,w-4,h-4);
@@ -309,18 +304,15 @@ const Devices = (() => {
       ctx.globalAlpha=1;
     }
 
-    // وميض خفيف على إطار الـ canvas
     const glow=0.3+Math.sin(_anim*2)*0.2;
     ctx.strokeStyle=`rgba(255,255,255,${glow})`;
     ctx.lineWidth=2;
     ctx.strokeRect(2,2,w-4,h-4);
   }
 
-  // ─── رسم شاشة "اللعبة تعمل" بعد إطلاق native ───
   function _renderGameLaunched(){
     const ctx=_pCtx, w=400, h=300;
 
-    // إذا كانت الصورة محمّلة نبقي عليها كخلفية
     const imgReady = _gamePreviewImg &&
                      _gamePreviewImg.complete &&
                      _gamePreviewImg.naturalWidth>0 &&
@@ -338,7 +330,6 @@ const Devices = (() => {
       ctx.fillRect(0,0,w,h);
     }
 
-    // طبقة داكنة + رسالة
     ctx.fillStyle='rgba(0,0,0,0.62)';
     ctx.fillRect(0,0,w,h);
 
