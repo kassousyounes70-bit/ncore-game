@@ -3,10 +3,10 @@ const Devices = (() => {
   let _active=null,_near=null;
   let _pCvs=null,_pCtx=null,_pEl=null,_closeBtn=null,_fsBtn=null,_iframe=null;
   let _interactBtn=null;
-  let _playBtn=null;          
-  let _isGameDevice=false;    
-  let _gameLaunched=false;    
-  let _gamePreviewImg=null;   
+  let _playBtn=null;
+  let _isGameDevice=false;
+  let _gameLaunched=false;
+  let _gamePreviewImg=null;
   let _anim=0,_promptA=0,_promptT=0;
   let _isFullscreen=false;
   const RANGE=68;
@@ -65,6 +65,19 @@ const Devices = (() => {
     _playBtn.addEventListener('click', _onPlayBtnClick);
     _playBtn.addEventListener('touchend', e=>{ e.preventDefault(); _onPlayBtnClick(); });
     _pEl.appendChild(_playBtn);
+  }
+
+  // ========== المساعدة: بناء requiredKeys من GameControls ==========
+  function _getRequiredKeysForDevice(devId) {
+    // التحقق من وجود GameControls وإعدادات مخصصة لهذا الجهاز
+    if (typeof GameControls !== 'undefined' && GameControls[devId]) {
+      const cfg = GameControls[devId];
+      const joystickType = (cfg.joystick === 'wasd') ? 'JOYSTICK_WASD' : 'JOYSTICK_ARROWS';
+      const buttonsStr = cfg.buttons.map(btn => btn.toUpperCase()).join(',');
+      return `${joystickType},${buttonsStr}`;
+    }
+    // القيمة الافتراضية الآمنة (إذا لم يتم تعريف GameControls أو الجهاز)
+    return "JOYSTICK_ARROWS,Z,A,ENTER";
   }
 
   function _onPlayBtnClick(){
@@ -152,7 +165,6 @@ const Devices = (() => {
         _playBtn.style.display='block';
         _playBtn.disabled=false;
       }
-
     } else {
       if(_playBtn) _playBtn.style.display='none';
       Utils.hide('device-iframe');
@@ -163,6 +175,7 @@ const Devices = (() => {
     Joystick.hide();Joystick.reset();
   }
 
+  // ========== تشغيل اللعبة معتمداً على GameControls فقط ==========
   function _launchGame(devId){
     if(!_active) return;
     const gameEntry = GamesData[devId];
@@ -174,48 +187,35 @@ const Devices = (() => {
     }
 
     if(window.AndroidApp && window.AndroidApp.triggerNativeTakeover){
+      // وضع أندرويد: إيقاف الموسيقى
       if(window.AndroidApp.pauseMusic) window.AndroidApp.pauseMusic();
 
       const onReturnFocus = () => {
         if(_gameLaunched && window.AndroidApp && window.AndroidApp.resumeMusic){
-          window.AndroidApp.resumeMusic(); 
+          window.AndroidApp.resumeMusic();
         }
         window.removeEventListener('focus', onReturnFocus);
       };
       window.addEventListener('focus', onReturnFocus);
 
-      // بناء نص الأزرار بشكل استعلامي صارم دون تخمين
-      let requiredKeys = ""; 
-      
-      if (typeof GameControls !== 'undefined' && GameControls[devId]) {
-          const config = GameControls[devId];
-          const joyType = config.joystick ? config.joystick.toUpperCase() : 'ARROWS';
-          const btnsStr = (config.buttons && config.buttons.length > 0) 
-                          ? ',' + config.buttons.map(b => b.toUpperCase()).join(',') 
-                          : '';
-          requiredKeys = `JOYSTICK_${joyType}${btnsStr}`;
-      } else {
-          // إذا لم يجد إعدادات لهذا الحاسوب، يرسل عصا التحكم فقط لتجنب الأخطاء
-          console.warn("No controls configured for devId: " + devId);
-          requiredKeys = "JOYSTICK_ARROWS";
-      }
-
+      // استخدام الدالة المساعدة لقراءة الإعدادات من GameControls (بدون شروط صلبة)
+      const requiredKeys = _getRequiredKeysForDevice(devId);
       window.AndroidApp.triggerNativeTakeover(gameUrl, requiredKeys);
 
-      _gameLaunched=true;
+      _gameLaunched = true;
       _renderGameLaunched();
       if(_playBtn){
         _playBtn.innerHTML='&#9654;&nbsp; إعادة اللعب';
         _playBtn.disabled=false;
       }
-
     } else {
+      // وضع الويب (دون تغيير)
       Utils.hide('device-canvas');
       Utils.show('device-iframe');
       if(_playBtn) _playBtn.style.display='none';
-      _iframe.src=gameUrl;
+      _iframe.src = gameUrl;
       _iframe.focus();
-      _iframe.onload=()=>{ _iframe.contentWindow.focus(); };
+      _iframe.onload = () => { _iframe.contentWindow.focus(); };
       if(typeof GamepadUI!=='undefined') GamepadUI.showForGame(devId);
     }
   }
@@ -245,6 +245,7 @@ const Devices = (() => {
     MiniGames.stop();
   }
 
+  // دوال الرسم (لم تتغير)
   function _render(dev){
     const ctx=_pCtx,w=400,h=300;
     ctx.clearRect(0,0,w,h);
@@ -289,14 +290,12 @@ const Devices = (() => {
       const sw=iw*scale, sh=ih*scale;
       const sx=(w-sw)/2, sy=(h-sh)/2;
       ctx.drawImage(_gamePreviewImg, sx, sy, sw, sh);
-
       ctx.fillStyle='rgba(0,0,0,0.38)';
       ctx.fillRect(0,0,w,h);
     } else {
       ctx.fillStyle='#0a0a18';
       ctx.fillRect(0,0,w,h);
       ctx.strokeStyle='#40f080';ctx.lineWidth=2;ctx.strokeRect(2,2,w-4,h-4);
-
       const pulse=0.5+Math.sin(_anim*4)*0.5;
       ctx.globalAlpha=0.5+pulse*0.5;
       Utils.drawPixelText(ctx,'جاري تحميل الصورة...',w/2,h/2,
@@ -312,12 +311,10 @@ const Devices = (() => {
 
   function _renderGameLaunched(){
     const ctx=_pCtx, w=400, h=300;
-
     const imgReady = _gamePreviewImg &&
                      _gamePreviewImg.complete &&
                      _gamePreviewImg.naturalWidth>0 &&
                      !_gamePreviewImg._failed;
-
     if(imgReady){
       const iw=_gamePreviewImg.naturalWidth;
       const ih=_gamePreviewImg.naturalHeight;
@@ -329,10 +326,8 @@ const Devices = (() => {
       ctx.fillStyle='#050510';
       ctx.fillRect(0,0,w,h);
     }
-
     ctx.fillStyle='rgba(0,0,0,0.62)';
     ctx.fillRect(0,0,w,h);
-
     Utils.drawPixelText(ctx,'اللعبة تعمل الآن!',w/2,h/2-18,
       {font:'9px "Press Start 2P"',color:'#f0c040',shadow:'#000',align:'center'});
     Utils.drawPixelText(ctx,'اضغط "إغلاق" للعودة',w/2,h/2+8,
@@ -352,5 +347,6 @@ const Devices = (() => {
 
   function hasActive(){return _active!==null;}
   function getNear(){return _near;}
+
   return{init,update,tryOpen,open,close,drawPrompt,hasActive,getNear};
 })();
