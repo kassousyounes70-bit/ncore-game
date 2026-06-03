@@ -29,7 +29,13 @@ const Network = (() => {
         }catch(e){}
       }
 
-      _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:playerName});
+      _sock.emit('player:join',{
+        charId: _charId,
+        x: sp.x,
+        y: sp.y,
+        dir: 'down',
+        name: _username || playerName || 'لاعب'
+      });
       _onConn&&_onConn();
     });
     
@@ -63,7 +69,13 @@ const Network = (() => {
     _sock.on('reconnect',()=>{
       _connected=true;
       const sp=GameMap.getSpawnPoint();
-      _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:'لاعب'});
+      _sock.emit('player:join',{
+        charId: _charId,
+        x: sp.x,
+        y: sp.y,
+        dir: 'down',
+        name: _username || playerName || 'لاعب'
+      });
       UI.showToast('تمت إعادة الاتصال ✅',1500);
     });
     _sock.on('connect_error',()=>{});
