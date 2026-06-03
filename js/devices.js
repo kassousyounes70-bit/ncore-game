@@ -116,6 +116,7 @@ const Devices = (() => {
 
   function open(dev){
     _active=dev;
+    Report.hideReportBtn(); // إخفاء زر التبليغ عند فتح الجهاز
     _anim=0;
     _gameLaunched=false;
     _pCvs.width=400;_pCvs.height=300;
@@ -221,6 +222,7 @@ const Devices = (() => {
 
   function close(skipResumeMusic=false){
     Utils.hide('device-popup');
+    Report.showReportBtn(); // إظهار زر التبليغ عند إغلاق الجهاز
     _iframe.src='';
     if(_playBtn) _playBtn.style.display='none';
     if(_isFullscreen) toggleFullscreen();

@@ -6,6 +6,10 @@ const Player = (() => {
   let _mouthOpen=false,_mouthT=0;
   const MOUTH_SPEED=0.12; // ثانية لكل نبضة
 
+  // أنيميشن السحب
+  let _dragged=false,_dragT=0,_dragTargetX=0,_dragTargetY=0;
+  const DRAG_SPEED=200;
+
   function preload(){
     // تم إزالة تحميل الصور الخارجية، الكود الآن يعتمد حصرياً على الرسم البرمجي السريع
   }
@@ -18,6 +22,22 @@ const Player = (() => {
   }
 
   function update(delta){
+    // أنيميشن السحب
+    if(_dragged){
+      _dragT+=delta;
+      const dx=_dragTargetX-_x, dy=_dragTargetY-_y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<10){
+        _dragged=false;
+        if(typeof Network!=='undefined') Network.forceDisconnect();
+      } else {
+        const spd=DRAG_SPEED*delta;
+        const nx=dx/dist, ny=dy/dist;
+        _x+=nx*spd; _y+=ny*spd;
+      }
+      return;
+    }
+
     const dx=Joystick.getDx(),dy=Joystick.getDy(),mag=Joystick.getMagnitude();
     _moving=mag>0.05;
     if(_moving){
@@ -255,5 +275,15 @@ const Player = (() => {
   function getCharId(){return _charId;}
   function getCharName(){return CHARS[_charId]?.name||'';}
 
-  return{preload,init,update,draw,getRect,getCenterX,getCenterY,getCharId,getCharName,getAllChars};
+  // دالة بدء السحب إلى نقطة التولد
+  function startDragToSpawn(){
+    const spawn=GameMap.getSpawnPoint();
+    _dragTargetX=spawn.x;
+    _dragTargetY=spawn.y;
+    _dragged=true;
+    _dragT=0;
+  }
+
+  return{preload,init,update,draw,getRect,getCenterX,getCenterY,
+    getCharId,getCharName,getAllChars,startDragToSpawn};
 })();

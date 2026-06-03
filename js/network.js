@@ -80,6 +80,15 @@ const Network = (() => {
     });
     _sock.on('connect_error',()=>{});
     _sock.on('error:full',()=>UI.showToast('الصالة ممتلئة! حاول لاحقاً 😅',3000));
+    
+    // ========== أحداث الشرطة ==========
+    _sock.on('police:alert', ({ targetId }) => {
+        if (window.PoliceSystem) PoliceSystem.activate(targetId);
+    });
+
+    _sock.on('police:update', ({ targetId, stars }) => {
+        if (window.PoliceSystem) PoliceSystem.updateStars(targetId, stars);
+    });
   }
 
   function _mk(d){
@@ -147,6 +156,12 @@ const Network = (() => {
     }
   }
 
+  // ========== دالة قطع الاتصال الإجباري ==========
+  function forceDisconnect(){
+    if(_sock) _sock.disconnect();
+    UI.showToast('تم إخراجك من الصالة 🚔',3000);
+  }
+
   return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,
-    getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins};
+    getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins,forceDisconnect};
 })();

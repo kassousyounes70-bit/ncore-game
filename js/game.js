@@ -21,6 +21,8 @@ const Game = (() => {
     Camera.init(_cvs.width,_cvs.height,2560,1920,0.12);
     Devices.init();Joystick.init();
     if(window.Chat) Chat.init();
+    MiniMap.init();
+    Report.init(); // إضافة نظام التبليغ
   }
 
   function _onChar(charId){
@@ -49,7 +51,9 @@ const Game = (() => {
       Network.sendPosition(Player.getCenterX(),Player.getCenterY(),Player.getRect(),Joystick.getDirection());
     }
     
-    NPC.update(delta);Devices.update(delta);
+    NPC.update(delta);
+    Devices.update(delta);
+    PoliceSystem.update(delta); // تحديث نظام الشرطة
     
     if(window.Chat && Network.isConnected()) {
        Chat.update(delta);
@@ -85,9 +89,21 @@ const Game = (() => {
         console.warn('[Game] Chat غير معرف');
       }
       
-      if(_debug)Collision.debugDraw(ctx,Camera.getOffset());
+      if(_debug) Collision.debugDraw(ctx,Camera.getOffset());
+      PoliceSystem.draw(ctx); // رسم رجال الشرطة
     Camera.endDraw(ctx);
+    
+    // رسم المؤثرات والخريطة المصغرة
     _vignette(ctx, cw, ch);
+    PoliceSystem.drawFlash(ctx, cw, ch); // وميض الخريطة
+    PoliceSystem.drawStars(ctx);         // عرض النجوم في HUD
+    
+    MiniMap.draw(
+      Player.getCenterX(),
+      Player.getCenterY(),
+      _getPlayerAngle(),
+      Network.getPlayers()
+    );
   }
 
   function _vignette(ctx,w,h){
@@ -114,6 +130,12 @@ const Game = (() => {
     _cvs.width=window.innerWidth;_cvs.height=window.innerHeight;
     if(_ctx) _ctx.imageSmoothingEnabled=false;
     if(_state===S.PLAYING)Camera.resize(_cvs.width,_cvs.height);
+  }
+
+  function _getPlayerAngle(){
+    const dir = Joystick.getDirection();
+    const map = { right:0, down:Math.PI/2, left:Math.PI, up:-Math.PI/2, idle:0 };
+    return map[dir] || 0;
   }
 
   function pause(){if(_state===S.PLAYING){_state=S.PAUSED;if(_raf)cancelAnimationFrame(_raf);}}
