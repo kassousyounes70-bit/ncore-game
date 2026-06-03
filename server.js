@@ -224,6 +224,93 @@ io.on('connection', sock => {
 
 app.get('/ping', (req, res) => res.json({ status: 'alive', players: players.size, max: MAX, uptime: Math.floor(process.uptime()) + 's' }));
 
+// ========== نظام التبليغات ==========
+const reports = new Map(); // targetId -> [{reporterId, sessionId}]
+
+app.post('/api/report', async (req, res) => {
+    try {
+        const { reporterId, targetId, sessionId } = req.body;
+        if (!reporterId || !targetId || !sessionId)
+            return res.status(400).json({ error: 'Missing data' });
+        if (reporterId === targetId)
+            return res.status(400).json({ error: 'Cannot report yourself' });
+
+        if (!reports.has(targetId)) reports.set(targetId, []);
+        const list = reports.get(targetId);
+
+        // تحقق: نفس اللاعب في نفس الجلسة لا تُحسب
+        const alreadyInSession = list.find(
+            r => r.reporterId === reporterId && r.sessionId === sessionId
+        );
+        if (alreadyInSession)
+            return res.status(200).json({ message: 'Already reported in this session' });
+
+        list.push({ reporterId, sessionId });
+
+        // حساب عدد المبلّغين المختلفين
+        const uniqueReporters = new Set(list.map(r => r.reporterId)).size;
+
+        if (uniqueReporters >= 3) {
+            // تفعيل الشرطة على جميع اللاعبين
+            io.emit('police:alert', { targetId });
+        }
+
+        res.status(200).json({ reports: uniqueReporters });
+    } catch (e) {
+        res.status(500).json({ error: 'Report error' });
+    }
+});
+
+app.post('/api/report/clear', (req, res) => {
+    const { targetId } = req.body;
+    if (targetId) reports.delete(targetId);
+    res.status(200).json({ message: 'Cleared' });
+});
+
+// ========== نهاية نظام التبليغات ==========
+
+// ========== نظام البان ==========
+app.post('/api/ban/create', async (req, res) => {
+    try {
+        const { deviceId, key, targetId, banTimestamp } = req.body;
+        if (!deviceId || !key) return res.status(400).json({ error: 'Missing data' });
+        await db.collection('bans').doc(deviceId).set({
+            key,
+            targetId,
+            isBanned: true,
+            banTimestamp,
+            adsWatched: 0
+        });
+        res.status(200).json({ message: 'Ban created' });
+    } catch (e) {
+        res.status(500).json({ error: 'Ban create error' });
+    }
+});
+
+app.get('/api/ban/key', async (req, res) => {
+    try {
+        const { deviceId } = req.query;
+        if (!deviceId) return res.status(400).json({ error: 'Missing deviceId' });
+        const doc = await db.collection('bans').doc(deviceId).get();
+        if (!doc.exists) return res.status(404).json({ error: 'Not found' });
+        res.status(200).json({ key: doc.data().key });
+    } catch (e) {
+        res.status(500).json({ error: 'Key fetch error' });
+    }
+});
+
+app.post('/api/ban/clear', async (req, res) => {
+    try {
+        const { deviceId } = req.body;
+        if (!deviceId) return res.status(400).json({ error: 'Missing deviceId' });
+        await db.collection('bans').doc(deviceId).update({ isBanned: false });
+        res.status(200).json({ message: 'Ban cleared' });
+    } catch (e) {
+        res.status(500).json({ error: 'Clear ban error' });
+    }
+});
+// ========== نهاية نظام البان ==========
+
 // ========== التعديل المطلوب: نقطة نهاية مزامنة الخروج ==========
 app.post('/api/sync-exit', async (req, res) => {
     try {

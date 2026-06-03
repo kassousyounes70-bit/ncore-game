@@ -112,6 +112,16 @@
     
     <button id="chat-action-btn" class="pixel-btn" style="position: fixed; bottom: 140px; right: 24px; z-index: 40; background: #1E90FF; color: white; box-shadow: 4px 4px 0 #0000CD, inset -2px -2px 0 rgba(0,0,0,0.3), 0 0 15px rgba(30,144,255,0.6); animation: pulse 1.5s infinite;">💬 تحدث</button>
 
+    <button id="report-btn" class="pixel-btn hidden" style="position:fixed;bottom:200px;right:24px;z-index:40;background:#cc1111;color:white;box-shadow:4px 4px 0 #880000,inset -2px -2px 0 rgba(0,0,0,0.3),0 0 15px rgba(200,0,0,0.6);">🚨 تبليغ</button>
+
+    <div id="report-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:100;">
+      <div style="background:#1a1a2e;border:3px solid #cc1111;padding:20px;min-width:260px;font-family:'Press Start 2P',monospace;">
+        <div style="color:#f0c040;font-size:9px;margin-bottom:14px;text-align:center;">🚨 تبليغ عن لاعب</div>
+        <div id="report-players-list" style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;"></div>
+        <button onclick="Report.closeModal()" style="margin-top:14px;width:100%;background:#cc1111;color:#fff;border:none;padding:10px;font-family:'Press Start 2P',monospace;font-size:8px;cursor:pointer;">إلغاء</button>
+      </div>
+    </div>
+
     <div id="device-popup" class="hidden">
       <div id="device-header" style="display: flex; gap: 8px; width: 100%; justify-content: space-between; align-items: center; margin-bottom: 5px; z-index: 101;">
         <button id="device-fs-btn" class="pixel-btn" style="background: var(--color-secondary); padding: 8px 12px; font-size: 8px;">⛶ تكبير</button>
@@ -174,6 +184,9 @@
   
   <script src="js/sound.js"></script>
   
+  <script src="js/minimap.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/police.js"></script>
   <script src="js/game.js?v=3"></script>
   <script src="js/main.js"></script>
 
