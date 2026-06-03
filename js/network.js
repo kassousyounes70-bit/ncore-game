@@ -3,6 +3,7 @@ const Network = (() => {
   const SERVER='https://ncore-mmo-server.onrender.com';
   const SEND_RATE=100,INTERP=0.18,PW=24,PH=28;
   let _sock=null,_connected=false,_myId=null,_charId=0,_lastSend=0,_onConn=null;
+  let _coins=0,_username='';
   const _players=new Map();
 
   function connect(charId,onConnect){
@@ -15,7 +16,20 @@ const Network = (() => {
     _sock.on('connect',()=>{
       _connected=true;_myId=_sock.id;
       const sp=GameMap.getSpawnPoint();
-      _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:'لاعب'});
+
+      // جلب بيانات اللاعب من التطبيق
+      let playerName='لاعب';
+      if(window.AndroidApp&&typeof window.AndroidApp.getPlayerData==='function'){
+        try{
+          const data=JSON.parse(window.AndroidApp.getPlayerData());
+          playerName=data.username||data.name||'لاعب';
+          _coins=data.coins||0;
+          _username=data.username||'';
+          UI.updateCoins(_coins);
+        }catch(e){}
+      }
+
+      _sock.emit('player:join',{charId:_charId,x:sp.x,y:sp.y,dir:'down',name:playerName});
       _onConn&&_onConn();
     });
     
@@ -99,15 +113,28 @@ const Network = (() => {
 
   function _drawName(ctx,p){
     const nx=p.x,ny=p.y-PH/2-16;
-    const tw=p.name.length*6+10;
-    ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(nx-tw/2,ny-8,tw,11);
-    Utils.drawPixelText(ctx,p.name,nx,ny-7,{font:'5px "Press Start 2P"',color:'#f0c040',shadow:'#000',align:'center'});
+    const nameStr=p.name||'لاعب';
+    const tw=nameStr.length*6+10;
+    ctx.fillStyle='rgba(0,0,0,0.65)';
+    ctx.fillRect(nx-tw/2,ny-8,tw,11);
+    Utils.drawPixelText(ctx,nameStr,nx,ny-7,{font:'5px "Press Start 2P"',color:'#f0c040',shadow:'#000',align:'center'});
   }
 
   function getPlayerCount(){return _players.size;}
   function isConnected(){return _connected;}
   function getMyId(){return _myId;}
   function getPlayers(){return _players;}
+  function getCoins(){return _coins;}
+  function getUsername(){return _username;}
 
-  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,getMyId, sendChat, getPlayers};
+  function spendCoins(amount){
+    _coins=Math.max(0,_coins-amount);
+    UI.updateCoins(_coins);
+    if(window.AndroidApp&&typeof window.AndroidApp.syncCoins==='function'){
+      try{window.AndroidApp.syncCoins(_coins);}catch(e){}
+    }
+  }
+
+  return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,
+    getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins};
 })();

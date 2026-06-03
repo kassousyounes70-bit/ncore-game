@@ -132,6 +132,24 @@ const UI = (() => {
   }
   function hideHUD(){Utils.hide('hud');}
 
+  /* ====== COINS DISPLAY ====== */
+  function updateCoins(amount){
+    let el=Utils.$('hud-coins');
+    if(!el){
+      el=document.createElement('div');
+      el.id='hud-coins';
+      el.style.cssText=[
+        'position:fixed','top:10px','right:16px','z-index:30',
+        'background:rgba(10,10,20,0.88)','border:2px solid #f0c040',
+        'padding:5px 12px','font-family:\'Press Start 2P\',monospace',
+        'font-size:9px','color:#f0c040','pointer-events:none',
+        'display:flex','align-items:center','gap:6px'
+      ].join(';');
+      document.body.appendChild(el);
+    }
+    el.textContent='🪙 '+amount;
+  }
+
   /* ====== TOAST ====== */
   let _toast=null,_toastTimer=null;
   function showToast(msg,dur=2500){
@@ -153,5 +171,5 @@ const UI = (() => {
   function showGame(){Utils.hide('loading-screen');Utils.hide('character-select-screen');Utils.show('game-container');}
   function getSelectedChar(){return _sel;}
 
-  return{showLoading,showCharacterSelect,stopPreviewAnimation,showHUD,hideHUD,showToast,showGame,getSelectedChar};
+  return{showLoading,showCharacterSelect,stopPreviewAnimation,showHUD,hideHUD,showToast,showGame,getSelectedChar,updateCoins};
 })();
