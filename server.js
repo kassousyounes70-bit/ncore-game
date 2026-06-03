@@ -224,6 +224,18 @@ io.on('connection', sock => {
 
 app.get('/ping', (req, res) => res.json({ status: 'alive', players: players.size, max: MAX, uptime: Math.floor(process.uptime()) + 's' }));
 
+// ========== التعديل المطلوب: نقطة نهاية مزامنة الخروج ==========
+app.post('/api/sync-exit', async (req, res) => {
+    try {
+        const { username, coins } = req.body;
+        if (!username) return res.status(400).json({ error: 'Missing username' });
+        await db.collection('users').doc(username).set({ coins }, { merge: true });
+        res.status(200).json({ message: 'Exit sync successful' });
+    } catch (error) {
+        res.status(500).json({ error: 'Sync error' });
+    }
+});
+
 setInterval(() => {
   const now = Date.now();
   players.forEach((p, id) => {
