@@ -22,7 +22,8 @@ const Game = (() => {
     Devices.init();Joystick.init();
     if(window.Chat) Chat.init();
     MiniMap.init();
-    Report.init(); // إضافة نظام التبليغ
+    Report.init();
+    EventManager.init(); // إدارة الفعاليات
   }
 
   function _onChar(charId){
@@ -42,6 +43,19 @@ const Game = (() => {
   }
 
   function _update(delta){
+    // إذا كان اللوبي نشطاً، نحدّث اللوبي فقط ونخرج
+    if(EventLobby.isActive()){
+      EventLobby.update(delta);
+      EventManager.updateTransition(delta);
+      return;
+    }
+    // إذا كانت لعبة Uno نشطة، نحدّثها ونخرج
+    if(EventUno.isActive()){
+      EventUno.update(delta);
+      EventManager.updateTransition(delta);
+      return;
+    }
+
     const open=Devices.hasActive();
     Joystick.update();
     
@@ -53,7 +67,8 @@ const Game = (() => {
     
     NPC.update(delta);
     Devices.update(delta);
-    PoliceSystem.update(delta); // تحديث نظام الشرطة
+    PoliceSystem.update(delta);
+    EventManager.update(delta); // تحديث قرب باب الفعاليات
     
     if(window.Chat && Network.isConnected()) {
        Chat.update(delta);
@@ -70,6 +85,19 @@ const Game = (() => {
     ctx.fillStyle = '#050510';
     ctx.fillRect(0, 0, cw, ch);
     
+    // إذا كان اللوبي نشطاً، نرسم اللوبي ونخرج
+    if(EventLobby.isActive()){
+      EventLobby.draw(ctx);
+      EventManager.drawTransition(ctx, cw, ch);
+      return;
+    }
+    // إذا كانت لعبة Uno نشطة، نرسمها ونخرج
+    if(EventUno.isActive()){
+      EventUno.draw(ctx);
+      EventManager.drawTransition(ctx, cw, ch);
+      return;
+    }
+
     Camera.beginDraw(ctx);
       GameMap.draw(ctx);
       Devices.drawPrompt(ctx);
@@ -77,7 +105,6 @@ const Game = (() => {
       Network.drawOtherPlayers(ctx,Player.getAllChars());
       Player.draw(ctx);
       
-      // استدعاء آمن لفقاعات الدردشة
       if(window.Chat) {
         if(typeof Chat.drawBubbles === 'function') {
           Chat.drawBubbles(ctx, {x: Player.getCenterX(), y: Player.getCenterY()}, Network.getPlayers());
@@ -90,13 +117,12 @@ const Game = (() => {
       }
       
       if(_debug) Collision.debugDraw(ctx,Camera.getOffset());
-      PoliceSystem.draw(ctx); // رسم رجال الشرطة
+      PoliceSystem.draw(ctx);
     Camera.endDraw(ctx);
     
-    // رسم المؤثرات والخريطة المصغرة
     _vignette(ctx, cw, ch);
-    PoliceSystem.drawFlash(ctx, cw, ch); // وميض الخريطة
-    PoliceSystem.drawStars(ctx);         // عرض النجوم في HUD
+    PoliceSystem.drawFlash(ctx, cw, ch);
+    PoliceSystem.drawStars(ctx);
     
     MiniMap.draw(
       Player.getCenterX(),
@@ -104,6 +130,10 @@ const Game = (() => {
       _getPlayerAngle(),
       Network.getPlayers()
     );
+    
+    // رسم مؤشر باب الفعاليات وانتقالاتها
+    EventManager.drawPrompt(ctx);
+    EventManager.drawTransition(ctx, cw, ch);
   }
 
   function _vignette(ctx,w,h){
@@ -117,8 +147,14 @@ const Game = (() => {
     if (interactBtn) {
       const onInteract = (e) => {
         e.preventDefault();
+        // إذا كان اللوبي نشطاً، نتعامل مع الضغط داخله (مثل زر الخروج)
+        if(EventLobby.isActive()){
+          EventLobby.handleTap(e.clientX, e.clientY);
+          return;
+        }
         if(Devices.hasActive()) Devices.close();
         else if(Devices.getNear()) Devices.tryOpen();
+        else if(EventManager.isNearDoor()) EventManager.tryOpenMenu();
       };
       interactBtn.addEventListener('click', onInteract);
       interactBtn.addEventListener('touchend', onInteract, {passive: false});

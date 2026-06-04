@@ -162,6 +162,13 @@ const Network = (() => {
     UI.showToast('تم إخراجك من الصالة 🚔',3000);
   }
 
+  // ========== دالة إرسال حدث الدفع (لـ Uno) ==========
+  function sendPush(targetId, nx, ny){
+    if(!_connected) return;
+    _sock.emit('event:push', { targetId, x: nx, y: ny });
+  }
+
   return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,
-    getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins,forceDisconnect};
+    getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins,
+    forceDisconnect, sendPush};
 })();

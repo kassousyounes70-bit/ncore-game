@@ -2,6 +2,7 @@
 const GameMap = (() => {
   const WORLD_W=2560,WORLD_H=1920,T=32;
   const DOOR_X=WORLD_W-T,DOOR_Y=WORLD_H/2-80,DOOR_H=160;
+  const EVENT_DOOR_X=WORLD_W-T, EVENT_DOOR_Y=WORLD_H/2+160, EVENT_DOOR_H=120;
   const SPAWN_X=WORLD_W-T-70,SPAWN_Y=WORLD_H/2-14;
 
   // منطقة البناء — الزاوية اليمنى العلوية
@@ -39,7 +40,8 @@ const GameMap = (() => {
     const W=WORLD_W,H=WORLD_H;
     _w(0,0,W,T);_w(0,H-T,W,T);_w(0,T,T,H-T*2);
     _w(W-T,T,T,DOOR_Y-T);
-    _w(W-T,DOOR_Y+DOOR_H,T,H-T-(DOOR_Y+DOOR_H));
+    _w(W-T,DOOR_Y+DOOR_H,T,EVENT_DOOR_Y-(DOOR_Y+DOOR_H));
+    _w(W-T,EVENT_DOOR_Y+EVENT_DOOR_H,T,H-T-(EVENT_DOOR_Y+EVENT_DOOR_H));
   }
   function _w(x,y,w,h){_obs.push({x,y,w,h,type:'wall'});}
 
@@ -97,6 +99,7 @@ const GameMap = (() => {
     _drawDecorations(ctx);
     _drawAllPCs(ctx);
     _drawDoor(ctx);
+    _drawEventDoor(ctx);
     _drawCeilingLights(ctx);
     // إضافات جديدة
     _drawBigScreen(ctx);
@@ -156,7 +159,8 @@ const GameMap = (() => {
       {x:0,y:0,w:W,h:T},{x:0,y:H-T,w:W,h:T},
       {x:0,y:T,w:T,h:H-T*2},
       {x:W-T,y:T,w:T,h:DOOR_Y-T},
-      {x:W-T,y:DOOR_Y+DOOR_H,w:T,h:H-T-(DOOR_Y+DOOR_H)}
+      {x:W-T,y:DOOR_Y+DOOR_H,w:T,h:EVENT_DOOR_Y-(DOOR_Y+DOOR_H)},
+      {x:W-T,y:EVENT_DOOR_Y+EVENT_DOOR_H,w:T,h:H-T-(EVENT_DOOR_Y+EVENT_DOOR_H)}
     ];
     for(const s of segs){
       ctx.fillStyle='#160830';ctx.fillRect(s.x,s.y,s.w,s.h);
@@ -676,7 +680,7 @@ const GameMap = (() => {
     }
   }
 
-  /* ======================== DOOR ======================== */
+  /* ======================== DOOR (خروج) ======================== */
   function _drawDoor(ctx){
     ctx.fillStyle='#050510';ctx.fillRect(DOOR_X,DOOR_Y,T+6,DOOR_H);
     ctx.strokeStyle='#f0c040';ctx.lineWidth=3;
@@ -686,6 +690,63 @@ const GameMap = (() => {
     ctx.lineTo(DOOR_X+2,DOOR_Y+DOOR_H/2-14);
     ctx.lineTo(DOOR_X+2,DOOR_Y+DOOR_H/2+14);ctx.closePath();ctx.fill();
     _neon(ctx,DOOR_X-90,DOOR_Y-56,'ENTER');
+  }
+
+  /* ======================== EVENT DOOR ======================== */
+  function _drawEventDoor(ctx){
+    const t = Date.now()/1000;
+    // إطار الباب
+    ctx.fillStyle='#050510';
+    ctx.fillRect(EVENT_DOOR_X, EVENT_DOOR_Y, T+6, EVENT_DOOR_H);
+
+    // تأثير Glitch على الإطار
+    const glitchColors=['#8800ff','#00ff88','#ff0088'];
+    const gc = glitchColors[Math.floor(t*3)%3];
+    ctx.strokeStyle = gc;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(EVENT_DOOR_X-2, EVENT_DOOR_Y-4, T+6, EVENT_DOOR_H+8);
+
+    // وميض داخلي
+    const pulse = 0.5+Math.sin(t*4)*0.5;
+    const gr = ctx.createLinearGradient(EVENT_DOOR_X, EVENT_DOOR_Y, EVENT_DOOR_X, EVENT_DOOR_Y+EVENT_DOOR_H);
+    gr.addColorStop(0,`rgba(136,0,255,${pulse*0.6})`);
+    gr.addColorStop(0.5,`rgba(0,255,136,${pulse*0.3})`);
+    gr.addColorStop(1,`rgba(255,0,136,${pulse*0.6})`);
+    ctx.fillStyle = gr;
+    ctx.fillRect(EVENT_DOOR_X, EVENT_DOOR_Y, T+6, EVENT_DOOR_H);
+
+    // سهم الدخول
+    ctx.fillStyle=`rgba(255,255,255,${0.5+pulse*0.5})`;
+    ctx.beginPath();
+    ctx.moveTo(EVENT_DOOR_X+16, EVENT_DOOR_Y+EVENT_DOOR_H/2);
+    ctx.lineTo(EVENT_DOOR_X+2,  EVENT_DOOR_Y+EVENT_DOOR_H/2-14);
+    ctx.lineTo(EVENT_DOOR_X+2,  EVENT_DOOR_Y+EVENT_DOOR_H/2+14);
+    ctx.closePath();
+    ctx.fill();
+
+    // نص "EVENTS" فوق الباب بتأثير Glitch
+    const ex = EVENT_DOOR_X - 60;
+    const ey = EVENT_DOOR_Y - 52;
+    ctx.fillStyle='rgba(0,0,0,0.8)';
+    ctx.fillRect(ex, ey, 130, 46);
+    ctx.strokeStyle=gc;
+    ctx.lineWidth=2;
+    ctx.strokeRect(ex, ey, 130, 46);
+
+    // Glitch offset
+    const gx = Math.sin(t*15)*2*(Math.random()>0.85?3:0);
+    ctx.fillStyle='#00ff88';
+    ctx.font='bold 9px "Press Start 2P"';
+    ctx.textAlign='center';
+    ctx.fillText('⚡ EVENTS', ex+65+gx, ey+14);
+    ctx.fillStyle='rgba(136,0,255,0.7)';
+    ctx.fillText('⚡ EVENTS', ex+65-gx, ey+14);
+    ctx.fillStyle='#ffffff';
+    ctx.fillText('⚡ EVENTS', ex+65, ey+14);
+
+    ctx.fillStyle='rgba(255,0,136,0.8)';
+    ctx.font='7px "Press Start 2P"';
+    ctx.fillText('PORTAL', ex+65, ey+30);
   }
 
   function _neon(ctx,x,y,text){
@@ -716,5 +777,6 @@ const GameMap = (() => {
   function getChairs(){return _chairs;}
   function getSpawnPoint(){return{x:SPAWN_X,y:SPAWN_Y};}
   function getDoorRect(){return{x:DOOR_X,y:DOOR_Y,w:T,h:DOOR_H};}
-  return{init,update,draw,getWorldSize,getDevices,getChairs,getSpawnPoint,getDoorRect};
+  function getEventDoorRect(){return{x:EVENT_DOOR_X,y:EVENT_DOOR_Y,w:T,h:EVENT_DOOR_H};}
+  return{init,update,draw,getWorldSize,getDevices,getChairs,getSpawnPoint,getDoorRect,getEventDoorRect};
 })();
