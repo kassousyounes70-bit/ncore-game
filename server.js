@@ -214,6 +214,11 @@ io.on('connection', sock => {
     if (clean) sock.broadcast.emit('chat:message', { id: sock.id, text: clean });
   });
 
+  // ========== حدث الدفع (لـ Uno) ==========
+  sock.on('event:push', ({ targetId, x, y }) => {
+    sock.broadcast.emit('event:pushed', { targetId, x, y });
+  });
+
   sock.on('disconnect', () => {
     if (players.has(sock.id)) {
       players.delete(sock.id);
@@ -310,6 +315,88 @@ app.post('/api/ban/clear', async (req, res) => {
     }
 });
 // ========== نهاية نظام البان ==========
+
+// ========== نظام الفعاليات (EVENT SYSTEM) ==========
+const eventLobbies = new Map(); // eventId -> { players:[], timer, timerActive, started }
+
+app.post('/api/event/join', (req, res) => {
+  const { eventId, playerId, playerName } = req.body;
+  if (!eventId || !playerId) return res.status(400).json({ error: 'Missing data' });
+
+  if (!eventLobbies.has(eventId)) {
+    eventLobbies.set(eventId, {
+      players: [], timer: 0, timerActive: false, started: false
+    });
+  }
+  const lobby = eventLobbies.get(eventId);
+  if (lobby.started) return res.status(400).json({ error: 'Already started' });
+  if (lobby.players.length >= 50) return res.status(400).json({ error: 'Full' });
+
+  const exists = lobby.players.find(p => p.id === playerId);
+  if (!exists) {
+    lobby.players.push({
+      id: playerId, name: playerName || 'لاعب',
+      lobbyX: 200 + Math.random() * 400, lobbyY: 200 + Math.random() * 200
+    });
+  }
+
+  // بدء العد أو إضافة وقت
+  if (lobby.players.length >= 3) {
+    if (!lobby.timerActive) {
+      lobby.timerActive = true;
+      lobby.timer = 30;
+      _startLobbyTimer(eventId);
+    } else {
+      lobby.timer = Math.min(lobby.timer + 10, 60);
+    }
+  }
+
+  io.emit(`event:lobby:${eventId}`, lobby);
+  res.status(200).json({ message: 'Joined' });
+});
+
+app.post('/api/event/leave', (req, res) => {
+  const { eventId, playerId } = req.body;
+  if (!eventId || !playerId) return res.status(400).json({ error: 'Missing data' });
+  const lobby = eventLobbies.get(eventId);
+  if (!lobby) return res.status(404).json({ error: 'Not found' });
+  lobby.players = lobby.players.filter(p => p.id !== playerId);
+  if (lobby.players.length < 3) {
+    lobby.timerActive = false;
+  }
+  io.emit(`event:lobby:${eventId}`, lobby);
+  res.status(200).json({ message: 'Left' });
+});
+
+app.get('/api/event/lobby', (req, res) => {
+  const { eventId } = req.query;
+  if (!eventId) return res.status(400).json({ error: 'Missing eventId' });
+  const lobby = eventLobbies.get(eventId);
+  if (!lobby) return res.status(200).json({ players: [], timer: 0, timerActive: false, started: false });
+  res.status(200).json(lobby);
+});
+
+function _startLobbyTimer(eventId) {
+  const iv = setInterval(() => {
+    const lobby = eventLobbies.get(eventId);
+    if (!lobby || !lobby.timerActive) {
+      clearInterval(iv);
+      return;
+    }
+    lobby.timer -= 1;
+    io.emit(`event:lobby:${eventId}`, lobby);
+    if (lobby.timer <= 0) {
+      clearInterval(iv);
+      if (lobby.players.length >= 3) {
+        lobby.started = true;
+        io.emit(`event:start:${eventId}`, { players: lobby.players });
+      } else {
+        lobby.timerActive = false;
+      }
+    }
+  }, 1000);
+}
+// ========== نهاية نظام الفعاليات ==========
 
 // ========== التعديل المطلوب: نقطة نهاية مزامنة الخروج ==========
 app.post('/api/sync-exit', async (req, res) => {
