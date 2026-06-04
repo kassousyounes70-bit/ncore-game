@@ -92,8 +92,12 @@ const Devices = (() => {
     _promptT+=delta*3;
     _promptA=(_near&&!_active)?0.6+Math.sin(_promptT)*0.4:0;
 
+    // التحقق من قرب باب الفعاليات
+    const nearEventDoor = (typeof EventManager !== 'undefined' && EventManager.isNearDoor && !_active);
+
     if(_interactBtn){
-      if(_near&&!_active){
+      // إظهار الزر إذا كان هناك جهاز قريب أو باب الفعاليات قريب
+      if((_near && !_active) || nearEventDoor){
         _interactBtn.classList.remove('hidden');
         _interactBtn.style.display='block';
       } else {
@@ -112,7 +116,12 @@ const Devices = (() => {
     }
   }
 
-  function tryOpen(){if(_near&&!_active)open(_near);}
+  function tryOpen(){
+    if(_near && !_active) open(_near);
+    else if(!_active && typeof EventManager !== 'undefined' && EventManager.isNearDoor && EventManager.isNearDoor()) {
+      EventManager.tryOpenMenu();
+    }
+  }
 
   function open(dev){
     _active=dev;
