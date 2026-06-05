@@ -5,7 +5,6 @@ const Report = (() => {
 
   function init() {
     _sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2);
-
     const btn = Utils.$('report-btn');
     if (btn) {
       btn.onclick = openModal;
@@ -70,11 +69,13 @@ const Report = (() => {
     }
   }
 
-  function showReportBtn()  {
+  function showReportBtn() {
     const b = Utils.$('report-btn');
     if (b) { b.classList.remove('hidden'); b.style.display = 'block'; }
   }
-  function hideReportBtn()  {
+
+  function hideReportBtn() {
+    closeModal(); 
     const b = Utils.$('report-btn');
     if (b) { b.classList.add('hidden'); b.style.display = 'none'; }
   }

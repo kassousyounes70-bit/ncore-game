@@ -1,80 +1,61 @@
 'use strict';
 const EventUno = (() => {
-
-  // ═══════════════════════════════
-  //  CONSTANTS
-  // ═══════════════════════════════
   const TILE        = 64;
-  const GRID_COLS   = 10;
-  const GRID_ROWS   = 8;
+  const GRID_COLS   = 20;
+  const GRID_ROWS   = 14;
   const ROUND_TIME  = 10;
-  const PUSH_CHARGE = 2.85;  // ثواني لامتلاء شريط الدفع
-  const DODGE_CHARGE= 3.5;   // ثواني لامتلاء شريط التفادي
-
+  const PUSH_CHARGE = 2.85;
+  const DODGE_CHARGE= 3.5;
   const COLORS = ['red','blue','green','yellow'];
   const NUMBERS = [0,1,2,3,4,5,6,7,8,9];
-
   const ACTION_CARDS = ['reverse','skip','plus2','wild'];
-
-  // مناطق الخريطة (بالبلاطات)
-  const SAFE_ZONE_COLS  = 3;   // أقصى اليسار
-  const GRID_START_COL  = 3;   // بداية المنطقة المحرمة
-  const GRID_END_COL    = 7;   // نهاية المنطقة المحرمة
-  const CARD_ZONE_COLS  = 3;   // أقصى اليمين
-
+  const SAFE_ZONE_COLS  = 5;
+  const GRID_START_COL  = 5;
+  const GRID_END_COL    = 15;
+  const CARD_ZONE_COLS  = 5;
   const WORLD_W = GRID_COLS * TILE;
   const WORLD_H = GRID_ROWS * TILE;
-
-  // ═══════════════════════════════
-  //  STATE
-  // ═══════════════════════════════
   let _active       = false;
-  let _players      = [];   // { id, name, x, y, hearts, card, alive, spectating, color }
+  let _players      = [];
   let _myId         = '';
   let _roundTimer   = 0;
   let _roundActive  = false;
   let _roundNum     = 0;
-  let _phase        = 'waiting'; // waiting|countdown|running|result
+  let _phase        = 'waiting';
   let _countdownT   = 3;
-  let _targetCard   = null;  // { color, number }
-  let _actionCard   = null;  // reverse|skip|plus2|wild|null
-  let _cards        = [];    // بطاقات في حقل اليمين
-  let _capsules     = [];    // كبسولات النجاة
-  let _fragiles     = [];    // بلاطات هشة
-  let _blockers     = [];    // جدران متقطعة
+  let _targetCard   = null;
+  let _actionCard   = null;
+  let _cards        = [];
+  let _capsules     = [];
+  let _fragiles     = [];
+  let _blockers     = [];
   let _laserOn      = true;
   let _lightsOn     = true;
   let _reversed     = false;
   let _skipTriggered= false;
   let _camX=0, _camY=0;
-
-  // بيانات اللاعب الحالي
   const _me = {
-    x: 1.5*TILE, y: 3.5*TILE,
+    x: 2.5*TILE, y: 7*TILE,
     pushCharge: 0, dodgeCharge: 0,
     pushing: false, dodging: false,
     pushDir: null,
-    invincible: 0,  // ثوانٍ لا يُدفع فيها
+    invincible: 0,
     heldCard: null,
-    heldCard2: null, // للـ +2
+    heldCard2: null,
     frame: 0, ft: 0, moving: false,
     dx: 0, dy: 0,
   };
 
-  // ═══════════════════════════════
-  //  INIT
-  // ═══════════════════════════════
   function enter(players) {
     _active    = true;
     _roundNum  = 0;
     _phase     = 'waiting';
     _myId      = Network.getMyId();
     _reversed  = false;
-
     _players = players.map((p, i) => ({
       id       : p.id,
       name     : p.name || 'لاعب',
-      x        : 1.5 * TILE,
+      x        : 2.5 * TILE,
       y        : (1 + i % (GRID_ROWS-2)) * TILE,
       hearts   : 3,
       card     : null,
@@ -84,21 +65,21 @@ const EventUno = (() => {
       charId   : p.charId || 0,
       frame    : 0, ft: 0, moving: false,
     }));
-
-    _me.x = 1.5*TILE;
-    _me.y = 3.5*TILE;
+    _me.x = 2.5*TILE;
+    _me.y = 7*TILE;
     _me.heldCard = null;
     _me.heldCard2= null;
     _me.pushCharge = 0;
     _me.dodgeCharge= 0;
-
+    
+    if (typeof UI !== 'undefined' && UI.toggleWorldHUD) {
+      UI.toggleWorldHUD(false);
+    }
+    
     _buildUI();
     _startRound();
   }
 
-  // ═══════════════════════════════
-  //  ROUND SETUP
-  // ═══════════════════════════════
   function _startRound() {
     _roundNum++;
     _phase       = 'countdown';
@@ -110,55 +91,37 @@ const EventUno = (() => {
     _skipTriggered = false;
     _me.heldCard = null;
     _me.heldCard2= null;
-
-    // بطاقة الهدف
     _targetCard = {
       color : COLORS[Math.floor(Math.random()*COLORS.length)],
       number: NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
     };
-
-    // بطاقة أكشن (من الجولة الثانية)
     _actionCard = _roundNum > 1 && Math.random() < 0.55
       ? ACTION_CARDS[Math.floor(Math.random()*ACTION_CARDS.length)]
       : null;
-
-    // تطبيق Reverse
     if (_actionCard === 'reverse') _reversed = !_reversed;
-
-    // بناء البطاقات والكبسولات
     _buildCards();
     _buildCapsules();
     _buildFragiles();
     _buildBlockers();
-
-    // إعادة اللاعبين لموضعهم
     _resetPositions();
   }
 
-  // ═══════════════════════════════
-  //  BUILD CARDS (حقل اليمين)
-  // ═══════════════════════════════
   function _buildCards() {
     _cards = [];
-    const alivePlayers = _players.filter(p => p.alive).length + 1; // +1 للاعب الحالي
+    const alivePlayers = _players.filter(p => p.alive).length + 1;
     const cardZoneX    = _reversed ? SAFE_ZONE_COLS * TILE : (GRID_END_COL) * TILE;
-
-    // عدد البطاقات الصحيحة = alivePlayers - 10%
     const correctCount = Math.max(1, Math.floor(alivePlayers * 0.9));
-
     for (let i = 0; i < correctCount; i++) {
       _cards.push({
         color  : _targetCard.color,
         number : _targetCard.number,
-        x      : cardZoneX + Utils.randInt(10, CARD_ZONE_COLS*TILE-10),
+        x      : cardZoneX + Utils.randInt(30, CARD_ZONE_COLS*TILE-30),
         y      : Utils.randInt(TILE, WORLD_H - TILE),
         taken  : false,
         real   : true,
       });
     }
-
-    // بطاقات خادعة (Visual Bluffs)
-    const bluffCount = Utils.randInt(3, 7);
+    const bluffCount = Utils.randInt(5, 10);
     for (let i = 0; i < bluffCount; i++) {
       const isColorBluff  = Math.random() < 0.5;
       const bluffColor    = isColorBluff
@@ -167,24 +130,21 @@ const EventUno = (() => {
       const bluffNumber   = !isColorBluff
         ? _getSimilarNumber(_targetCard.number)
         : NUMBERS[Math.floor(Math.random()*NUMBERS.length)];
-
       _cards.push({
         color  : bluffColor,
         number : bluffNumber,
-        x      : cardZoneX + Utils.randInt(10, CARD_ZONE_COLS*TILE-10),
+        x      : cardZoneX + Utils.randInt(30, CARD_ZONE_COLS*TILE-30),
         y      : Utils.randInt(TILE, WORLD_H - TILE),
         taken  : false,
         real   : false,
       });
     }
-
-    // +2: بطاقتان مطلوبتان
     if (_actionCard === 'plus2') {
       for (let i = 0; i < correctCount; i++) {
         _cards.push({
           color  : COLORS[Math.floor(Math.random()*COLORS.length)],
           number : NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
-          x      : cardZoneX + Utils.randInt(10, CARD_ZONE_COLS*TILE-10),
+          x      : cardZoneX + Utils.randInt(30, CARD_ZONE_COLS*TILE-30),
           y      : Utils.randInt(TILE, WORLD_H - TILE),
           taken  : false,
           real   : true,
@@ -207,36 +167,25 @@ const EventUno = (() => {
     return (num + 1) % 10;
   }
 
-  // ═══════════════════════════════
-  //  BUILD CAPSULES (كبسولات اليسار)
-  // ═══════════════════════════════
   function _buildCapsules() {
     _capsules = [];
     const capsX = _reversed ? GRID_END_COL*TILE : 0;
-    const count = 4; // كبسولة لكل لون
-
     COLORS.forEach((color, i) => {
       _capsules.push({
         color,
         x    : capsX + Utils.randInt(4, SAFE_ZONE_COLS*TILE - TILE - 4),
-        y    : (i * 2 + 0.5) * TILE,
+        y    : (i * 3 + 1) * TILE,
         w    : TILE * 1.2,
         h    : TILE * 1.2,
         open : true,
         occupants: [],
       });
     });
-
-    // Skip: أغلق نصف الكبسولات عند الثانية 5
-    // (يُطبَّق في update)
   }
 
-  // ═══════════════════════════════
-  //  BUILD FRAGILE TILES
-  // ═══════════════════════════════
   function _buildFragiles() {
     _fragiles = [];
-    const count = Utils.randInt(6, 12);
+    const count = Utils.randInt(15, 30);
     for (let i = 0; i < count; i++) {
       const col = Utils.randInt(GRID_START_COL, GRID_END_COL - 1);
       const row = Utils.randInt(1, GRID_ROWS - 2);
@@ -245,18 +194,15 @@ const EventUno = (() => {
         y      : row * TILE,
         w      : TILE,
         h      : TILE,
-        state  : 'normal', // normal|cracked|fallen
-        crackT : 0,
+        state  : 'normal',
+        steppedBy: []
       });
     }
   }
 
-  // ═══════════════════════════════
-  //  BUILD BLOCKERS (جدران متقطعة)
-  // ═══════════════════════════════
   function _buildBlockers() {
     _blockers = [];
-    const count = Utils.randInt(3, 6);
+    const count = Utils.randInt(6, 12);
     for (let i = 0; i < count; i++) {
       const col = Utils.randInt(GRID_START_COL, GRID_END_COL - 1);
       const row = Utils.randInt(0, GRID_ROWS - 1);
@@ -272,16 +218,12 @@ const EventUno = (() => {
     }
   }
 
-  // ═══════════════════════════════
-  //  RESET POSITIONS
-  // ═══════════════════════════════
   function _resetPositions() {
-    const startX = _reversed ? WORLD_W - 2*TILE : 1.5*TILE;
+    const startX = _reversed ? WORLD_W - 2.5*TILE : 2.5*TILE;
     _me.x = startX;
-    _me.y = 3.5 * TILE;
+    _me.y = 7 * TILE;
     _me.heldCard  = null;
     _me.heldCard2 = null;
-
     _players.forEach((p, i) => {
       p.x = startX;
       p.y = (1 + i % (GRID_ROWS-2)) * TILE;
@@ -290,24 +232,17 @@ const EventUno = (() => {
     });
   }
 
-  // ═══════════════════════════════
-  //  UPDATE
-  // ═══════════════════════════════
   function update(delta) {
     if (!_active) return;
-
     switch (_phase) {
       case 'countdown': _updateCountdown(delta); break;
       case 'running'  : _updateRunning(delta);   break;
       case 'result'   : _updateResult(delta);    break;
     }
-
-    // كاميرا تتبع اللاعب
     _camX = Utils.clamp(_me.x - window.innerWidth/2,  0, Math.max(0, WORLD_W - window.innerWidth));
     _camY = Utils.clamp(_me.y - window.innerHeight/2, 0, Math.max(0, WORLD_H - window.innerHeight));
   }
 
-  // ─── Countdown ───
   function _updateCountdown(delta) {
     _countdownT -= delta;
     if (_countdownT <= 0) {
@@ -317,21 +252,14 @@ const EventUno = (() => {
     }
   }
 
-  // ─── Running ───
   function _updateRunning(delta) {
     _roundTimer -= delta;
-
-    // Skip: أغلق نصف الكبسولات عند الثانية 5
     if (_actionCard === 'skip' && !_skipTriggered && _roundTimer <= 5) {
       _skipTriggered = true;
       _capsules.forEach((c, i) => { if (i % 2 === 0) c.open = false; });
       UI.showToast('⚠️ نصف الكبسولات أُغلقت!', 1500);
     }
-
-    // Wild: إطفاء الأنوار
     if (_actionCard === 'wild') _lightsOn = false;
-
-    // تحديث الجدران المتقطعة
     for (const b of _blockers) {
       b.timer -= delta;
       if (b.timer <= 0) {
@@ -339,94 +267,58 @@ const EventUno = (() => {
         b.timer   = b.period;
       }
     }
-
-    // تحديث البلاطات الهشة
-    for (const f of _fragiles) {
-      if (f.state === 'cracked') {
-        f.crackT -= delta;
-        if (f.crackT <= 0) {
-          f.state = 'fallen';
-          _checkFallenTile(f);
-        }
-      }
-    }
-
-    // تحديث اللاعب
     _updateMe(delta);
-
-    // شحن أزرار الدفع والتفادي
     if (_me.pushCharge  < 1) _me.pushCharge  += delta / PUSH_CHARGE;
     if (_me.dodgeCharge < 1) _me.dodgeCharge += delta / DODGE_CHARGE;
     _me.pushCharge  = Math.min(1, _me.pushCharge);
     _me.dodgeCharge = Math.min(1, _me.dodgeCharge);
-
-    // انتهاء الوقت
     if (_roundTimer <= 0) _endRound();
   }
 
-  // ─── تحديث اللاعب الحالي ───
   function _updateMe(delta) {
-    if (_laserOn) return;
-
+    const mePlayer = _getMyPlayer();
+    if (mePlayer && (mePlayer.spectating || !mePlayer.alive)) return;
     const jx  = Joystick.getDx();
     const jy  = Joystick.getDy();
     const mag = Math.sqrt(jx*jx+jy*jy);
     _me.moving = mag > 0.05;
-
     if (_me.moving) {
-      const spd = 140 * delta;
+      const spd = 160 * delta;
       const nx  = _me.x + jx * spd;
       const ny  = _me.y + jy * spd;
-
       if (_canMove(nx, _me.y)) _me.x = Utils.clamp(nx, 0, WORLD_W);
       if (_canMove(_me.x, ny)) _me.y = Utils.clamp(ny, 0, WORLD_H);
-
       _me.ft += delta;
       if (_me.ft >= 0.13) { _me.ft=0; _me.frame=(_me.frame+1)%3; }
     } else {
       _me.frame=0; _me.ft=0;
     }
-
     if (_me.invincible > 0) _me.invincible -= delta;
-
-    // التقاط بطاقة
+    if (_laserOn) return;
     if (!_me.heldCard) _checkPickupCard();
-
-    // دخول كبسولة
     _checkCapsuleEntry();
-
-    // تحقق البلاطة الهشة
     _checkFragile(_me);
   }
 
-  // ─── تصادم ───
   function _canMove(nx, ny) {
-    // جدران الخريطة
     if (nx < 0 || nx > WORLD_W || ny < 0 || ny > WORLD_H) return false;
-
-    // الليزر
     const laserX = _reversed ? GRID_END_COL*TILE : SAFE_ZONE_COLS*TILE;
     if (_laserOn) {
       if (!_reversed && nx > laserX - 10) return false;
       if ( _reversed && nx < laserX + 10) return false;
     }
-
-    // جدران متقطعة مرئية
     for (const b of _blockers) {
       if (!b.visible) continue;
       if (nx > b.x && nx < b.x+b.w && ny > b.y && ny < b.y+b.h) return false;
     }
-
     return true;
   }
 
-  // ─── التقاط البطاقة ───
   function _checkPickupCard() {
     for (const c of _cards) {
       if (c.taken) continue;
       const dist = Utils.distance(_me.x, _me.y, c.x, c.y);
       if (dist < 28) {
-        // +2: تحتاج بطاقتين
         if (_actionCard === 'plus2' && _me.heldCard && !_me.heldCard2 && c.isSecond) {
           c.taken       = true;
           _me.heldCard2 = c;
@@ -440,20 +332,15 @@ const EventUno = (() => {
     }
   }
 
-  // ─── دخول الكبسولة ───
   function _checkCapsuleEntry() {
     if (!_me.heldCard) return;
     if (_actionCard === 'plus2' && !_me.heldCard2) return;
-
     for (const cap of _capsules) {
       if (!cap.open) continue;
       const dist = Utils.distance(_me.x, _me.y, cap.x + cap.w/2, cap.y + cap.h/2);
       if (dist > 36) continue;
-
-      // قواعد UNO: لون مطابق أو رقم مطابق
       const colorMatch  = _me.heldCard.color  === cap.color;
       const numberMatch = _me.heldCard.number === _targetCard.number;
-
       if (colorMatch || numberMatch) {
         cap.occupants.push(_myId);
         UI.showToast('✅ نجوت!', 1000);
@@ -465,33 +352,35 @@ const EventUno = (() => {
     }
   }
 
-  // ─── البلاطة الهشة ───
   function _checkFragile(entity) {
+    if (entity.spectating || !entity.alive) return;
+    const entityId = entity.id || 'me';
     for (const f of _fragiles) {
-      if (f.state === 'fallen') continue;
+      if (f.state === 'fallen') {
+        const onFallen = entity.x > f.x && entity.x < f.x+f.w && entity.y > f.y && entity.y < f.y+f.h;
+        if (onFallen && entity === _me && !f.steppedBy.includes(entityId)) {
+          f.steppedBy.push(entityId);
+          _loseHeart();
+        }
+        continue;
+      }
       const onTile = entity.x > f.x && entity.x < f.x+f.w &&
                      entity.y > f.y && entity.y < f.y+f.h;
-      if (!onTile) continue;
-
-      if (f.state === 'normal') {
-        f.state  = 'cracked';
-        f.crackT = 1.2;
-      } else if (f.state === 'cracked') {
-        f.state = 'fallen';
-        _checkFallenTile(f);
+      const wasOnTile = f.steppedBy.includes(entityId);
+      if (onTile && !wasOnTile) {
+        f.steppedBy.push(entityId);
+        if (f.state === 'normal') {
+          f.state = 'cracked';
+        } else if (f.state === 'cracked') {
+          f.state = 'fallen';
+          if (entity === _me) _loseHeart();
+        }
+      } else if (!onTile && wasOnTile) {
+        f.steppedBy = f.steppedBy.filter(id => id !== entityId);
       }
     }
   }
 
-  function _checkFallenTile(tile) {
-    // تحقق لاعب الحالي
-    if (_me.x > tile.x && _me.x < tile.x+tile.w &&
-        _me.y > tile.y && _me.y < tile.y+tile.h) {
-      _loseHeart();
-    }
-  }
-
-  // ─── خسارة قلب ───
   function _loseHeart() {
     const me = _getMyPlayer();
     if (!me) return;
@@ -507,24 +396,17 @@ const EventUno = (() => {
     }
   }
 
-  // ─── نهاية الجولة ───
   function _endRound() {
     _roundActive = false;
     _phase       = 'result';
     _lightsOn    = true;
-
-    // من لم يدخل كبسولة يخسر قلباً
     const me = _getMyPlayer();
     if (me && me.alive && !me.spectating) {
       const inCapsule = _capsules.some(c => c.occupants.includes(_myId));
       if (!inCapsule) _loseHeart();
     }
-
-    // إعادة المتفرجين للعب
     _players.forEach(p => { p.spectating = false; });
-    if (me) me.spectating = false;
-
-    // تحقق من الفائز
+    if (me && me.alive) me.spectating = false;
     const alive = _getAlivePlayers();
     if (alive.length <= 1) {
       _phase = 'gameover';
@@ -533,24 +415,17 @@ const EventUno = (() => {
       setTimeout(exit, 5000);
       return;
     }
-
-    // جولة جديدة بعد 3 ثوانٍ
     setTimeout(_startRound, 3000);
   }
 
-  // ─── نتيجة ───
-  function _updateResult(delta) {
-    // الانتظار يتم عبر setTimeout في _endRound
-  }
+  function _updateResult(delta) {}
 
-  // ═══════════════════════════════
-  //  PUSH SYSTEM
-  // ═══════════════════════════════
   function push(dir) {
+    const mePlayer = _getMyPlayer();
+    if (!mePlayer || mePlayer.spectating || !mePlayer.alive) return;
     if (_me.pushCharge < 1) return;
     _me.pushCharge = 0;
-
-    const pushDist = TILE; // بلاطة واحدة
+    const pushDist = TILE;
     const offsets  = {
       up   : { dx:  0, dy: -pushDist },
       down : { dx:  0, dy:  pushDist },
@@ -559,56 +434,40 @@ const EventUno = (() => {
     };
     const off = offsets[dir];
     if (!off) return;
-
-    // ابحث عن لاعب في الاتجاه
     for (const p of _players) {
       if (!p.alive || p.spectating) continue;
       const dist = Utils.distance(_me.x, _me.y, p.x, p.y);
       if (dist > TILE * 1.2) continue;
-
-      // دفعه
       const nx = p.x + off.dx;
       const ny = p.y + off.dy;
       p.x = Utils.clamp(nx, 0, WORLD_W);
       p.y = Utils.clamp(ny, 0, WORLD_H);
-
-      // لو دفعه على بلاطة هشة
       _checkFragile(p);
-
-      // إرسال للسيرفر
       Network.sendPush(p.id, p.x, p.y);
       UI.showToast(`💥 دفعت ${p.name}!`, 800);
       break;
     }
   }
 
-  // ═══════════════════════════════
-  //  DODGE SYSTEM
-  // ═══════════════════════════════
   function dodge() {
+    const mePlayer = _getMyPlayer();
+    if (!mePlayer || mePlayer.spectating || !mePlayer.alive) return;
     if (_me.dodgeCharge < 1) return;
     _me.dodgeCharge = 0;
-
-    // نجاح عشوائي (60% نجاح)
     const success = Math.random() < 0.6;
     if (success) {
-      _me.invincible = 0.8; // 0.8 ثانية لا يُدفع
+      _me.invincible = 0.8;
       UI.showToast('💨 تفاديت!', 700);
     } else {
       UI.showToast('😵 فشل التفادي!', 700);
     }
   }
 
-  // ═══════════════════════════════
-  //  DRAW
-  // ═══════════════════════════════
   function draw(ctx) {
     if (!_active) return;
     const cw = window.innerWidth, ch = window.innerHeight;
-
     ctx.save();
     ctx.translate(-_camX, -_camY);
-
     _drawFloor(ctx);
     _drawFragiles(ctx);
     _drawBlockers(ctx);
@@ -617,45 +476,57 @@ const EventUno = (() => {
     _drawCards(ctx);
     _drawPlayers(ctx);
     _drawMe(ctx);
-
     ctx.restore();
-
-    // Wild: طبقة ظلام
     if (!_lightsOn) _drawDarkness(ctx, cw, ch);
-
     _drawHUD(ctx, cw, ch);
     _drawActionCard(ctx, cw, ch);
   }
 
-  // ─── أرضية ───
   function _drawFloor(ctx) {
+    ctx.fillStyle = '#020008';
+    ctx.fillRect(0,0,WORLD_W,WORLD_H);
+    const t = Date.now()/1000;
+    ctx.fillStyle = '#fff';
+    for(let i=0; i<150; i++){
+        const sx = (Math.sin(i*123) * 5000 + t * (i%3+1)*20) % WORLD_W;
+        const sy = Math.cos(i*321) * WORLD_H;
+        const sz = Math.abs(Math.sin(t*2 + i));
+        ctx.globalAlpha = sz;
+        ctx.fillRect(Math.abs(sx), Math.abs(sy), i%2+1, i%2+1);
+    }
+    ctx.globalAlpha = 1;
     for (let r=0; r<GRID_ROWS; r++) {
       for (let c=0; c<GRID_COLS; c++) {
         let color;
-        if (c < SAFE_ZONE_COLS || c >= GRID_END_COL) {
-          color = (r+c)%2===0 ? '#0d0025' : '#0a001e';
+        const isSafe = (c < SAFE_ZONE_COLS || c >= GRID_END_COL);
+        if (isSafe) {
+          color = (r+c)%2===0 ? '#150535' : '#100028';
         } else {
-          color = (r+c)%2===0 ? '#1a0a00' : '#150800';
+          color = (r+c)%2===0 ? '#220800' : '#180500';
         }
-        ctx.fillStyle = _reversed ? (c >= GRID_COLS-SAFE_ZONE_COLS ? '#0d0025' : color) : color;
+        const fill = _reversed ? (c >= GRID_COLS-SAFE_ZONE_COLS ? ((r+c)%2===0 ? '#150535' : '#100028') : color) : color;
+        ctx.fillStyle = fill;
         ctx.fillRect(c*TILE, r*TILE, TILE, TILE);
+        ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(c*TILE + 1, r*TILE + 1, TILE - 2, TILE - 2);
+        ctx.strokeStyle = isSafe ? 'rgba(136,0,255,0.2)' : 'rgba(255,60,0,0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(c*TILE + 2, r*TILE + 2, TILE - 4, TILE - 4);
       }
-    }
-    // شبكة
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    ctx.lineWidth   = 0.5;
-    for (let x=0; x<=WORLD_W; x+=TILE) {
-      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,WORLD_H); ctx.stroke();
-    }
-    for (let y=0; y<=WORLD_H; y+=TILE) {
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(WORLD_W,y); ctx.stroke();
     }
   }
 
-  // ─── بلاطات هشة ───
   function _drawFragiles(ctx) {
     for (const f of _fragiles) {
-      if (f.state === 'fallen') continue;
+      if (f.state === 'fallen') {
+        ctx.fillStyle = '#010003';
+        ctx.fillRect(f.x, f.y, f.w, f.h);
+        ctx.strokeStyle = '#220800';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(f.x+2, f.y+2, f.w-4, f.h-4);
+        continue;
+      }
       if (f.state === 'normal') {
         ctx.fillStyle = 'rgba(255,140,0,0.18)';
         ctx.fillRect(f.x, f.y, f.w, f.h);
@@ -663,10 +534,9 @@ const EventUno = (() => {
         ctx.lineWidth = 1;
         ctx.strokeRect(f.x+2, f.y+2, f.w-4, f.h-4);
       } else if (f.state === 'cracked') {
-        ctx.fillStyle = 'rgba(255,60,0,0.3)';
+        ctx.fillStyle = 'rgba(255,60,0,0.4)';
         ctx.fillRect(f.x, f.y, f.w, f.h);
-        // شقوق
-        ctx.strokeStyle = 'rgba(255,60,0,0.8)';
+        ctx.strokeStyle = 'rgba(255,60,0,0.9)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(f.x+f.w*0.3, f.y);
@@ -682,7 +552,6 @@ const EventUno = (() => {
     }
   }
 
-  // ─── جدران متقطعة ───
   function _drawBlockers(ctx) {
     for (const b of _blockers) {
       if (!b.visible) continue;
@@ -694,7 +563,6 @@ const EventUno = (() => {
     }
   }
 
-  // ─── ليزر ───
   function _drawLaser(ctx) {
     if (!_laserOn) return;
     const lx = _reversed
@@ -704,7 +572,6 @@ const EventUno = (() => {
     const alpha = 0.6 + Math.sin(t*8)*0.4;
     ctx.fillStyle = `rgba(255,0,0,${alpha})`;
     ctx.fillRect(lx-3, 0, 6, WORLD_H);
-    // تأثير توهج
     const gr = ctx.createLinearGradient(lx-20, 0, lx+20, 0);
     gr.addColorStop(0,'rgba(255,0,0,0)');
     gr.addColorStop(0.5,`rgba(255,0,0,${alpha*0.4})`);
@@ -713,7 +580,6 @@ const EventUno = (() => {
     ctx.fillRect(lx-20, 0, 40, WORLD_H);
   }
 
-  // ─── كبسولات النجاة ───
   function _drawCapsules(ctx) {
     for (const cap of _capsules) {
       const colorMap = {
@@ -721,8 +587,6 @@ const EventUno = (() => {
         green:'#118811', yellow:'#ccaa00'
       };
       const c = colorMap[cap.color] || '#444';
-
-      // لو مغلقة
       if (!cap.open) {
         ctx.fillStyle = 'rgba(80,80,80,0.6)';
         ctx.fillRect(cap.x, cap.y, cap.w, cap.h);
@@ -733,7 +597,6 @@ const EventUno = (() => {
           {font:'14px serif', align:'center'});
         continue;
       }
-
       const t = Date.now()/1000;
       const pulse = 0.6+Math.sin(t*3)*0.4;
       ctx.fillStyle = c + '33';
@@ -741,8 +604,6 @@ const EventUno = (() => {
       ctx.strokeStyle = c;
       ctx.lineWidth = 3;
       ctx.strokeRect(cap.x, cap.y, cap.w, cap.h);
-
-      // توهج
       const gr = ctx.createRadialGradient(
         cap.x+cap.w/2, cap.y+cap.h/2, 0,
         cap.x+cap.w/2, cap.y+cap.h/2, cap.w
@@ -751,8 +612,6 @@ const EventUno = (() => {
       gr.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gr;
       ctx.fillRect(cap.x-10, cap.y-10, cap.w+20, cap.h+20);
-
-      // لون + رقم
       ctx.font = '9px "Press Start 2P"';
       ctx.textAlign = 'center';
       ctx.fillStyle = '#fff';
@@ -760,7 +619,6 @@ const EventUno = (() => {
     }
   }
 
-  // ─── بطاقات ───
   function _drawCards(ctx) {
     for (const c of _cards) {
       if (c.taken) continue;
@@ -769,43 +627,45 @@ const EventUno = (() => {
         green:'#118811', yellow:'#ccaa00',
       };
       const bg = colorMap[c.color] || '#555';
-
-      ctx.fillStyle = bg;
-      ctx.fillRect(c.x-14, c.y-20, 28, 38);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      Utils.drawPixelRect(ctx, c.x-14+2, c.y-20+2, 28, 40, 3);
+      Utils.drawPixelRect(ctx, c.x-14, c.y-20, 28, 40, 3, '#fff', '#111', 1);
+      Utils.drawPixelRect(ctx, c.x-11, c.y-17, 22, 34, 4, bg);
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(-Math.PI / 6);
       ctx.fillStyle = '#fff';
-      ctx.fillRect(c.x-10, c.y-16, 20, 30);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 7, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
       ctx.fillStyle = bg;
-      ctx.font = 'bold 14px "Press Start 2P"';
+      ctx.font = 'bold 12px "Press Start 2P"';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(c.number.toString(), c.x, c.y);
+      ctx.fillText(c.number.toString(), c.x, c.y+1);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 6px "Press Start 2P"';
+      ctx.fillText(c.number.toString(), c.x-7, c.y-12);
+      ctx.fillText(c.number.toString(), c.x+7, c.y+13);
     }
   }
 
-  // ─── رسم اللاعبين الآخرين ───
   function _drawPlayers(ctx) {
     for (const p of _players) {
       if (!p.alive && !p.spectating) continue;
       const char = Player.getAllChars()[p.charId];
       if (!char) continue;
-
       ctx.save();
       if (p.spectating) ctx.globalAlpha = 0.4;
-
       char.draw(ctx, p.x-12, p.y-14, 'down', p.frame, p.moving);
-
-      // اسم اللاعب
       Utils.drawPixelText(ctx, p.name, p.x, p.y-22,
         { font:'5px "Press Start 2P"', color:'#f0c040', align:'center' });
-
-      // قلوب
       let heartsStr = '';
       for (let i=0; i<p.hearts; i++) heartsStr += '❤️';
       ctx.font = '8px serif';
       ctx.textAlign = 'center';
       ctx.fillText(heartsStr, p.x, p.y-32);
-
-      // وسم الضعيف (قلب واحد)
       if (p.hearts === 1) {
         const pulse = 0.5+Math.sin(Date.now()/200)*0.5;
         ctx.globalAlpha = pulse * (p.spectating ? 0.4 : 1);
@@ -813,8 +673,6 @@ const EventUno = (() => {
         ctx.lineWidth = 2;
         ctx.strokeRect(p.x-14, p.y-14, 28, 36);
       }
-
-      // البطاقة المحمولة
       if (p.card) {
         const colorMap = {red:'#cc1111',blue:'#1144cc',green:'#118811',yellow:'#ccaa00'};
         ctx.fillStyle = colorMap[p.card.color]||'#555';
@@ -828,21 +686,16 @@ const EventUno = (() => {
     }
   }
 
-  // ─── رسم اللاعب الحالي ───
   function _drawMe(ctx) {
     const me = _getMyPlayer();
     if (!me || (!me.alive && !me.spectating)) return;
-
     ctx.save();
     if (me.spectating) ctx.globalAlpha = 0.4;
     if (_me.invincible > 0) {
       ctx.globalAlpha = 0.5 + Math.sin(Date.now()/80)*0.5;
     }
-
     const char = Player.getAllChars()[Player.getCharId()];
     if (char) char.draw(ctx, _me.x-12, _me.y-14, 'down', _me.frame, _me.moving);
-
-    // وسم الضعيف
     if (me.hearts === 1) {
       const pulse = 0.5+Math.sin(Date.now()/200)*0.5;
       ctx.globalAlpha = pulse;
@@ -850,11 +703,9 @@ const EventUno = (() => {
       ctx.lineWidth = 3;
       ctx.strokeRect(_me.x-14, _me.y-14, 28, 36);
     }
-
     ctx.restore();
   }
 
-  // ─── ظلام Wild ───
   function _drawDarkness(ctx, cw, ch) {
     const gr = ctx.createRadialGradient(
       _me.x-_camX, _me.y-_camY, TILE*0.5,
@@ -866,31 +717,33 @@ const EventUno = (() => {
     ctx.fillRect(0,0,cw,ch);
   }
 
-  // ─── HUD ───
   function _drawHUD(ctx, cw, ch) {
     const me = _getMyPlayer();
-
-    // بطاقة الهدف
     const tx = cw/2, ty = 14;
     ctx.fillStyle='rgba(0,0,0,0.85)';
-    ctx.fillRect(tx-60, ty, 120, 40);
+    ctx.fillRect(tx-60, ty, 40, 40);
     ctx.strokeStyle='#f0c040';
     ctx.lineWidth=2;
-    ctx.strokeRect(tx-60, ty, 120, 40);
-    Utils.drawPixelText(ctx,'الهدف:', tx-40, ty+6,
-      {font:'6px "Press Start 2P"',color:'#aaa',align:'left'});
+    ctx.strokeRect(tx-60, ty, 40, 40);
     if (_targetCard) {
       const colorMap={red:'#cc1111',blue:'#1144cc',green:'#118811',yellow:'#ccaa00'};
-      ctx.fillStyle=colorMap[_targetCard.color]||'#fff';
-      ctx.fillRect(tx+10, ty+6, 18, 26);
+      const bg = colorMap[_targetCard.color]||'#fff';
+      Utils.drawPixelRect(ctx, tx-51, ty+6, 22, 28, 3, '#fff', '#111', 1);
+      Utils.drawPixelRect(ctx, tx-49, ty+8, 18, 24, 2, bg);
+      ctx.save();
+      ctx.translate(tx-40, ty+20);
+      ctx.rotate(-Math.PI / 6);
       ctx.fillStyle='#fff';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle=bg;
       ctx.font='bold 11px "Press Start 2P"';
       ctx.textAlign='center';
       ctx.textBaseline='middle';
-      ctx.fillText(_targetCard.number.toString(), tx+19, ty+19);
+      ctx.fillText(_targetCard.number.toString(), tx-40, ty+21);
     }
-
-    // عداد الوقت
     const timerColor = _roundTimer<4 ? '#ff0088' : '#f0c040';
     const timerPulse = _roundTimer<4 ? 0.7+Math.sin(Date.now()/100)*0.3 : 1;
     ctx.save();
@@ -898,8 +751,6 @@ const EventUno = (() => {
     Utils.drawPixelText(ctx, Math.ceil(_roundTimer)+'s', cw/2, 58,
       {font:'10px "Press Start 2P"',color:timerColor,align:'center'});
     ctx.restore();
-
-    // القلوب
     if (me) {
       let h='';
       for(let i=0;i<me.hearts;i++) h+='❤️';
@@ -907,8 +758,6 @@ const EventUno = (() => {
       ctx.textAlign='left';
       ctx.fillText(h, 14, 24);
     }
-
-    // العداد العكسي
     if (_phase==='countdown' && _countdownT>0) {
       const n = Math.ceil(_countdownT);
       ctx.save();
@@ -924,18 +773,12 @@ const EventUno = (() => {
       ctx.fillText(n===3?'3':n===2?'2':'GO!', 0, 0);
       ctx.restore();
     }
-
-    // شريط الدفع + التفادي
     _drawChargeBar(ctx, 14, ch-44, 80, 12, _me.pushCharge, '#ff4400', '👊');
     _drawChargeBar(ctx, 14, ch-26, 80, 12, _me.dodgeCharge,'#00aaff', '💨');
-
-    // نص الطور
     if (_phase==='result') {
       Utils.drawPixelText(ctx,'نهاية الجولة...', cw/2, ch/2-20,
         {font:'8px "Press Start 2P"',color:'#f0c040',align:'center'});
     }
-
-    // رقم الجولة
     Utils.drawPixelText(ctx,`R${_roundNum}`, 14, ch-60,
       {font:'6px "Press Start 2P"',color:'#888',align:'left'});
   }
@@ -953,7 +796,6 @@ const EventUno = (() => {
     ctx.fillText(icon, x+w+2, y+h-1);
   }
 
-  // ─── بطاقة الأكشن ───
   function _drawActionCard(ctx, cw, ch) {
     if (!_actionCard) return;
     const labels={
@@ -974,12 +816,8 @@ const EventUno = (() => {
       {font:'5px "Press Start 2P"',color:'#fff',align:'center'});
   }
 
-  // ═══════════════════════════════
-  //  BUILD UI (أزرار الدفع والتفادي)
-  // ═══════════════════════════════
   function _buildUI() {
     if (document.getElementById('uno-btns')) return;
-
     const wrap = document.createElement('div');
     wrap.id = 'uno-btns';
     wrap.style.cssText=[
@@ -989,15 +827,12 @@ const EventUno = (() => {
       'grid-template-rows:44px 44px 44px',
       'gap:4px','pointer-events:auto',
     ].join(';');
-
     const btnStyle=(bg)=>[
       `background:${bg}`,'border:2px solid rgba(255,255,255,0.4)',
       'color:#fff','font-size:16px','cursor:pointer',
       'border-radius:6px','display:flex',
       'align-items:center','justify-content:center',
     ].join(';');
-
-    // ترتيب الشبكة: فوق/وسط/تحت
     const btns=[
       {id:'uno-up',   icon:'⬆', dir:'up',    col:2, row:1, bg:'#333'},
       {id:'uno-left', icon:'⬅', dir:'left',  col:1, row:2, bg:'#333'},
@@ -1005,7 +840,6 @@ const EventUno = (() => {
       {id:'uno-right',icon:'➡', dir:'right', col:3, row:2, bg:'#333'},
       {id:'uno-down', icon:'⬇', dir:'down',  col:2, row:3, bg:'#333'},
     ];
-
     for (const b of btns) {
       const btn=document.createElement('button');
       btn.id=b.id;
@@ -1023,7 +857,6 @@ const EventUno = (() => {
       });
       wrap.appendChild(btn);
     }
-
     document.body.appendChild(wrap);
   }
 
@@ -1032,9 +865,6 @@ const EventUno = (() => {
     if(el) el.remove();
   }
 
-  // ═══════════════════════════════
-  //  HELPERS
-  // ═══════════════════════════════
   function _getMyPlayer() {
     return _players.find(p=>p.id===_myId) || null;
   }
@@ -1046,15 +876,17 @@ const EventUno = (() => {
     return list;
   }
 
-  // ═══════════════════════════════
-  //  EXIT
-  // ═══════════════════════════════
   function exit() {
     _active = false;
     _removeUI();
-    EventManager._startTransition('out', () => {
-      UI.showToast('عدت إلى العالم 🌍', 2000);
-    });
+    if (typeof UI !== 'undefined' && UI.toggleWorldHUD) {
+      UI.toggleWorldHUD(true);
+    }
+    if (typeof EventManager !== 'undefined') {
+      EventManager.startTransitionOut(() => {
+        UI.showToast('عدت إلى العالم 🌍', 2000);
+      });
+    }
   }
 
   function isActive() { return _active; }

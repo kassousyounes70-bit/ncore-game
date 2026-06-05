@@ -33,7 +33,6 @@ const Chat = (() => {
     }
   }
 
-  // ✅ جديد: هل يوجد فقاعة نشطة لهذا الـ id؟
   function hasBubble(id) {
     return activeBubbles.has(id);
   }
@@ -187,7 +186,19 @@ const Chat = (() => {
     activeBubbles.set(playerId, { text, timer: duration });
   }
 
-  const exported = { init, update, drawBubbles, addBubble, hasBubble };
+  function showBtn() {
+    if(chatBtn) { chatBtn.classList.remove('hidden'); chatBtn.style.display = 'block'; }
+  }
+
+  function hideBtn() {
+    if(chatModal) {
+      chatModal.style.display = 'none';
+      chatModal.classList.add('hidden');
+    }
+    if(chatBtn) { chatBtn.classList.add('hidden'); chatBtn.style.display = 'none'; }
+  }
+
+  const exported = { init, update, drawBubbles, addBubble, hasBubble, showBtn, hideBtn };
   if (typeof window !== 'undefined') window.Chat = exported;
   return exported;
 })();

@@ -17,7 +17,6 @@ const Network = (() => {
       _connected=true;_myId=_sock.id;
       const sp=GameMap.getSpawnPoint();
 
-      // جلب بيانات اللاعب من التطبيق
       let playerName='لاعب';
       if(window.AndroidApp&&typeof window.AndroidApp.getPlayerData==='function'){
         try{
@@ -40,7 +39,7 @@ const Network = (() => {
     });
     
     _sock.on('players:list', players => {
-      _players.clear();
+      _players.clear(); 
       for(const[id,d] of Object.entries(players)) {
         if(id!==_myId) {
             _players.set(id,_mk(d));
@@ -64,24 +63,33 @@ const Network = (() => {
       if(window.Chat && id !== _myId) Chat.addBubble(id, text);
     });
 
-    _sock.on('player:left',id=>{_players.delete(id);});
-    _sock.on('disconnect',()=>{_connected=false;UI.showToast('جارِ إعادة الاتصال ⏳',2000);});
+    _sock.on('player:left',id=>{
+      _players.delete(id); 
+    });
+
+    _sock.on('disconnect',()=>{
+      _connected=false;
+      _players.clear(); 
+      UI.showToast('جارِ إعادة الاتصال ⏳',2000);
+    });
+
     _sock.on('reconnect',()=>{
       _connected=true;
+      _players.clear(); 
       const sp=GameMap.getSpawnPoint();
       _sock.emit('player:join',{
         charId: _charId,
         x: sp.x,
         y: sp.y,
         dir: 'down',
-        name: _username || playerName || 'لاعب'
+        name: _username || 'لاعب'
       });
       UI.showToast('تمت إعادة الاتصال ✅',1500);
     });
+
     _sock.on('connect_error',()=>{});
     _sock.on('error:full',()=>UI.showToast('الصالة ممتلئة! حاول لاحقاً 😅',3000));
     
-    // ========== أحداث الشرطة ==========
     _sock.on('police:alert', ({ targetId }) => {
         if (window.PoliceSystem) PoliceSystem.activate(targetId);
     });
@@ -156,19 +164,21 @@ const Network = (() => {
     }
   }
 
-  // ========== دالة قطع الاتصال الإجباري ==========
   function forceDisconnect(){
     if(_sock) _sock.disconnect();
     UI.showToast('تم إخراجك من الصالة 🚔',3000);
   }
 
-  // ========== دالة إرسال حدث الدفع (لـ Uno) ==========
   function sendPush(targetId, nx, ny){
     if(!_connected) return;
     _sock.emit('event:push', { targetId, x: nx, y: ny });
   }
 
+  function clearPlayers() {
+    _players.clear();
+  }
+
   return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,
     getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins,
-    forceDisconnect, sendPush};
+    forceDisconnect, sendPush, clearPlayers};
 })();
