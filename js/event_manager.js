@@ -236,7 +236,7 @@ const EventManager = (() => {
   }
 
   // ═══════════════════════════════
-  //  TRANSITION ANIMATION
+  //  TRANSITION ANIMATION (الداخلية)
   // ═══════════════════════════════
   function _startTransition(dir, onDone) {
     _transitioning    = true;
@@ -245,7 +245,7 @@ const EventManager = (() => {
     _onTransitionDone = onDone;
   }
 
-  function updateTransition(delta) {
+  function _updateTransition(delta) {
     if (!_transitioning) return;
     _transitionT += delta;
 
@@ -254,6 +254,11 @@ const EventManager = (() => {
       _transitionT   = 0;
       if (_onTransitionDone) { _onTransitionDone(); _onTransitionDone = null; }
     }
+  }
+
+  // الواجهة العامة للتحديث (تستدعي الدالة الداخلية)
+  function updateTransition(delta) {
+    _updateTransition(delta);
   }
 
   function drawTransition(ctx, cw, ch) {
@@ -297,7 +302,7 @@ const EventManager = (() => {
   //  UPDATE
   // ═══════════════════════════════
   function update(delta) {
-    updateTransition(delta);
+    _updateTransition(delta); // استدعاء الدالة الداخلية
 
     const pr   = Player.getRect();
     const door = GameMap.getEventDoorRect();
@@ -367,5 +372,8 @@ const EventManager = (() => {
   function isTransitioning(){ return _transitioning; }
   function startTransitionOut(onDone) { _startTransition('out', onDone); }
 
-  return { init, update, drawPrompt, drawTransition, tryOpenMenu, closeMenu, isNearDoor, isTransitioning, startTransitionOut };
+  return {
+    init, update, drawPrompt, drawTransition, updateTransition,
+    tryOpenMenu, closeMenu, isNearDoor, isTransitioning, startTransitionOut
+  };
 })();

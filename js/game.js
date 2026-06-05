@@ -31,7 +31,9 @@ const Game = (() => {
     Player.init(charId);NPC.init();
     Camera.snapTo(Player.getCenterX(), Player.getCenterY());
     UI.showHUD(Player.getCharName());
-    Joystick.show();_regInteract();
+    Joystick.show();
+    _regInteract();
+    _regLobbyClick(); // إضافة مستمع النقر المباشر للوبي
     Network.connect(charId,()=>UI.showToast('مرحباً بك في صالة الألعاب! 🎮',2500));
     _state=S.PLAYING;_last=performance.now();_raf=requestAnimationFrame(_loop);
   }
@@ -143,6 +145,20 @@ const Game = (() => {
     ctx.fillStyle=gr;ctx.fillRect(0,0,w,h);
   }
 
+  // مستمع النقر المباشر على canvas للوبي (بدون زر التفاعل)
+  function _regLobbyClick(){
+    _cvs.addEventListener('click', e => {
+      if(!EventLobby.isActive()) return;
+      EventLobby.handleTap(e.clientX, e.clientY);
+    });
+    _cvs.addEventListener('touchend', e => {
+      if(!EventLobby.isActive()) return;
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      EventLobby.handleTap(t.clientX, t.clientY);
+    }, {passive: false});
+  }
+
   function _regInteract(){
     const interactBtn = Utils.$('interact-btn');
     if (interactBtn) {
@@ -150,7 +166,10 @@ const Game = (() => {
         e.preventDefault();
         // إذا كان اللوبي نشطاً، نتعامل مع الضغط داخله (مثل زر الخروج)
         if(EventLobby.isActive()){
-          EventLobby.handleTap(e.clientX, e.clientY);
+          // استخراج الإحداثيات بشكل صحيح للمس أو الفأرة
+          const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+          const cy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+          EventLobby.handleTap(cx, cy);
           return;
         }
         if(Devices.hasActive()) Devices.close();
