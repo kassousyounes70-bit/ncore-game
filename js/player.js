@@ -2,17 +2,13 @@
 const Player = (() => {
   const SPEED=160,W=24,H=28,FRAME_TIME=0.14;
   let _x=0,_y=0,_dir='down',_frame=0,_ft=0,_moving=false,_charId=0;
-  // ✅ مؤقت تحريك الفم (يتبدل بين مفتوح/مغلق)
   let _mouthOpen=false,_mouthT=0;
-  const MOUTH_SPEED=0.12; // ثانية لكل نبضة
+  const MOUTH_SPEED=0.12;
 
-  // أنيميشن السحب
   let _dragged=false,_dragT=0,_dragTargetX=0,_dragTargetY=0;
   const DRAG_SPEED=200;
 
-  function preload(){
-    // تم إزالة تحميل الصور الخارجية، الكود الآن يعتمد حصرياً على الرسم البرمجي السريع
-  }
+  function preload(){}
 
   function init(charId){
     _charId=charId;
@@ -22,7 +18,6 @@ const Player = (() => {
   }
 
   function update(delta){
-    // أنيميشن السحب
     if(_dragged){
       _dragT+=delta;
       const dx=_dragTargetX-_x, dy=_dragTargetY-_y;
@@ -50,7 +45,6 @@ const Player = (() => {
       _ft+=delta;if(_ft>=FRAME_TIME){_ft-=FRAME_TIME;_frame=(_frame+1)%3;}
     } else {_frame=0;_ft=0;}
 
-    // ✅ تحديث مؤقت الفم — يتحرك فقط عندما توجد فقاعة نشطة
     const talking = typeof Chat!=='undefined' && Chat.hasBubble('me');
     if(talking){
       _mouthT+=delta;
@@ -67,22 +61,17 @@ const Player = (() => {
     if(c) c.draw(ctx,_x,_y,_dir,_frame,_moving,_mouthOpen);
   }
 
-  // ✅ دالة مشتركة لرسم الفم — تُستخدم في كل الشخصيات
   function _mouth(ctx,x,y,dir,open,skinColor){
-    // الفم يظهر فقط للاتجاهين down و right (الوجه مرئي)
     if(dir==='up') return;
     const mx=x+(dir==='left'?8:dir==='right'?10:9);
     const my=y+12;
     if(open){
-      // فم مفتوح — فتحة صغيرة داكنة
       ctx.fillStyle='#3a1a0a';
       ctx.fillRect(mx,my,4,2);
-      // شفاه
       ctx.fillStyle=skinColor||'#c8785a';
       ctx.fillRect(mx-1,my-1,6,1);
       ctx.fillRect(mx-1,my+2,6,1);
     } else {
-      // فم مغلق — خط صغير
       ctx.fillStyle='#9a5040';
       ctx.fillRect(mx,my,4,1);
     }
@@ -90,7 +79,7 @@ const Player = (() => {
 
   const CHARS=[
     { name:'فتى النار',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#c83020';ctx.fillRect(x+6,y+12,12,14);
         _legs(ctx,x,y,frame,moving,'#8B1010','#c83020');
         _arms(ctx,x,y,dir,frame,moving,'#c83020');
@@ -103,7 +92,7 @@ const Player = (() => {
       }
     },
     { name:'فتاة الماء',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#2080e0';ctx.fillRect(x+5,y+12,14,16);
         ctx.fillStyle='#4090f0';ctx.fillRect(x+7,y+14,10,8);
         _legs(ctx,x,y,frame,moving,'#1060c0','#2080e0');
@@ -117,7 +106,7 @@ const Player = (() => {
       }
     },
     { name:'Hobo',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#6b4226';ctx.fillRect(x+5,y+12,14,15);
         ctx.fillStyle='#8b5a30';ctx.fillRect(x+8,y+14,5,5);
         _legs(ctx,x,y,frame,moving,'#4a2e18','#6b4226');
@@ -131,7 +120,7 @@ const Player = (() => {
       }
     },
     { name:'Stickman',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.strokeStyle='#fff';ctx.lineWidth=2;
         ctx.beginPath();ctx.arc(x+12,y+7,6,0,Math.PI*2);ctx.stroke();
         ctx.beginPath();ctx.moveTo(x+12,y+13);ctx.lineTo(x+12,y+24);ctx.stroke();
@@ -142,13 +131,12 @@ const Player = (() => {
         ctx.beginPath();ctx.moveTo(x+12,y+24);ctx.lineTo(x+6,y+32+ls);ctx.stroke();
         ctx.beginPath();ctx.moveTo(x+12,y+24);ctx.lineTo(x+18,y+32-ls);ctx.stroke();
         ctx.fillStyle='#fff';ctx.fillRect(x+9,y+5,2,2);ctx.fillRect(x+13,y+5,2,2);
-        // فم Stickman بسيط (خط أبيض)
         if(talking){ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x+12,y+9,2,0,Math.PI);ctx.stroke();}
         else{ctx.fillStyle='#fff';ctx.fillRect(x+10,y+10,4,1);}
       }
     },
     { name:'النينجا',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#1a6b1a';ctx.fillRect(x+5,y+12,14,15);
         _legs(ctx,x,y,frame,moving,'#0f4f0f','#1a6b1a');
         _arms(ctx,x,y,dir,frame,moving,'#1a6b1a');
@@ -158,13 +146,11 @@ const Player = (() => {
         ctx.fillStyle='#f00';ctx.fillRect(x+8,y+7,2,2);ctx.fillRect(x+14,y+7,2,2);
         ctx.fillStyle='#cc2200';ctx.fillRect(x+4,y+4,16,2);
         if(dir==='right'){ctx.fillStyle='#c0c0c0';ctx.fillRect(x+19,y+10,10,2);ctx.fillStyle='#8b4513';ctx.fillRect(x+18,y+9,4,4);}
-        // النينجا وجهه مغطى — الفم يظهر فقط كعيون حمراء تتغير (لا فم)
-        // لكن إذا يتكلم نُظهر إشارة صغيرة أسفل الغطاء
         if(talking&&dir!=='up'){ctx.fillStyle='rgba(255,255,255,0.4)';ctx.fillRect(x+8,y+11,8,1);}
       }
     },
     { name:'الزومبي',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#5a7a3a';ctx.fillRect(x+5,y+12,14,15);
         _legs(ctx,x,y,frame,moving,'#3a5a2a','#5a7a3a');
         if(dir==='down'||dir==='right'){ctx.fillStyle='#5a7a3a';ctx.fillRect(x-4,y+14,8,4);ctx.fillRect(x+20,y+14,8,4);}
@@ -172,13 +158,12 @@ const Player = (() => {
         ctx.fillStyle='#6a8a4a';ctx.fillRect(x+5,y+2,14,13);
         ctx.fillStyle='#2a1a0a';ctx.fillRect(x+4,y,4,5);ctx.fillRect(x+10,y-2,3,4);ctx.fillRect(x+16,y,4,5);
         ctx.fillStyle='#cc0000';ctx.fillRect(x+7,y+6,3,3);ctx.fillRect(x+14,y+6,3,3);
-        // فم الزومبي — متشقق دائماً
         ctx.fillStyle='#8b0000';ctx.fillRect(x+9,y+10,6,2);
         if(talking&&dir!=='up'){ctx.fillStyle='#3a0000';ctx.fillRect(x+10,y+10,4,3);}
       }
     },
     { name:'الفارس',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#a0a0b0';ctx.fillRect(x+4,y+11,16,16);
         ctx.fillStyle='#c0c0d0';ctx.fillRect(x+6,y+13,12,10);
         _legs(ctx,x,y,frame,moving,'#606070','#a0a0b0');
@@ -188,12 +173,11 @@ const Player = (() => {
         ctx.fillStyle='#505058';ctx.fillRect(x+7,y+5,10,6);
         ctx.fillStyle='#ffff00';ctx.fillRect(x+8,y+6,3,3);ctx.fillRect(x+13,y+6,3,3);
         if(dir==='right'||dir==='down'){ctx.fillStyle='#d0d0d0';ctx.fillRect(x+20,y+8,3,18);ctx.fillStyle='#c8a000';ctx.fillRect(x+18,y+12,7,3);}
-        // الفارس يرتدي خوذة — فتحة صغيرة للفم
         if(talking&&dir!=='up'){ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(x+9,y+10,6,2);}
       }
     },
     { name:'الروبوت',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#4a6080';ctx.fillRect(x+4,y+12,16,15);
         ctx.fillStyle='#5a7090';ctx.fillRect(x+6,y+14,12,9);
         ctx.fillStyle='#40c0f0';ctx.fillRect(x+8,y+15,4,4);
@@ -204,11 +188,9 @@ const Player = (() => {
         ctx.fillStyle='#4a6080';ctx.fillRect(x+6,y+3,12,9);
         ctx.fillStyle=moving?'#00ff00':'#ff4400';
         ctx.fillRect(x+7,y+5,4,4);ctx.fillRect(x+13,y+5,4,4);
-        // شبكة LED
         ctx.fillStyle='#40c0f0';for(let i=0;i<4;i++)ctx.fillRect(x+7+i*3,y+10,2,2);
         ctx.fillStyle='#a0b0c0';ctx.fillRect(x+11,y-4,2,6);
         ctx.fillStyle='#f00';ctx.fillRect(x+10,y-5,4,2);
-        // فم الروبوت — LED تومض
         if(dir!=='up'){
           ctx.fillStyle=talking?'#00ffff':'#204060';
           for(let i=0;i<4;i++)ctx.fillRect(x+7+i*3,y+10,2,2);
@@ -216,7 +198,7 @@ const Player = (() => {
       }
     },
     { name:'الساحرة',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#4a1a6a';ctx.fillRect(x+4,y+12,16,16);
         ctx.fillStyle='#6a2a8a';ctx.fillRect(x+6,y+14,12,10);
         ctx.fillStyle='#f0d020';ctx.fillRect(x+7,y+15,2,2);ctx.fillRect(x+14,y+18,2,2);
@@ -232,7 +214,7 @@ const Player = (() => {
       }
     },
     { name:'اللص',
-      draw(ctx,x,y,dir,frame,moving,talking){
+      draw(ctx,x,y,dir,frame,moving,talking=false){
         ctx.fillStyle='#1a1a1a';ctx.fillRect(x+5,y+12,14,15);
         ctx.fillStyle='#2a2a2a';ctx.fillRect(x+7,y+14,10,9);
         _legs(ctx,x,y,frame,moving,'#111','#1a1a1a');
@@ -275,7 +257,6 @@ const Player = (() => {
   function getCharId(){return _charId;}
   function getCharName(){return CHARS[_charId]?.name||'';}
 
-  // دالة بدء السحب إلى نقطة التولد
   function startDragToSpawn(){
     const spawn=GameMap.getSpawnPoint();
     _dragTargetX=spawn.x;

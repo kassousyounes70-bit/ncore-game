@@ -7,12 +7,12 @@ const UI = (() => {
     const bar=Utils.$('loading-bar'),pct=Utils.$('loading-percent'),lbl=Utils.$('loading-label');
     let prog=0;
     const steps=[
-      {t:15,d:120,l:'تحميل الأصوات...'},
-      {t:35,d:200,l:'بناء الخريطة...'},
-      {t:60,d:300,l:'رسم الشخصيات...'},
-      {t:80,d:200,l:'إعداد الأجهزة...'},
-      {t:95,d:150,l:'تهيئة العالم...'},
-      {t:100,d:100,l:'جاهز! 🎮'}
+      {t:15,d:120,l:' ...'},
+      {t:35,d:200,l:' ...'},
+      {t:60,d:300,l:' ...'},
+      {t:80,d:200,l:' ...'},
+      {t:95,d:150,l:' ...'},
+      {t:100,d:100,l:'! '}
     ];
     let si=0;
     function next(){
@@ -115,7 +115,7 @@ const UI = (() => {
 
   function showHUD(name){
     Utils.show('hud');
-    const el=Utils.$('hud-character-name');if(el)el.textContent='⚡ '+name;
+    const el=Utils.$('hud-character-name');if(el)el.textContent=' '+name;
   }
   function hideHUD(){Utils.hide('hud');}
 
@@ -133,7 +133,7 @@ const UI = (() => {
       ].join(';');
       document.body.appendChild(el);
     }
-    el.textContent='🪙 '+amount;
+    el.textContent=' '+amount;
   }
 
   let _toast=null,_toastTimer=null;
@@ -158,18 +158,21 @@ const UI = (() => {
 
   function toggleWorldHUD(show) {
     const interactBtn = Utils.$('interact-btn');
+    const chatBtn = Utils.$('chat-action-btn');
+    const reportBtn = Utils.$('report-btn');
+    
     if (show) {
       if (interactBtn) interactBtn.style.display = 'block';
-      if (typeof Joystick !== 'undefined' && Joystick.show) Joystick.show();
-      if (typeof Chat !== 'undefined' && Chat.showBtn) Chat.showBtn();
-      if (typeof Report !== 'undefined' && Report.showReportBtn) Report.showReportBtn();
+      if (chatBtn) chatBtn.style.display = 'block';
+      if (reportBtn) reportBtn.style.display = 'block';
       if (typeof MiniMap !== 'undefined' && MiniMap.show) MiniMap.show();
+      if (typeof Joystick !== 'undefined' && Joystick.show) Joystick.show();
     } else {
       if (interactBtn) interactBtn.style.display = 'none';
-      if (typeof Joystick !== 'undefined' && Joystick.hide) Joystick.hide();
-      if (typeof Chat !== 'undefined' && Chat.hideBtn) Chat.hideBtn();
-      if (typeof Report !== 'undefined' && Report.hideReportBtn) Report.hideReportBtn();
+      if (chatBtn) chatBtn.style.display = 'none';
+      if (reportBtn) reportBtn.style.display = 'none';
       if (typeof MiniMap !== 'undefined' && MiniMap.hide) MiniMap.hide();
+      // : Joystick.hide()        
     }
   }
 
