@@ -45,12 +45,14 @@ const Game = (() => {
   function _update(delta){
     // إذا كان اللوبي نشطاً، نحدّث اللوبي فقط ونخرج
     if(EventLobby.isActive()){
+      Joystick.update();
       EventLobby.update(delta);
       EventManager.updateTransition(delta);
       return;
     }
     // إذا كانت لعبة Uno نشطة، نحدّثها ونخرج
     if(EventUno.isActive()){
+      Joystick.update();
       EventUno.update(delta);
       EventManager.updateTransition(delta);
       return;
@@ -79,7 +81,6 @@ const Game = (() => {
   }
 
   function _draw(){
-    console.log('[Game] _draw running');
     const ctx = _ctx;
     const cw = _cvs.width, ch = _cvs.height;
     ctx.fillStyle = '#050510';

@@ -120,6 +120,10 @@ const EventLobby = (() => {
     if (!_active) return;
     const cw = window.innerWidth, ch = window.innerHeight;
 
+    // لا نرسم لو كانت نافذة الدردشة مفتوحة
+    const chatModal = document.getElementById('chat-modal');
+    if (chatModal && chatModal.style.display === 'flex') return;
+
     ctx.fillStyle = '#05000f';
     ctx.fillRect(0, 0, cw, ch);
 

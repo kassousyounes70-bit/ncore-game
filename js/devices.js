@@ -92,8 +92,9 @@ const Devices = (() => {
     _promptT+=delta*3;
     _promptA=(_near&&!_active)?0.6+Math.sin(_promptT)*0.4:0;
 
-    // التحقق من قرب باب الفعاليات
-    const nearEventDoor = (typeof EventManager !== 'undefined' && EventManager.isNearDoor && !_active);
+    // التحقق من قرب باب الفعاليات (استدعاء الدالة بشكل صحيح)
+    const nearEventDoor = (typeof EventManager !== 'undefined' && 
+      EventManager.isNearDoor && EventManager.isNearDoor() && !_active);
 
     if(_interactBtn){
       // إظهار الزر إذا كان هناك جهاز قريب أو باب الفعاليات قريب
