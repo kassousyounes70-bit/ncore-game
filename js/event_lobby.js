@@ -83,6 +83,27 @@ const EventLobby = (() => {
     } catch (e) {}
   }
 
+  function _startWithBots() {
+    if (!_active) return;
+    clearInterval(_pollInterval);
+    _players = [];
+    _players.push({
+      id: 'bot_pro_' + Date.now(),
+      name: '🤖 محترف',
+      charId: 7,
+      isBot: true,
+      botLevel: 'pro'
+    });
+    _players.push({
+      id: 'bot_noob_' + Date.now(),
+      name: '🤖 مبتدئ',
+      charId: 5,
+      isBot: true,
+      botLevel: 'noob'
+    });
+    _startGame();
+  }
+
   function _startGame() {
     _active = false;
     if (_eventId === 'cursed_uno') {
@@ -233,6 +254,14 @@ const EventLobby = (() => {
     ctx.strokeRect(cw - 110, ch - 44, 100, 32);
     Utils.drawPixelText(ctx, '✖ خروج', cw - 60, ch - 36,
       { font: '6px "Press Start 2P"', color: '#ff0088', align: 'center' });
+
+    ctx.fillStyle = 'rgba(10,30,10,0.9)';
+    ctx.fillRect(10, ch - 44, 150, 32);
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(10, ch - 44, 150, 32);
+    Utils.drawPixelText(ctx, '🤖 بدء تجربة مع آليين', 85, ch - 36,
+      { font: '6px "Press Start 2P"', color: '#00ff88', align: 'center' });
   }
 
   function _drawCenteredGlitchTitle(ctx) {
@@ -266,10 +295,17 @@ const EventLobby = (() => {
   function handleTap(x, y) {
     if (!_active) return false;
     const cw = window.innerWidth, ch = window.innerHeight;
+    
     if (x > cw - 115 && x < cw - 5 && y > ch - 50 && y < ch - 8) {
       exit();
       return true;
     }
+
+    if (x > 10 && x < 160 && y > ch - 50 && y < ch - 8) {
+      _startWithBots();
+      return true;
+    }
+
     return false;
   }
 

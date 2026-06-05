@@ -55,6 +55,9 @@ const EventUno = (() => {
     _players = players.map((p, i) => ({
       id       : p.id,
       name     : p.name || 'لاعب',
+      isBot    : p.isBot || false,
+      botLevel : p.botLevel || 'noob',
+      target   : null,
       x        : 2.5 * TILE,
       y        : (1 + i % (GRID_ROWS-2)) * TILE,
       hearts   : 3,
@@ -229,6 +232,7 @@ const EventUno = (() => {
       p.y = (1 + i % (GRID_ROWS-2)) * TILE;
       p.card  = null;
       p.card2 = null;
+      p.target = null;
     });
   }
 
@@ -268,11 +272,141 @@ const EventUno = (() => {
       }
     }
     _updateMe(delta);
+    _updateBots(delta);
     if (_me.pushCharge  < 1) _me.pushCharge  += delta / PUSH_CHARGE;
     if (_me.dodgeCharge < 1) _me.dodgeCharge += delta / DODGE_CHARGE;
     _me.pushCharge  = Math.min(1, _me.pushCharge);
     _me.dodgeCharge = Math.min(1, _me.dodgeCharge);
     if (_roundTimer <= 0) _endRound();
+  }
+
+  function _updateBots(delta) {
+    for (const p of _players) {
+      if (p.isBot && p.alive && !p.spectating) {
+        _updateBot(p, delta);
+      }
+    }
+  }
+
+  function _updateBot(p, delta) {
+    if (_laserOn) {
+      p.moving = false;
+      p.frame = 0;
+      return;
+    }
+    const inCapsule = _capsules.some(c => c.occupants.includes(p.id));
+    if (inCapsule) {
+      p.moving = false;
+      p.frame = 0;
+      return;
+    }
+    if (!p.card) {
+      if (!p.target || p.target.taken) {
+         p.target = _findBestCardForBot(p);
+      }
+      if (p.target) {
+         _moveBotToward(p, p.target.x, p.target.y, delta);
+      }
+      _checkBotPickupCard(p);
+    } else {
+      if (!p.target || !p.target.open) {
+         p.target = _findBestCapsuleForBot(p);
+      }
+      if (p.target) {
+         _moveBotToward(p, p.target.x + p.target.w/2, p.target.y + p.target.h/2, delta);
+      }
+      _checkBotCapsuleEntry(p);
+    }
+    _checkFragile(p);
+  }
+
+  function _findBestCardForBot(p) {
+    let best = null, minDist = Infinity;
+    for (const c of _cards) {
+      if (c.taken) continue;
+      const isCorrect = c.color === _targetCard.color || c.number === _targetCard.number;
+      if (p.botLevel === 'pro' && !isCorrect) continue;
+      const dist = Utils.distance(p.x, p.y, c.x, c.y);
+      if (dist < minDist) { minDist = dist; best = c; }
+    }
+    if (!best && p.botLevel === 'pro') {
+       for (const c of _cards) {
+         if (c.taken) continue;
+         const dist = Utils.distance(p.x, p.y, c.x, c.y);
+         if (dist < minDist) { minDist = dist; best = c; }
+       }
+    }
+    return best;
+  }
+
+  function _findBestCapsuleForBot(p) {
+    let best = null, minDist = Infinity;
+    for (const cap of _capsules) {
+      if (!cap.open) continue;
+      const colorMatch = p.card.color === cap.color;
+      const numberMatch = p.card.number === _targetCard.number;
+      if (p.botLevel === 'pro' && !(colorMatch || numberMatch)) continue;
+      const dist = Utils.distance(p.x, p.y, cap.x + cap.w/2, cap.y + cap.h/2);
+      if (dist < minDist) { minDist = dist; best = cap; }
+    }
+    return best;
+  }
+
+  function _moveBotToward(p, tx, ty, delta) {
+    const dx = tx - p.x;
+    const dy = ty - p.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 4) { p.moving = false; p.frame = 0; return; }
+    p.moving = true;
+    const speed = (p.botLevel === 'pro' ? 140 : 100) * delta;
+    const nx = p.x + (dx/dist)*speed;
+    const ny = p.y + (dy/dist)*speed;
+    if (_canMove(nx, p.y, p)) p.x = nx;
+    if (_canMove(p.x, ny, p)) p.y = ny;
+    p.dir = Math.abs(dx) > Math.abs(dy) ? (dx>0?'right':'left') : (dy>0?'down':'up');
+    p.ft += delta;
+    if (p.ft >= 0.13) { p.ft = 0; p.frame = (p.frame+1)%3; }
+  }
+
+  function _checkBotPickupCard(p) {
+    for (const c of _cards) {
+      if (c.taken) continue;
+      if (Utils.distance(p.x, p.y, c.x, c.y) < 28) {
+        c.taken = true;
+        p.card = c;
+        p.target = null;
+        break;
+      }
+    }
+  }
+
+  function _checkBotCapsuleEntry(p) {
+    if (!p.card) return;
+    for (const cap of _capsules) {
+      if (!cap.open) continue;
+      if (Utils.distance(p.x, p.y, cap.x + cap.w/2, cap.y + cap.h/2) <= 36) {
+        const colorMatch = p.card.color === cap.color;
+        const numberMatch = p.card.number === _targetCard.number;
+        if (colorMatch || numberMatch) {
+          cap.occupants.push(p.id);
+        } else {
+          p.card = null;
+          p.target = null;
+        }
+        break;
+      }
+    }
+  }
+
+  function _loseHeartBot(p) {
+    p.hearts--;
+    if (p.hearts <= 0) {
+      p.alive = false;
+    } else {
+      p.spectating = true;
+      p.x = _reversed ? WORLD_W - TILE : TILE/2;
+      p.y = WORLD_H/2;
+    }
   }
 
   function _updateMe(delta) {
@@ -286,8 +420,8 @@ const EventUno = (() => {
       const spd = 160 * delta;
       const nx  = _me.x + jx * spd;
       const ny  = _me.y + jy * spd;
-      if (_canMove(nx, _me.y)) _me.x = Utils.clamp(nx, 0, WORLD_W);
-      if (_canMove(_me.x, ny)) _me.y = Utils.clamp(ny, 0, WORLD_H);
+      if (_canMove(nx, _me.y, null)) _me.x = Utils.clamp(nx, 0, WORLD_W);
+      if (_canMove(_me.x, ny, null)) _me.y = Utils.clamp(ny, 0, WORLD_H);
       _me.ft += delta;
       if (_me.ft >= 0.13) { _me.ft=0; _me.frame=(_me.frame+1)%3; }
     } else {
@@ -300,8 +434,14 @@ const EventUno = (() => {
     _checkFragile(_me);
   }
 
-  function _canMove(nx, ny) {
+  function _canMove(nx, ny, entity = null) {
     if (nx < 0 || nx > WORLD_W || ny < 0 || ny > WORLD_H) return false;
+    if (entity && entity.isBot) {
+      if (entity.spectating || !entity.alive) return true;
+    } else {
+      const mePlayer = _getMyPlayer();
+      if (mePlayer && (mePlayer.spectating || !mePlayer.alive)) return true;
+    }
     const laserX = _reversed ? GRID_END_COL*TILE : SAFE_ZONE_COLS*TILE;
     if (_laserOn) {
       if (!_reversed && nx > laserX - 10) return false;
@@ -358,9 +498,10 @@ const EventUno = (() => {
     for (const f of _fragiles) {
       if (f.state === 'fallen') {
         const onFallen = entity.x > f.x && entity.x < f.x+f.w && entity.y > f.y && entity.y < f.y+f.h;
-        if (onFallen && entity === _me && !f.steppedBy.includes(entityId)) {
+        if (onFallen && !f.steppedBy.includes(entityId)) {
           f.steppedBy.push(entityId);
-          _loseHeart();
+          if (entity === _me) _loseHeart();
+          else if (entity.isBot) _loseHeartBot(entity);
         }
         continue;
       }
@@ -374,6 +515,7 @@ const EventUno = (() => {
         } else if (f.state === 'cracked') {
           f.state = 'fallen';
           if (entity === _me) _loseHeart();
+          else if (entity.isBot) _loseHeartBot(entity);
         }
       } else if (!onTile && wasOnTile) {
         f.steppedBy = f.steppedBy.filter(id => id !== entityId);
@@ -404,6 +546,12 @@ const EventUno = (() => {
     if (me && me.alive && !me.spectating) {
       const inCapsule = _capsules.some(c => c.occupants.includes(_myId));
       if (!inCapsule) _loseHeart();
+    }
+    for (const p of _players) {
+      if (p.isBot && p.alive && !p.spectating) {
+         const inCapsule = _capsules.some(c => c.occupants.includes(p.id));
+         if (!inCapsule) _loseHeartBot(p);
+      }
     }
     _players.forEach(p => { p.spectating = false; });
     if (me && me.alive) me.spectating = false;
