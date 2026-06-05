@@ -1,0 +1,193 @@
+'use strict';
+const Chat = (() => {
+  const MAX_CHARS = 100;
+  const activeBubbles = new Map();
+  let chatBtn, chatModal, chatInput, chatSendBtn, chatCloseBtn;
+
+  function init() {
+    chatBtn      = Utils.$('chat-action-btn');
+    chatModal    = Utils.$('chat-modal');
+    chatInput    = Utils.$('chat-input');
+    chatSendBtn  = Utils.$('chat-send-btn');
+    chatCloseBtn = Utils.$('chat-close-btn');
+    if(!chatInput) return;
+
+    chatInput.maxLength = MAX_CHARS;
+    chatInput.addEventListener('keypress', e => { if(e.key==='Enter') sendChat(); });
+
+    if(chatBtn) { 
+      chatBtn.onclick = openChat; 
+      chatBtn.ontouchstart = e=>{ e.preventDefault(); openChat(); };
+      chatBtn.classList.remove('hidden'); 
+      chatBtn.style.display = 'block'; 
+    }
+    if(chatCloseBtn) { chatCloseBtn.onclick = closeChat; }
+    if(chatSendBtn)  { chatSendBtn.onclick  = sendChat;  }
+  }
+
+  function update(delta = 0.016) {
+    const deltaMs = delta * 1000;
+    for(const [id, b] of activeBubbles.entries()) {
+      b.timer -= deltaMs;
+      if(b.timer <= 0) activeBubbles.delete(id);
+    }
+  }
+
+  // ✅ جديد: هل يوجد فقاعة نشطة لهذا الـ id؟
+  function hasBubble(id) {
+    return activeBubbles.has(id);
+  }
+
+  function drawBubbles(ctx, myPlayer, otherPlayers) {
+    if(!ctx) return;
+    if(myPlayer && activeBubbles.has('me')) {
+      _drawBubble(ctx, myPlayer.x, myPlayer.y, activeBubbles.get('me'));
+    }
+    if(otherPlayers) {
+      for(const [id, p] of otherPlayers.entries()) {
+        if(activeBubbles.has(id)) _drawBubble(ctx, p.x, p.y, activeBubbles.get(id));
+      }
+    }
+  }
+
+  function _drawBubble(ctx, x, y, bubble) {
+    if(!ctx || !bubble) return;
+    ctx.save();
+    
+    const FONT_SIZE = 16;
+    const LINE_HEIGHT = FONT_SIZE * 1.4;
+    ctx.font = `${FONT_SIZE}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.direction = 'rtl';
+
+    const text = bubble.text;
+    const MAX_BUBBLE_WIDTH = 220;
+
+    const lines = [];
+    const words = text.split(' ');
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const width = ctx.measureText(currentLine + " " + word).width;
+      if (width < MAX_BUBBLE_WIDTH) {
+        currentLine += " " + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    lines.push(currentLine);
+
+    const finalLines = [];
+    for (const line of lines) {
+      if (ctx.measureText(line).width > MAX_BUBBLE_WIDTH) {
+        let tempLine = '';
+        for (const char of line) {
+          if (ctx.measureText(tempLine + char).width > MAX_BUBBLE_WIDTH) {
+            finalLines.push(tempLine);
+            tempLine = char;
+          } else {
+            tempLine += char;
+          }
+        }
+        if (tempLine) finalLines.push(tempLine);
+      } else {
+        finalLines.push(line);
+      }
+    }
+
+    let maxLineWidth = 0;
+    for(const line of finalLines) {
+       maxLineWidth = Math.max(maxLineWidth, ctx.measureText(line).width);
+    }
+
+    const tw = Math.max(maxLineWidth + 28, 70);
+    const th = (finalLines.length * LINE_HEIGHT) + 16;
+    const bx = x;
+
+    const tailTipY = y - 25;
+    const tailBaseY = tailTipY - 10;
+
+    let alpha = 1;
+    if(bubble.timer < 600) alpha = bubble.timer / 600;
+    ctx.globalAlpha = Math.max(0, alpha);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.strokeStyle = '#0a0a0f';
+    ctx.lineWidth = 2.5;
+    _roundRect(ctx, bx - tw/2, tailBaseY - th, tw, th, 8);
+    ctx.fill(); ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(bx-7, tailBaseY);
+    ctx.lineTo(bx+7, tailBaseY);
+    ctx.lineTo(bx,   tailTipY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.fill();
+    ctx.strokeStyle = '#0a0a0f'; ctx.lineWidth = 2;
+    
+    ctx.beginPath();
+    ctx.moveTo(bx-7, tailBaseY + 1);
+    ctx.lineTo(bx,   tailTipY);
+    ctx.lineTo(bx+7, tailBaseY + 1);
+    ctx.stroke();
+
+    ctx.fillStyle = '#0a0a0f';
+    ctx.globalAlpha = Math.max(0, alpha);
+    let textY = (tailBaseY - th) + 8 + (LINE_HEIGHT / 2);
+    for (const line of finalLines) {
+      ctx.fillText(line, bx, textY);
+      textY += LINE_HEIGHT;
+    }
+    
+    ctx.restore();
+  }
+
+  function _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+    ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+    ctx.closePath();
+  }
+
+  function openChat() {
+    if(!chatModal) return;
+    chatModal.style.display = 'flex';
+    chatModal.classList.remove('hidden');
+    if(chatBtn){ chatBtn.classList.add('hidden'); chatBtn.style.display='none'; }
+    if(chatInput){ chatInput.value=''; chatInput.focus(); }
+  }
+
+  function closeChat() {
+    if(chatModal) {
+        chatModal.style.display = 'none';
+        chatModal.classList.add('hidden');
+    }
+    if(chatBtn){ chatBtn.classList.remove('hidden'); chatBtn.style.display='block'; }
+  }
+
+  function sendChat() {
+    if(!chatInput) return;
+    const text = chatInput.value.trim().substring(0, MAX_CHARS);
+    if(text.length > 0) {
+      addBubble('me', text);
+      if(typeof Network !== 'undefined' && Network.isConnected())
+        Network.sendChat(text);
+    }
+    closeChat();
+  }
+
+  function addBubble(playerId, text) {
+    const duration = Math.min(1000 + text.length * 70, 8000);
+    activeBubbles.set(playerId, { text, timer: duration });
+  }
+
+  const exported = { init, update, drawBubbles, addBubble, hasBubble };
+  if (typeof window !== 'undefined') window.Chat = exported;
+  return exported;
+})();
