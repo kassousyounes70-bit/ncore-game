@@ -320,7 +320,7 @@ app.post('/api/ban/clear', async (req, res) => {
 const eventLobbies = new Map(); // eventId -> { players:[], timer, timerActive, started }
 
 app.post('/api/event/join', (req, res) => {
-  const { eventId, playerId, playerName } = req.body;
+  const { eventId, playerId, playerName, charId, isBot, botLevel } = req.body;
   if (!eventId || !playerId) return res.status(400).json({ error: 'Missing data' });
 
   if (!eventLobbies.has(eventId)) {
@@ -335,18 +335,23 @@ app.post('/api/event/join', (req, res) => {
   const exists = lobby.players.find(p => p.id === playerId);
   if (!exists) {
     lobby.players.push({
-      id: playerId, name: playerName || 'لاعب',
-      lobbyX: 200 + Math.random() * 400, lobbyY: 200 + Math.random() * 200
+      id: playerId,
+      name: playerName || 'لاعب',
+      charId: charId || 0,
+      isBot: isBot || false,
+      botLevel: botLevel || 'medium',
+      lobbyX: 200 + Math.random() * 400,
+      lobbyY: 200 + Math.random() * 200
     });
   }
 
-  // بدء العد أو إضافة وقت
+  // بدء العد أو إضافة وقت (العداد يديره السيرفر فقط)
   if (lobby.players.length >= 3) {
-    if (!lobby.timerActive) {
+    if (!lobby.timerActive && !lobby.started) {
       lobby.timerActive = true;
       lobby.timer = 30;
       _startLobbyTimer(eventId);
-    } else {
+    } else if (lobby.timerActive) {
       lobby.timer = Math.min(lobby.timer + 10, 60);
     }
   }
@@ -379,7 +384,7 @@ app.get('/api/event/lobby', (req, res) => {
 function _startLobbyTimer(eventId) {
   const iv = setInterval(() => {
     const lobby = eventLobbies.get(eventId);
-    if (!lobby || !lobby.timerActive) {
+    if (!lobby || !lobby.timerActive || lobby.started) {
       clearInterval(iv);
       return;
     }
@@ -398,7 +403,7 @@ function _startLobbyTimer(eventId) {
 }
 // ========== نهاية نظام الفعاليات ==========
 
-// ========== التعديل المطلوب: نقطة نهاية مزامنة الخروج ==========
+// ========== نقطة نهاية مزامنة الخروج ==========
 app.post('/api/sync-exit', async (req, res) => {
     try {
         const { username, coins } = req.body;
