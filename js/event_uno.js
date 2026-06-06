@@ -47,6 +47,12 @@ const EventUno = (() => {
   let _reversed    = false;
   let _skipApplied = false;
 
+  // متغيرات بطاقة الأكشن الجديدة
+  let _pendingAction = null;
+  let _actionTimer   = 0;
+  let _actionShown   = false;
+  let _actionDisplayT= 0;
+
   let _camX = 0, _camY = 0;
   let _sweepT = 0, _sweepDir = 1;
   let _freeCam = { x:0, y:0, active:false };
@@ -60,6 +66,8 @@ const EventUno = (() => {
     invincible:0, falling:false, fallT:0,
     jdx:0, jdy:0,
     alive:true, hearts:3, spectating:false,
+    _lostThisRound: false, // منع خسارة قلب مزدوج
+    _frozen: false,        // للتجميد في REVERSE
   };
 
   // ═══════════════════════════════
@@ -76,6 +84,8 @@ const EventUno = (() => {
     _me.pushCharge = 0; _me.dodgeCharge = 0;
     _me.heldCard = null; _me.heldCard2 = null;
     _me.invincible = 0;
+    _me._lostThisRound = false;
+    _me._frozen = false;
 
     _players = players.map((p,i)=>({
       id: p.id, name: p.name||'لاعب',
@@ -86,6 +96,8 @@ const EventUno = (() => {
       isBot: p.isBot||false, botLevel: p.botLevel||'medium',
       falling: false, fallT: 0, invincible: 0,
       _pauseT: 0,
+      _lostThisRound: false,
+      _frozen: false,
     }));
 
     _buildUI();
@@ -120,15 +132,27 @@ const EventUno = (() => {
     _roundTimer = ROUND_TIME;
     _laserOn = true; _lightsOn = true; _skipApplied = false;
     _me.heldCard = null; _me.heldCard2 = null;
+    _me._lostThisRound = false;
+    _me._frozen = false;
+
+    // إعادة تعيين متغيرات الأكشن
+    _actionCard = null;
+    _actionShown = false;
+    _actionDisplayT = 0;
+    _pendingAction = (_roundNum>1 && Math.random()<0.55)
+      ? ACTIONS[Math.floor(Math.random()*ACTIONS.length)] : null;
+    _actionTimer = _pendingAction ? Utils.randFloat(5, 20) : 0;
+
+    // إعادة تعيين علامات الخسارة والتجميد للاعبين الآخرين
+    _players.forEach(p => {
+      p._lostThisRound = false;
+      p._frozen = false;
+    });
 
     _targetCard = {
       color : COLORS[Math.floor(Math.random()*COLORS.length)],
       number: NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
     };
-
-    _actionCard = _roundNum>1 && Math.random()<0.55
-      ? ACTIONS[Math.floor(Math.random()*ACTIONS.length)] : null;
-    if(_actionCard==='reverse') _reversed=!_reversed;
 
     _buildCards();
     _buildCapsules();
@@ -172,7 +196,7 @@ const EventUno = (() => {
       });
     }
 
-    if(_actionCard==='plus2'){
+    if(_pendingAction === 'plus2'){
       for(let i=0;i<correctCount;i++){
         _cards.push({
           color:COLORS[Math.floor(Math.random()*COLORS.length)],
@@ -204,7 +228,7 @@ const EventUno = (() => {
         x: cx + TILE*0.5, y: startY + (i*TILE*3),
         w: TILE*1.5, h: TILE*2.2,
         occupantsCount:0,
-        pulseT: Math.random()*Math.PI*2, // offset للنبض
+        pulseT: Math.random()*Math.PI*2,
       });
     });
 
@@ -318,10 +342,62 @@ const EventUno = (() => {
     if(_countdownT<=0){ _phase='running'; _laserOn=false; }
   }
 
+  // دالة تطبيق بطاقة الأكشن الجديدة
+  function _applyActionCard(action) {
+    switch(action){
+      case 'skip':
+        _roundTimer = Math.max(0, _roundTimer - 5);
+        UI.showToast('⏭ SKIP! الوقت -5 ثوانٍ!', 2500);
+        break;
+
+      case 'reverse':
+        // تجميد اللاعبين لجزء من الثانية
+        _me._frozen = true;
+        _players.forEach(p=>{ p._frozen=true; });
+        setTimeout(()=>{
+          // عكس الخريطة
+          _reversed = !_reversed;
+          // نقل المواضع للجهة المعاكسة
+          const mirrorX = (x) => WORLD_W - x;
+          _me.x = mirrorX(_me.x);
+          _players.forEach(p=>{ p.x = mirrorX(p.x); });
+          _cards.forEach(c=>{ c.x = mirrorX(c.x); });
+          _capsules.forEach(c=>{ c.x = mirrorX(c.x); });
+          // إلغاء التجميد
+          _me._frozen = false;
+          _players.forEach(p=>{ p._frozen=false; });
+          UI.showToast('🔄 REVERSE! الخريطة انقلبت!', 2500);
+        }, 600); // 0.6 ثانية تجميد
+        break;
+
+      case 'plus2':
+        UI.showToast('+2 🃏 التقط بطاقتين!', 2500);
+        break;
+
+      case 'wild':
+        _lightsOn = false;
+        UI.showToast('🌑 WILD! انطفأت الأنوار!', 2500);
+        break;
+    }
+  }
+
   function _updateRunning(delta) {
     _roundTimer-=delta;
 
-    if(_actionCard==='skip'&&!_skipApplied&&_roundTimer<=15){
+    // ظهور بطاقة الأكشن أثناء الجولة
+    if(_pendingAction && !_actionShown){
+      _actionTimer -= delta;
+      if(_actionTimer <= 0){
+        _actionShown = true;
+        _actionCard  = _pendingAction;
+        _actionDisplayT = 3.0; // تظهر على الشاشة 3 ثوانٍ
+        _applyActionCard(_actionCard);
+      }
+    }
+    // عداد عرض البطاقة
+    if(_actionDisplayT > 0) _actionDisplayT -= delta;
+
+    if(_actionCard==='skip' && !_skipApplied && _roundTimer<=15){
       _skipApplied=true;
       _roundTimer=Math.max(0,_roundTimer-5);
       UI.showToast('⏭ SKIP! -5 ثوانٍ!',1500);
@@ -338,7 +414,6 @@ const EventUno = (() => {
         f.crackT-=delta;
         if(f.crackT<=0){f.state='fallen';_onTileFallen(f);}
       }
-      // تحديث نبض الكبسولات
     }
 
     // تحديث نبض الكبسولات
@@ -364,7 +439,11 @@ const EventUno = (() => {
       _me.fallT+=delta;
       if(_me.fallT>1.0){
         _me.falling=false; _me.fallT=0;
+        _me.spectating=true;
+        _freeCam.active=true;
+        _freeCam.x=_camX; _freeCam.y=_camY;
         _loseHeart(_myId);
+        _me._lostThisRound=true; // منع الخسارة المزدوجة
       }
     }
 
@@ -373,6 +452,7 @@ const EventUno = (() => {
   }
 
   function _updateMeMovement(delta) {
+    if(_me._frozen) return; // تجميد Reverse
     const jx=_me.jdx||Joystick.getDx();
     const jy=_me.jdy||Joystick.getDy();
     const mag=Math.sqrt(jx*jx+jy*jy);
@@ -406,12 +486,17 @@ const EventUno = (() => {
   // ═══════════════════════════════
   function _updateBots(delta) {
     for(const p of _players){
-      if(!p.isBot||!p.alive) continue;
+      if(!p.isBot||!p.alive||p._frozen) continue; // تجميد البوتات أثناء REVERSE
 
       // سقوط البوت
       if(p.falling){
         p.fallT=(p.fallT||0)+delta;
-        if(p.fallT>1.0){ p.falling=false; p.fallT=0; _loseHeart(p.id); }
+        if(p.fallT>1.0){
+          p.falling=false; p.fallT=0;
+          p.spectating=true;
+          p._lostThisRound=true;
+          _loseHeart(p.id);
+        }
         continue;
       }
       if(p.spectating) continue;
@@ -512,7 +597,7 @@ const EventUno = (() => {
     for(const c of _cards){
       if(c.taken) continue;
       if(Utils.distance(_me.x,_me.y,c.x,c.y)<28){
-        if(_actionCard==='plus2'&&_me.heldCard&&!_me.heldCard2&&c.isSecond){
+        if(_pendingAction==='plus2'&&_me.heldCard&&!_me.heldCard2&&c.isSecond){
           c.taken=true; _me.heldCard2=c; UI.showToast('🃏 بطاقة إضافية!',800);
         } else if(!_me.heldCard&&!c.isSecond){
           c.taken=true; _me.heldCard=c; UI.showToast('🃏 تم الالتقاط',600);
@@ -581,13 +666,14 @@ const EventUno = (() => {
 
     // نسخ آمنة من _me بدون تعديله
     const allEntities=[..._players];
-    if(_me.alive&&!_me.spectating){
+    // لا نحسب اللاعب لو خسر قلباً في هذه الجولة بالفعل
+    if(_me.alive && !_me.spectating && !_me._lostThisRound){
       allEntities.push({..._me, id:_myId, card:_me.heldCard});
     }
 
     // محكمة نهاية الجولة الموحدة
     for(const p of allEntities){
-      if(!p.alive||p.spectating||p.falling) continue;
+      if(!p.alive||p.spectating||p.falling||p._lostThisRound) continue;
       const card=p.id===_myId?_me.heldCard:p.card;
       if(!card){ _loseHeart(p.id); continue; }
 
@@ -978,12 +1064,39 @@ const EventUno = (() => {
     } else {
       Utils.drawPixelText(ctx,'SPECTATOR',14,ch-30,{font:'5px "Press Start 2P"',color:'#00aaff',align:'left'});
     }
-    if(_actionCard){
-      const ac={skip:'⏭ SKIP',reverse:'🔄 REV',plus2:'+2 🃏',wild:'🌑 ×4'};
-      const cc={skip:'#ff8800',reverse:'#8800ff',plus2:'#0088ff',wild:'#111'};
-      ctx.fillStyle=cc[_actionCard]||'#333'; ctx.fillRect(cw-76,12,64,26);
-      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.strokeRect(cw-76,12,64,26);
-      Utils.drawPixelText(ctx,ac[_actionCard]||_actionCard,cw-44,16,{font:'5px "Press Start 2P"',color:'#fff',align:'center'});
+
+    // عرض بطاقة الأكشن في المنتصف عند ظهورها (الجديد)
+    if(_actionCard && _actionDisplayT > 0){
+      const alpha = Math.min(1, _actionDisplayT);
+      const ac={skip:'⏭ SKIP',reverse:'🔄 REVERSE',plus2:'+2 🃏',wild:'🌑 WILD ×4'};
+      const cc={skip:'#ff8800',reverse:'#8800ff',plus2:'#0088ff',wild:'#111111'};
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // بطاقة كبيرة في المنتصف
+      const bw=160, bh=60;
+      const bx=cw/2-bw/2, by=ch/2-bh/2-40;
+      ctx.fillStyle=cc[_actionCard]||'#333';
+      ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,8); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,8); ctx.stroke();
+
+      // توهج
+      ctx.shadowColor=cc[_actionCard]; ctx.shadowBlur=20*alpha;
+      Utils.drawPixelText(ctx,ac[_actionCard]||_actionCard,cw/2,by+12,
+        {font:'7px "Press Start 2P"',color:'#fff',align:'center'});
+      ctx.shadowBlur=0;
+      ctx.restore();
+    }
+    // أيقونة صغيرة دائمة بعد الظهور
+    else if(_actionCard){
+      const ac={skip:'⏭',reverse:'🔄',plus2:'+2',wild:'🌑'};
+      const cc={skip:'#ff8800',reverse:'#8800ff',plus2:'#0088ff',wild:'#333'};
+      ctx.fillStyle=cc[_actionCard]||'#333'; ctx.fillRect(cw-60,12,50,22);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.strokeRect(cw-60,12,50,22);
+      Utils.drawPixelText(ctx,ac[_actionCard]||'?',cw-35,14,
+        {font:'5px "Press Start 2P"',color:'#fff',align:'center'});
     }
   }
 
