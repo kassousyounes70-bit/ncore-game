@@ -279,7 +279,7 @@ const EventUno = (() => {
   }
 
   // ═══════════════════════════════
-  //  RESET POSITIONS
+  //  RESET POSITIONS — المعدل
   // ═══════════════════════════════
   function _resetPositions() {
     const sx = _reversed ? WORLD_W-SAFE_COLS*TILE/2 : SAFE_COLS*TILE/2;
@@ -299,11 +299,15 @@ const EventUno = (() => {
     }
 
     _players.forEach((p,i)=>{
+      // لو قلوبه صفر — لا تُعِده للعب أبداً
+      if(p.hearts<=0){
+        p.alive=false; p.spectating=true; return;
+      }
       p.x=sx; p.y=(1+i%(GRID_ROWS-2))*TILE;
       p.card=null; p.card2=null;
       p.falling=false; p.fallT=0;
-      // إعادة المتفرجين المؤقتين للعب
-      if(p.hearts>0){ p.alive=true; p.spectating=false; }
+      p.alive=true; p.spectating=false;
+      p._lostThisRound=false;
     });
   }
 
@@ -443,7 +447,6 @@ const EventUno = (() => {
         _freeCam.active=true;
         _freeCam.x=_camX; _freeCam.y=_camY;
         _loseHeart(_myId);
-        _me._lostThisRound=true; // منع الخسارة المزدوجة
       }
     }
 
@@ -494,7 +497,6 @@ const EventUno = (() => {
         if(p.fallT>1.0){
           p.falling=false; p.fallT=0;
           p.spectating=true;
-          p._lostThisRound=true;
           _loseHeart(p.id);
         }
         continue;
@@ -631,16 +633,19 @@ const EventUno = (() => {
   }
 
   // ═══════════════════════════════
-  //  HEART LOSS
+  //  HEART LOSS — المعدل (منع الخصم المزدوج)
   // ═══════════════════════════════
   function _loseHeart(id) {
     if(id===_myId){
-      _me.hearts=(_me.hearts||3)-1;
+      // منع الخصم المزدوج
+      if(_me._lostThisRound) return;
+      _me._lostThisRound=true;
+      _me.hearts=Math.max(0,(_me.hearts||3)-1);
       if(_me.hearts<=0){
         _me.alive=false; _me.spectating=true;
         _freeCam.active=true;
         _freeCam.x=_camX; _freeCam.y=_camY;
-        UI.showToast('💀 تم إقصاؤك!',2500);
+        UI.showToast('💀 تم إقصاؤك نهائياً!',2500);
       } else {
         _me.spectating=true;
         _freeCam.active=true;
@@ -651,29 +656,31 @@ const EventUno = (() => {
       if(me){ me.hearts=_me.hearts; me.alive=_me.alive; }
     } else {
       const p=_players.find(x=>x.id===id);
-      if(!p) return;
-      p.hearts--;
+      if(!p||p._lostThisRound) return; // منع الخصم المزدوج للبوتات
+      p._lostThisRound=true;
+      p.hearts=Math.max(0,p.hearts-1);
       if(p.hearts<=0){ p.alive=false; p.spectating=true; }
     }
   }
 
   // ═══════════════════════════════
-  //  END ROUND
+  //  END ROUND — المعدل
   // ═══════════════════════════════
   function _endRound() {
     _phase='result'; _lightsOn=true;
     _capsules.forEach(c=>c.occupantsCount=0);
 
-    // نسخ آمنة من _me بدون تعديله
+    // نسخ آمنة من _players
     const allEntities=[..._players];
-    // لا نحسب اللاعب لو خسر قلباً في هذه الجولة بالفعل
-    if(_me.alive && !_me.spectating && !_me._lostThisRound){
+    // أضف اللاعب الحالي فقط لو لم يخسر قلباً بالفعل في هذه الجولة
+    if(_me.alive && !_me._lostThisRound){
       allEntities.push({..._me, id:_myId, card:_me.heldCard});
     }
 
     // محكمة نهاية الجولة الموحدة
     for(const p of allEntities){
-      if(!p.alive||p.spectating||p.falling||p._lostThisRound) continue;
+      // تجاهل: ميت نهائياً، سقط في هذه الجولة، أو قلوبه صفر
+      if(!p.alive || p._lostThisRound || p.hearts<=0) continue;
       const card=p.id===_myId?_me.heldCard:p.card;
       if(!card){ _loseHeart(p.id); continue; }
 
@@ -695,11 +702,19 @@ const EventUno = (() => {
       }
     }
 
+    // تحقق من الفائز بعد تطبيق الخسائر
     const alive=_getAlivePlayers();
-    if(alive.length<=1){
+    const realAlive=alive.filter(p=>p.hearts>0);
+
+    if(realAlive.length<=1){
       _phase='gameover';
-      if(alive.length===0) UI.showToast('🤝 لا يوجد ناجون! مباراة نظيفة',4000);
-      else UI.showToast(`🏆 الفائز: ${alive[0].name||'أنت'}!`,4000);
+      if(realAlive.length===0){
+        UI.showToast('🤝 مباراة نظيفة — لا فائز!',4000);
+      } else {
+        const winner=realAlive[0];
+        const isMe=winner.id===_myId||!winner.id;
+        UI.showToast(`🏆 الفائز: ${isMe?'أنت':winner.name}!`,4000);
+      }
       setTimeout(exit,5000);
       return;
     }
@@ -1158,11 +1173,13 @@ const EventUno = (() => {
   }
 
   function _removeUI(){ const el=document.getElementById('uno-btns'); if(el) el.remove(); }
+  
   function _getMyPlayer(){ return _players.find(p=>p.id===_myId)||null; }
+  
+  // المعدلة: تشترط وجود قلوب
   function _getAlivePlayers(){
-    const list=_players.filter(p=>p.alive);
-    const me=_getMyPlayer();
-    if(me&&me.alive) list.push(me);
+    const list=_players.filter(p=>p.alive && p.hearts>0);
+    if(_me.alive && _me.hearts>0) list.push({..._me, id:_myId});
     return list;
   }
 
