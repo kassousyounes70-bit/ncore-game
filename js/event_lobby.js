@@ -3,17 +3,25 @@ const EventLobby = (() => {
   const SERVER = 'https://ncore-mmo-server.onrender.com';
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 50;
+  const BASE_TIMER  = 30;
+  const ADD_PER_PLAYER = 10;
+
   let _active      = false;
   let _eventId     = null;
   let _players     = [];
   let _timer       = 0;
   let _timerActive = false;
   let _pollInterval= null;
+
+  // خريطة اللوبي
   const LOBBY_W = 800, LOBBY_H = 600;
   let _camX = 0, _camY = 0;
   let _px = LOBBY_W/2, _py = LOBBY_H/2;
   let _frame = 0, _ft = 0, _moving = false;
 
+  // ═══════════════════════════════
+  //  PUBLIC
+  // ═══════════════════════════════
   function enter(eventId) {
     _active  = true;
     _eventId = eventId;
@@ -24,20 +32,16 @@ const EventLobby = (() => {
     _py = LOBBY_H/2;
     _frame = 0; _ft = 0; _moving = false;
 
-    if (typeof UI !== 'undefined' && UI.toggleWorldHUD) {
-      UI.toggleWorldHUD(false);
-    }
-
     fetch(`${SERVER}/api/event/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         eventId,
         playerId: Network.getMyId(),
-        playerName: Network.getUsername(),
-        charId: Player.getCharId()
+        playerName: Network.getUsername()
       })
     }).catch(() => {});
+
     _pollInterval = setInterval(_pollLobby, 2000);
     UI.showToast('🎮 دخلت لوبي الفعالية!', 2000);
   }
@@ -46,18 +50,13 @@ const EventLobby = (() => {
     if (!_active) return;
     clearInterval(_pollInterval);
     _active = false;
-    _players = [];
-    Network.spendCoins(-1);
 
+    Network.spendCoins(-1); // استرداد العملة
     fetch(`${SERVER}/api/event/leave`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId: _eventId, playerId: Network.getMyId() })
     }).catch(() => {});
-
-    if (typeof UI !== 'undefined' && UI.toggleWorldHUD) {
-      UI.toggleWorldHUD(true);
-    }
 
     if (typeof EventManager !== 'undefined') {
       EventManager.startTransitionOut(() => {
@@ -68,6 +67,26 @@ const EventLobby = (() => {
     }
   }
 
+  function addBot() {
+    if(!_active) return;
+    const levels = ['easy','medium','hard'];
+    const level = levels[Math.floor(Math.random()*levels.length)];
+    const botId = 'bot_' + Date.now() + '_' + Math.random();
+    _players.push({
+      id: botId,
+      name: 'BOT-' + _players.length,
+      lobbyX: Utils.randInt(60, LOBBY_W-60),
+      lobbyY: Utils.randInt(60, LOBBY_H-60),
+      isBot: true,
+      botLevel: level,
+      charId: Math.floor(Math.random() * 10),
+    });
+    UI.showToast(`🤖 Bot (${level}) انضم!`, 1200);
+  }
+
+  // ═══════════════════════════════
+  //  INTERNAL
+  // ═══════════════════════════════
   async function _pollLobby() {
     try {
       const res  = await fetch(`${SERVER}/api/event/lobby?eventId=${_eventId}`);
@@ -76,32 +95,12 @@ const EventLobby = (() => {
       _players     = data.players || [];
       _timer       = data.timer   || 0;
       _timerActive = data.timerActive || false;
+
       if (data.started) {
         clearInterval(_pollInterval);
         _startGame();
       }
     } catch (e) {}
-  }
-
-  function _startWithBots() {
-    if (!_active) return;
-    clearInterval(_pollInterval);
-    _players = [];
-    _players.push({
-      id: 'bot_pro_' + Date.now(),
-      name: '🤖 محترف',
-      charId: 7,
-      isBot: true,
-      botLevel: 'pro'
-    });
-    _players.push({
-      id: 'bot_noob_' + Date.now(),
-      name: '🤖 مبتدئ',
-      charId: 5,
-      isBot: true,
-      botLevel: 'noob'
-    });
-    _startGame();
   }
 
   function _startGame() {
@@ -123,9 +122,11 @@ const EventLobby = (() => {
 
   function update(delta) {
     if (!_active) return;
+
     const jx = Joystick.getDx(), jy = Joystick.getDy();
     const mag = Math.sqrt(jx*jx+jy*jy);
     _moving = mag > 0.05;
+
     if (_moving) {
       _px = Utils.clamp(_px + jx * 120 * delta, 20, LOBBY_W - 20);
       _py = Utils.clamp(_py + jy * 120 * delta, 20, LOBBY_H - 20);
@@ -134,6 +135,7 @@ const EventLobby = (() => {
     } else {
       _frame = 0; _ft = 0;
     }
+
     _camX = Utils.clamp(_px - window.innerWidth/2,  0, Math.max(0, LOBBY_W - window.innerWidth));
     _camY = Utils.clamp(_py - window.innerHeight/2, 0, Math.max(0, LOBBY_H - window.innerHeight));
   }
@@ -143,11 +145,17 @@ const EventLobby = (() => {
     const cw = window.innerWidth, ch = window.innerHeight;
     const t  = Date.now() / 1000;
 
+    // لا نرسم لو كانت نافذة الدردشة مفتوحة
+    const chatModal = document.getElementById('chat-modal');
+    if (chatModal && chatModal.style.display === 'flex') return;
+
     ctx.fillStyle = '#05000f';
     ctx.fillRect(0, 0, cw, ch);
+
     ctx.save();
     ctx.translate(-_camX, -_camY);
 
+    // أرضية
     for (let r = 0; r < Math.ceil(LOBBY_H / 32); r++) {
       for (let c = 0; c < Math.ceil(LOBBY_W / 32); c++) {
         ctx.fillStyle = (r + c) % 2 === 0 ? '#0d0025' : '#0a001e';
@@ -155,6 +163,7 @@ const EventLobby = (() => {
       }
     }
 
+    // شبكة
     ctx.strokeStyle = 'rgba(136,0,255,0.08)';
     ctx.lineWidth = 0.5;
     for (let x = 0; x <= LOBBY_W; x += 32) {
@@ -164,6 +173,7 @@ const EventLobby = (() => {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(LOBBY_W, y); ctx.stroke();
     }
 
+    // جدران
     ctx.fillStyle = '#160830';
     ctx.fillRect(0, 0, LOBBY_W, 32);
     ctx.fillRect(0, LOBBY_H - 32, LOBBY_W, 32);
@@ -177,29 +187,25 @@ const EventLobby = (() => {
 
     _drawCenteredGlitchTitle(ctx);
 
+    // رسم اللاعبين الآخرين (داخل الكاميرا)
     for (const p of _players) {
       if (p.id === Network.getMyId()) continue;
       const px = p.lobbyX || LOBBY_W / 2;
       const py = p.lobbyY || LOBBY_H / 2;
-      if (window.Player && Player.getAllChars) {
-        const char = Player.getAllChars()[p.charId || 0];
-        if (char) {
-          char.draw(ctx, px - 12, py - 14, p.dir || 'down', p.frame || 0, false);
-        } else {
-          ctx.fillStyle = 'rgba(0,255,136,0.8)';
-          ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill();
-        }
-      } else {
-        ctx.fillStyle = 'rgba(0,255,136,0.8)';
-        ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill();
-      }
-      Utils.drawPixelText(ctx, p.name || 'لاعب', px, py - 22,
+      ctx.fillStyle = 'rgba(0,255,136,0.8)';
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, Math.PI * 2);
+      ctx.fill();
+      Utils.drawPixelText(ctx, p.name || 'لاعب', px, py - 16,
         { font: '5px "Press Start 2P"', color: '#00ff88', align: 'center' });
     }
-    ctx.restore();
 
+    ctx.restore(); // العودة للإحداثيات الطبيعية للشاشة
+
+    // رسم الشخصية الحالية خارج ترجمة الكاميرا (بإحداثيات الشاشة)
     const screenX = _px - _camX;
     const screenY = _py - _camY;
+
     if (window.Player && Player.getAllChars) {
       const char = Player.getAllChars()[Player.getCharId()];
       if (char) char.draw(ctx, screenX - 12, screenY - 14, 'down', _frame, _moving);
@@ -208,6 +214,7 @@ const EventLobby = (() => {
       ctx.fillRect(screenX - 8, screenY - 12, 16, 24);
     }
 
+    // HUD
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
     ctx.fillRect(cw / 2 - 90, 12, 180, 30);
     ctx.strokeStyle = '#8800ff';
@@ -247,6 +254,7 @@ const EventLobby = (() => {
       ctx.restore();
     }
 
+    // زر الخروج
     ctx.fillStyle = 'rgba(10,0,30,0.9)';
     ctx.fillRect(cw - 110, ch - 44, 100, 32);
     ctx.strokeStyle = '#ff0088';
@@ -254,28 +262,23 @@ const EventLobby = (() => {
     ctx.strokeRect(cw - 110, ch - 44, 100, 32);
     Utils.drawPixelText(ctx, '✖ خروج', cw - 60, ch - 36,
       { font: '6px "Press Start 2P"', color: '#ff0088', align: 'center' });
-
-    ctx.fillStyle = 'rgba(10,30,10,0.9)';
-    ctx.fillRect(10, ch - 44, 150, 32);
-    ctx.strokeStyle = '#00ff88';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(10, ch - 44, 150, 32);
-    Utils.drawPixelText(ctx, '🤖 بدء تجربة مع آليين', 85, ch - 36,
-      { font: '6px "Press Start 2P"', color: '#00ff88', align: 'center' });
   }
 
   function _drawCenteredGlitchTitle(ctx) {
     const cx = LOBBY_W / 2, cy = LOBBY_H * 0.22;
     const t  = Date.now() / 1000;
+
     ctx.save();
     ctx.font = 'bold 14px "Press Start 2P"';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
     const lines = ['CURSED', 'UNO GRID'];
     lines.forEach((line, i) => {
       const ly = cy + i * 22 - 11;
       const gx = Math.sin(t * 18 + i * 3) * (Math.random() > 0.92 ? 5 : 0);
       const gy = Math.cos(t * 12 + i)   * (Math.random() > 0.95 ? 2 : 0);
+
       ctx.fillStyle = 'rgba(255,0,136,0.6)';
       ctx.fillText(line, cx + gx + 2, ly + 1 + gy);
       ctx.fillStyle = 'rgba(136,0,255,0.6)';
@@ -283,6 +286,7 @@ const EventLobby = (() => {
       ctx.fillStyle = i === 0 ? '#00ff88' : '#ff0088';
       ctx.fillText(line, cx, ly);
     });
+
     ctx.strokeStyle = 'rgba(0,255,136,0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -295,20 +299,15 @@ const EventLobby = (() => {
   function handleTap(x, y) {
     if (!_active) return false;
     const cw = window.innerWidth, ch = window.innerHeight;
-    
+    // منطقة الزر موسعة قليلاً
     if (x > cw - 115 && x < cw - 5 && y > ch - 50 && y < ch - 8) {
       exit();
       return true;
     }
-
-    if (x > 10 && x < 160 && y > ch - 50 && y < ch - 8) {
-      _startWithBots();
-      return true;
-    }
-
     return false;
   }
 
   function isActive() { return _active; }
-  return { enter, exit, update, draw, handleTap, isActive };
+
+  return { enter, exit, update, draw, handleTap, addBot, isActive };
 })();

@@ -1,107 +1,143 @@
 'use strict';
 const EventUno = (() => {
-  const TILE        = 64;
-  const GRID_COLS   = 20;
-  const GRID_ROWS   = 14;
-  const ROUND_TIME  = 10;
-  const PUSH_CHARGE = 2.85;
-  const DODGE_CHARGE= 3.5;
-  const COLORS = ['red','blue','green','yellow'];
-  const NUMBERS = [0,1,2,3,4,5,6,7,8,9];
-  const ACTION_CARDS = ['reverse','skip','plus2','wild'];
-  const SAFE_ZONE_COLS  = 5;
-  const GRID_START_COL  = 5;
-  const GRID_END_COL    = 15;
-  const CARD_ZONE_COLS  = 5;
+
+  // ═══════════════════════════════
+  //  CONSTANTS
+  // ═══════════════════════════════
+  const TILE         = 64;
+  const GRID_COLS    = 16;
+  const GRID_ROWS    = 10;
+  const ROUND_TIME   = 30;
+  const PUSH_CHARGE  = 2.85;
+  const DODGE_CHANCE = 0.85;
+
+  const SAFE_COLS  = 3;
+  const CARD_COLS  = 3;
+  const GRID_START = SAFE_COLS;
+  const GRID_END   = GRID_COLS - CARD_COLS;
+
   const WORLD_W = GRID_COLS * TILE;
   const WORLD_H = GRID_ROWS * TILE;
-  let _active       = false;
-  let _players      = [];
-  let _myId         = '';
-  let _roundTimer   = 0;
-  let _roundActive  = false;
-  let _roundNum     = 0;
-  let _phase        = 'waiting';
-  let _countdownT   = 3;
-  let _targetCard   = null;
-  let _actionCard   = null;
-  let _cards        = [];
-  let _capsules     = [];
-  let _fragiles     = [];
-  let _blockers     = [];
-  let _laserOn      = true;
-  let _lightsOn     = true;
-  let _reversed     = false;
-  let _skipTriggered= false;
-  let _camX=0, _camY=0;
-  const _me = {
-    x: 2.5*TILE, y: 7*TILE,
-    pushCharge: 0, dodgeCharge: 0,
-    pushing: false, dodging: false,
-    pushDir: null,
-    invincible: 0,
-    heldCard: null,
-    heldCard2: null,
-    frame: 0, ft: 0, moving: false,
-    dx: 0, dy: 0,
+
+  const COLORS  = ['red','blue','green','yellow'];
+  const NUMBERS = [0,1,2,3,4,5,6,7,8,9];
+  const ACTIONS = ['skip','reverse','plus2','wild'];
+
+  const COLOR_HEX = {
+    red:'#cc1111', blue:'#1144cc',
+    green:'#118811', yellow:'#ccaa00'
   };
 
+  // ═══════════════════════════════
+  //  STATE
+  // ═══════════════════════════════
+  let _active      = false;
+  let _players     = [];   // لاعبون حقيقيون + bots
+  let _myId        = '';
+  let _roundNum    = 0;
+  let _phase       = 'idle'; // idle|camSweep|countdown|running|result|gameover
+  let _roundTimer  = 0;
+  let _countdownT  = 3;
+  let _targetCard  = null;
+  let _actionCard  = null;
+  let _cards       = [];
+  let _capsules    = [];
+  let _fragiles    = [];
+  let _blockers    = [];
+  let _laserOn     = true;
+  let _lightsOn    = true;
+  let _reversed    = false;
+  let _skipApplied = false;
+  let _camX = 0, _camY = 0;
+  let _sweepT = 0;   // وقت حركة الكاميرا
+  let _sweepDir = 1; // 1=يمين, -1=يسار
+
+  // اللاعب الحالي
+  const _me = {
+    x: SAFE_COLS*TILE/2, y: WORLD_H/2,
+    frame:0, ft:0, moving:false,
+    pushCharge:0, dodgeCharge:0,
+    heldCard:null, heldCard2:null,
+    invincible:0,
+    falling:false, fallT:0,
+    jdx:0, jdy:0,
+  };
+
+  // ═══════════════════════════════
+  //  ENTER
+  // ═══════════════════════════════
   function enter(players) {
-    _active    = true;
-    _roundNum  = 0;
-    _phase     = 'waiting';
-    _myId      = Network.getMyId();
-    _reversed  = false;
-    _players = players.map((p, i) => ({
-      id       : p.id,
-      name     : p.name || 'لاعب',
-      isBot    : p.isBot || false,
-      botLevel : p.botLevel || 'noob',
-      target   : null,
-      x        : 2.5 * TILE,
-      y        : (1 + i % (GRID_ROWS-2)) * TILE,
-      hearts   : 3,
-      card     : null,
-      card2    : null,
-      alive    : true,
-      spectating: false,
-      charId   : p.charId || 0,
-      frame    : 0, ft: 0, moving: false,
+    _active   = true;
+    _roundNum = 0;
+    _phase    = 'idle';
+    _myId     = Network.getMyId();
+    _reversed = false;
+
+    _players = players.map((p,i)=>({
+      id    : p.id,
+      name  : p.name||'لاعب',
+      x     : SAFE_COLS*TILE/2,
+      y     : (1+i%(GRID_ROWS-2))*TILE,
+      hearts: 3,
+      card  : null, card2:null,
+      alive : true, spectating:false,
+      charId: p.charId||0,
+      frame :0, ft:0, moving:false,
+      isBot : p.isBot||false,
+      botLevel: p.botLevel||'medium',
+      botTarget:null, botState:'idle',
     }));
-    _me.x = 2.5*TILE;
-    _me.y = 7*TILE;
-    _me.heldCard = null;
-    _me.heldCard2= null;
-    _me.pushCharge = 0;
-    _me.dodgeCharge= 0;
-    
-    if (typeof UI !== 'undefined' && UI.toggleWorldHUD) {
-      UI.toggleWorldHUD(false);
-    }
-    
+
     _buildUI();
-    _startRound();
+    _hideWorldUI();
+    setTimeout(_startRound, 500);
   }
 
+  // ═══════════════════════════════
+  //  WORLD UI
+  // ═══════════════════════════════
+  function _hideWorldUI() {
+    ['report-btn','interact-btn'].forEach(id=>{
+      const el=Utils.$(id);
+      if(el){el.classList.add('hidden');el.style.display='none';}
+    });
+  }
+
+  function _showWorldUI() {
+    ['report-btn','interact-btn'].forEach(id=>{
+      const el=Utils.$(id);
+      if(el){el.classList.remove('hidden');el.style.display='block';}
+    });
+  }
+
+  // ═══════════════════════════════
+  //  ROUND SETUP
+  // ═══════════════════════════════
   function _startRound() {
+    if(!_active) return;
     _roundNum++;
-    _phase       = 'countdown';
-    _countdownT  = 3;
-    _roundTimer  = ROUND_TIME;
-    _roundActive = false;
-    _laserOn     = true;
-    _lightsOn    = true;
-    _skipTriggered = false;
+    _phase      = 'camSweep';
+    _sweepT     = 0;
+    _sweepDir   = 1;
+    _roundTimer = ROUND_TIME;
+    _laserOn    = true;
+    _lightsOn   = true;
+    _skipApplied= false;
     _me.heldCard = null;
     _me.heldCard2= null;
+
+    // بطاقة الهدف
     _targetCard = {
       color : COLORS[Math.floor(Math.random()*COLORS.length)],
       number: NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
     };
-    _actionCard = _roundNum > 1 && Math.random() < 0.55
-      ? ACTION_CARDS[Math.floor(Math.random()*ACTION_CARDS.length)]
-      : null;
-    if (_actionCard === 'reverse') _reversed = !_reversed;
+
+    // بطاقة أكشن من الجولة الثانية
+    _actionCard = _roundNum>1 && Math.random()<0.55
+      ? ACTIONS[Math.floor(Math.random()*ACTIONS.length)] : null;
+
+    if(_actionCard==='reverse') _reversed=!_reversed;
+
     _buildCards();
     _buildCapsules();
     _buildFragiles();
@@ -109,513 +145,521 @@ const EventUno = (() => {
     _resetPositions();
   }
 
+  // ═══════════════════════════════
+  //  BUILD WORLD ELEMENTS
+  // ═══════════════════════════════
   function _buildCards() {
-    _cards = [];
-    const alivePlayers = _players.filter(p => p.alive).length + 1;
-    const cardZoneX    = _reversed ? SAFE_ZONE_COLS * TILE : (GRID_END_COL) * TILE;
-    const correctCount = Math.max(1, Math.floor(alivePlayers * 0.9));
-    for (let i = 0; i < correctCount; i++) {
+    _cards=[];
+    const alive = _getAlivePlayers().length;
+    const zoneX = _reversed ? 0 : GRID_END*TILE;
+    const correct = Math.max(1, Math.floor(alive*0.9));
+
+    for(let i=0;i<correct;i++) {
       _cards.push({
-        color  : _targetCard.color,
-        number : _targetCard.number,
-        x      : cardZoneX + Utils.randInt(30, CARD_ZONE_COLS*TILE-30),
-        y      : Utils.randInt(TILE, WORLD_H - TILE),
-        taken  : false,
-        real   : true,
+        color:_targetCard.color, number:_targetCard.number,
+        x:zoneX+Utils.randInt(8,CARD_COLS*TILE-8),
+        y:Utils.randInt(TILE, WORLD_H-TILE),
+        taken:false, real:true, isSecond:false,
       });
     }
-    const bluffCount = Utils.randInt(5, 10);
-    for (let i = 0; i < bluffCount; i++) {
-      const isColorBluff  = Math.random() < 0.5;
-      const bluffColor    = isColorBluff
-        ? _getSimilarColor(_targetCard.color)
-        : COLORS[Math.floor(Math.random()*COLORS.length)];
-      const bluffNumber   = !isColorBluff
-        ? _getSimilarNumber(_targetCard.number)
-        : NUMBERS[Math.floor(Math.random()*NUMBERS.length)];
+
+    // بطاقات خادعة
+    const bluffs=Utils.randInt(3,7);
+    for(let i=0;i<bluffs;i++) {
       _cards.push({
-        color  : bluffColor,
-        number : bluffNumber,
-        x      : cardZoneX + Utils.randInt(30, CARD_ZONE_COLS*TILE-30),
-        y      : Utils.randInt(TILE, WORLD_H - TILE),
-        taken  : false,
-        real   : false,
+        color:_fakeSimilarColor(_targetCard.color),
+        number:_fakeSimilarNum(_targetCard.number),
+        x:zoneX+Utils.randInt(8,CARD_COLS*TILE-8),
+        y:Utils.randInt(TILE,WORLD_H-TILE),
+        taken:false, real:false, isSecond:false,
       });
     }
-    if (_actionCard === 'plus2') {
-      for (let i = 0; i < correctCount; i++) {
+
+    // +2: بطاقتان
+    if(_actionCard==='plus2') {
+      for(let i=0;i<correct;i++) {
         _cards.push({
-          color  : COLORS[Math.floor(Math.random()*COLORS.length)],
-          number : NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
-          x      : cardZoneX + Utils.randInt(30, CARD_ZONE_COLS*TILE-30),
-          y      : Utils.randInt(TILE, WORLD_H - TILE),
-          taken  : false,
-          real   : true,
-          isSecond: true,
+          color:COLORS[Math.floor(Math.random()*COLORS.length)],
+          number:NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
+          x:zoneX+Utils.randInt(8,CARD_COLS*TILE-8),
+          y:Utils.randInt(TILE,WORLD_H-TILE),
+          taken:false, real:true, isSecond:true,
         });
       }
     }
   }
 
-  function _getSimilarColor(color) {
-    const similar = { red:'#ff6600', blue:'#0066ff', green:'#00aa44', yellow:'#ffcc00' };
-    return similar[color] || color;
+  function _fakeSimilarColor(c) {
+    const m={red:'#ff4400',blue:'#0055ff',green:'#00aa33',yellow:'#ffcc00'};
+    return m[c]||c;
   }
-
-  function _getSimilarNumber(num) {
-    if (num === 1) return 7;
-    if (num === 7) return 1;
-    if (num === 6) return 9;
-    if (num === 9) return 6;
-    return (num + 1) % 10;
+  function _fakeSimilarNum(n) {
+    if(n===1)return 7; if(n===7)return 1;
+    if(n===6)return 9; if(n===9)return 6;
+    return(n+1)%10;
   }
 
   function _buildCapsules() {
-    _capsules = [];
-    const capsX = _reversed ? GRID_END_COL*TILE : 0;
-    COLORS.forEach((color, i) => {
+    _capsules=[];
+    const cx=_reversed?GRID_END*TILE:0;
+    COLORS.forEach((color,i)=>{
       _capsules.push({
-        color,
-        x    : capsX + Utils.randInt(4, SAFE_ZONE_COLS*TILE - TILE - 4),
-        y    : (i * 3 + 1) * TILE,
-        w    : TILE * 1.2,
-        h    : TILE * 1.2,
-        open : true,
-        occupants: [],
+        color, open:true, occupants:[],
+        x:cx+Utils.randInt(4,SAFE_COLS*TILE-TILE-4),
+        y:(i*2+0.5)*TILE,
+        w:TILE*1.2, h:TILE*1.2,
       });
     });
   }
 
   function _buildFragiles() {
-    _fragiles = [];
-    const count = Utils.randInt(15, 30);
-    for (let i = 0; i < count; i++) {
-      const col = Utils.randInt(GRID_START_COL, GRID_END_COL - 1);
-      const row = Utils.randInt(1, GRID_ROWS - 2);
+    _fragiles=[];
+    const count=Utils.randInt(6,14);
+    for(let i=0;i<count;i++) {
       _fragiles.push({
-        x      : col * TILE,
-        y      : row * TILE,
-        w      : TILE,
-        h      : TILE,
-        state  : 'normal',
-        steppedBy: []
+        x:Utils.randInt(GRID_START,GRID_END-1)*TILE,
+        y:Utils.randInt(1,GRID_ROWS-2)*TILE,
+        w:TILE, h:TILE,
+        state:'normal', crackT:0,
       });
     }
   }
 
   function _buildBlockers() {
-    _blockers = [];
-    const count = Utils.randInt(6, 12);
-    for (let i = 0; i < count; i++) {
-      const col = Utils.randInt(GRID_START_COL, GRID_END_COL - 1);
-      const row = Utils.randInt(0, GRID_ROWS - 1);
+    _blockers=[];
+    const count=Utils.randInt(4,8);
+    for(let i=0;i<count;i++) {
       _blockers.push({
-        x      : col * TILE,
-        y      : row * TILE,
-        w      : TILE,
-        h      : TILE / 4,
-        visible: Math.random() < 0.5,
-        timer  : Utils.randFloat(1.5, 3.5),
-        period : Utils.randFloat(1.5, 3.5),
+        x:Utils.randInt(GRID_START,GRID_END-1)*TILE,
+        y:Utils.randInt(0,GRID_ROWS-1)*TILE,
+        w:TILE, h:TILE/3,
+        visible:Math.random()<0.5,
+        timer:Utils.randFloat(1.2,3.0),
+        period:Utils.randFloat(1.2,3.0),
       });
     }
   }
 
   function _resetPositions() {
-    const startX = _reversed ? WORLD_W - 2.5*TILE : 2.5*TILE;
-    _me.x = startX;
-    _me.y = 7 * TILE;
-    _me.heldCard  = null;
-    _me.heldCard2 = null;
-    _players.forEach((p, i) => {
-      p.x = startX;
-      p.y = (1 + i % (GRID_ROWS-2)) * TILE;
-      p.card  = null;
-      p.card2 = null;
-      p.target = null;
+    const sx=_reversed?WORLD_W-SAFE_COLS*TILE/2:SAFE_COLS*TILE/2;
+    _me.x=sx; _me.y=WORLD_H/2;
+    _me.heldCard=null; _me.heldCard2=null;
+    _me.falling=false; _me.fallT=0;
+    _players.forEach((p,i)=>{
+      p.x=sx; p.y=(1+i%(GRID_ROWS-2))*TILE;
+      p.card=null; p.card2=null;
+      p.spectating=false;
     });
   }
 
+  // ═══════════════════════════════
+  //  UPDATE
+  // ═══════════════════════════════
   function update(delta) {
-    if (!_active) return;
-    switch (_phase) {
+    if(!_active) return;
+
+    switch(_phase) {
+      case 'camSweep' : _updateSweep(delta);    break;
       case 'countdown': _updateCountdown(delta); break;
       case 'running'  : _updateRunning(delta);   break;
-      case 'result'   : _updateResult(delta);    break;
+      case 'result'   : break;
+      case 'gameover' : break;
     }
-    _camX = Utils.clamp(_me.x - window.innerWidth/2,  0, Math.max(0, WORLD_W - window.innerWidth));
-    _camY = Utils.clamp(_me.y - window.innerHeight/2, 0, Math.max(0, WORLD_H - window.innerHeight));
+
+    // كاميرا تتبع اللاعب في وضع running
+    if(_phase==='running'||_phase==='result') {
+      _camX=Utils.clamp(_me.x-window.innerWidth/2, 0, Math.max(0,WORLD_W-window.innerWidth));
+      _camY=Utils.clamp(_me.y-window.innerHeight/2,0, Math.max(0,WORLD_H-window.innerHeight));
+    }
   }
 
+  // ─── Camera Sweep ───
+  function _updateSweep(delta) {
+    _sweepT+=delta;
+    const dur=2.0; // ثانيتان للمسح
+    const prog=Math.min(_sweepT/dur,1);
+
+    if(_sweepDir===1) {
+      // من اليسار إلى اليمين
+      _camX=Utils.lerp(0,WORLD_W-window.innerWidth,prog);
+    }
+    if(_sweepT>=dur && _sweepDir===1) {
+      _sweepDir=-1; _sweepT=0;
+    } else if(_sweepDir===-1) {
+      _camX=Utils.lerp(WORLD_W-window.innerWidth,0,prog);
+      if(_sweepT>=dur) {
+        // انتهى المسح — بدء العد التنازلي
+        _camX=0; _phase='countdown'; _countdownT=3;
+      }
+    }
+    _camY=Utils.clamp(_me.y-window.innerHeight/2,0,Math.max(0,WORLD_H-window.innerHeight));
+  }
+
+  // ─── Countdown ───
   function _updateCountdown(delta) {
-    _countdownT -= delta;
-    if (_countdownT <= 0) {
-      _phase       = 'running';
-      _roundActive = true;
-      _laserOn     = false;
+    _countdownT-=delta;
+    if(_countdownT<=0) {
+      _phase='running'; _laserOn=false;
     }
   }
 
+  // ─── Running ───
   function _updateRunning(delta) {
-    _roundTimer -= delta;
-    if (_actionCard === 'skip' && !_skipTriggered && _roundTimer <= 5) {
-      _skipTriggered = true;
-      _capsules.forEach((c, i) => { if (i % 2 === 0) c.open = false; });
-      UI.showToast('⚠️ نصف الكبسولات أُغلقت!', 1500);
+    _roundTimer-=delta;
+
+    // Skip: ناقص 5 ثوانٍ عند الثانية 15
+    if(_actionCard==='skip'&&!_skipApplied&&_roundTimer<=15) {
+      _skipApplied=true;
+      _roundTimer=Math.max(0,_roundTimer-5);
+      UI.showToast('⏭ SKIP! -5 ثوانٍ!',1500);
     }
-    if (_actionCard === 'wild') _lightsOn = false;
-    for (const b of _blockers) {
-      b.timer -= delta;
-      if (b.timer <= 0) {
-        b.visible = !b.visible;
-        b.timer   = b.period;
+
+    // Wild: إطفاء الأنوار
+    if(_actionCard==='wild') _lightsOn=false;
+
+    // جدران متقطعة
+    for(const b of _blockers) {
+      b.timer-=delta;
+      if(b.timer<=0){b.visible=!b.visible;b.timer=b.period;}
+    }
+
+    // بلاطات هشة
+    for(const f of _fragiles) {
+      if(f.state==='cracked'){
+        f.crackT-=delta;
+        if(f.crackT<=0){f.state='fallen';_onTileFallen(f);}
       }
     }
-    _updateMe(delta);
+
+    // تحديث اللاعب
+    if(!_me.falling) {
+      _updateMeMovement(delta);
+      _me.pushCharge=Math.min(1,_me.pushCharge+delta/PUSH_CHARGE);
+      _me.dodgeCharge=Math.min(1,_me.dodgeCharge+delta/2.5);
+      if(_me.invincible>0)_me.invincible-=delta;
+      _checkPickup();
+      _checkCapsule();
+      _checkFragileMe();
+    } else {
+      _me.fallT+=delta;
+      if(_me.fallT>1.0){
+        _me.falling=false; _me.fallT=0;
+        _loseHeart(_myId);
+      }
+    }
+
+    // تحديث bots
     _updateBots(delta);
-    if (_me.pushCharge  < 1) _me.pushCharge  += delta / PUSH_CHARGE;
-    if (_me.dodgeCharge < 1) _me.dodgeCharge += delta / DODGE_CHARGE;
-    _me.pushCharge  = Math.min(1, _me.pushCharge);
-    _me.dodgeCharge = Math.min(1, _me.dodgeCharge);
-    if (_roundTimer <= 0) _endRound();
+
+    if(_roundTimer<=0) _endRound();
   }
 
-  function _updateBots(delta) {
-    for (const p of _players) {
-      if (p.isBot && p.alive && !p.spectating) {
-        _updateBot(p, delta);
-      }
-    }
+  function _updateMeMovement(delta) {
+    const jx=_me.jdx||Joystick.getDx();
+    const jy=_me.jdy||Joystick.getDy();
+    const mag=Math.sqrt(jx*jx+jy*jy);
+    _me.moving=mag>0.05;
+    if(_me.moving){
+      const spd=160*delta;
+      const nx=_me.x+jx*spd, ny=_me.y+jy*spd;
+      if(_canMove(nx,_me.y))_me.x=Utils.clamp(nx,0,WORLD_W);
+      if(_canMove(_me.x,ny))_me.y=Utils.clamp(ny,0,WORLD_H);
+      _me.ft+=delta;
+      if(_me.ft>=0.13){_me.ft=0;_me.frame=(_me.frame+1)%3;}
+    } else {_me.frame=0;_me.ft=0;}
   }
 
-  function _updateBot(p, delta) {
-    if (_laserOn) {
-      p.moving = false;
-      p.frame = 0;
-      return;
+  function _canMove(nx,ny) {
+    if(nx<0||nx>WORLD_W||ny<0||ny>WORLD_H)return false;
+    const lx=_reversed?GRID_END*TILE:SAFE_COLS*TILE;
+    if(_laserOn){
+      if(!_reversed&&nx>lx-10)return false;
+      if(_reversed&&nx<lx+10)return false;
     }
-    const inCapsule = _capsules.some(c => c.occupants.includes(p.id));
-    if (inCapsule) {
-      p.moving = false;
-      p.frame = 0;
-      return;
-    }
-    if (!p.card) {
-      if (!p.target || p.target.taken) {
-         p.target = _findBestCardForBot(p);
-      }
-      if (p.target) {
-         _moveBotToward(p, p.target.x, p.target.y, delta);
-      }
-      _checkBotPickupCard(p);
-    } else {
-      if (!p.target || !p.target.open) {
-         p.target = _findBestCapsuleForBot(p);
-      }
-      if (p.target) {
-         _moveBotToward(p, p.target.x + p.target.w/2, p.target.y + p.target.h/2, delta);
-      }
-      _checkBotCapsuleEntry(p);
-    }
-    _checkFragile(p);
-  }
-
-  function _findBestCardForBot(p) {
-    let best = null, minDist = Infinity;
-    for (const c of _cards) {
-      if (c.taken) continue;
-      const isCorrect = c.color === _targetCard.color || c.number === _targetCard.number;
-      if (p.botLevel === 'pro' && !isCorrect) continue;
-      const dist = Utils.distance(p.x, p.y, c.x, c.y);
-      if (dist < minDist) { minDist = dist; best = c; }
-    }
-    if (!best && p.botLevel === 'pro') {
-       for (const c of _cards) {
-         if (c.taken) continue;
-         const dist = Utils.distance(p.x, p.y, c.x, c.y);
-         if (dist < minDist) { minDist = dist; best = c; }
-       }
-    }
-    return best;
-  }
-
-  function _findBestCapsuleForBot(p) {
-    let best = null, minDist = Infinity;
-    for (const cap of _capsules) {
-      if (!cap.open) continue;
-      const colorMatch = p.card.color === cap.color;
-      const numberMatch = p.card.number === _targetCard.number;
-      if (p.botLevel === 'pro' && !(colorMatch || numberMatch)) continue;
-      const dist = Utils.distance(p.x, p.y, cap.x + cap.w/2, cap.y + cap.h/2);
-      if (dist < minDist) { minDist = dist; best = cap; }
-    }
-    return best;
-  }
-
-  function _moveBotToward(p, tx, ty, delta) {
-    const dx = tx - p.x;
-    const dy = ty - p.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist < 4) { p.moving = false; p.frame = 0; return; }
-    p.moving = true;
-    const speed = (p.botLevel === 'pro' ? 140 : 100) * delta;
-    const nx = p.x + (dx/dist)*speed;
-    const ny = p.y + (dy/dist)*speed;
-    if (_canMove(nx, p.y, p)) p.x = nx;
-    if (_canMove(p.x, ny, p)) p.y = ny;
-    p.dir = Math.abs(dx) > Math.abs(dy) ? (dx>0?'right':'left') : (dy>0?'down':'up');
-    p.ft += delta;
-    if (p.ft >= 0.13) { p.ft = 0; p.frame = (p.frame+1)%3; }
-  }
-
-  function _checkBotPickupCard(p) {
-    for (const c of _cards) {
-      if (c.taken) continue;
-      if (Utils.distance(p.x, p.y, c.x, c.y) < 28) {
-        c.taken = true;
-        p.card = c;
-        p.target = null;
-        break;
-      }
-    }
-  }
-
-  function _checkBotCapsuleEntry(p) {
-    if (!p.card) return;
-    for (const cap of _capsules) {
-      if (!cap.open) continue;
-      if (Utils.distance(p.x, p.y, cap.x + cap.w/2, cap.y + cap.h/2) <= 36) {
-        const colorMatch = p.card.color === cap.color;
-        const numberMatch = p.card.number === _targetCard.number;
-        if (colorMatch || numberMatch) {
-          cap.occupants.push(p.id);
-        } else {
-          p.card = null;
-          p.target = null;
-        }
-        break;
-      }
-    }
-  }
-
-  function _loseHeartBot(p) {
-    p.hearts--;
-    if (p.hearts <= 0) {
-      p.alive = false;
-    } else {
-      p.spectating = true;
-      p.x = _reversed ? WORLD_W - TILE : TILE/2;
-      p.y = WORLD_H/2;
-    }
-  }
-
-  function _updateMe(delta) {
-    const mePlayer = _getMyPlayer();
-    if (mePlayer && (mePlayer.spectating || !mePlayer.alive)) return;
-    const jx  = Joystick.getDx();
-    const jy  = Joystick.getDy();
-    const mag = Math.sqrt(jx*jx+jy*jy);
-    _me.moving = mag > 0.05;
-    if (_me.moving) {
-      const spd = 160 * delta;
-      const nx  = _me.x + jx * spd;
-      const ny  = _me.y + jy * spd;
-      if (_canMove(nx, _me.y, null)) _me.x = Utils.clamp(nx, 0, WORLD_W);
-      if (_canMove(_me.x, ny, null)) _me.y = Utils.clamp(ny, 0, WORLD_H);
-      _me.ft += delta;
-      if (_me.ft >= 0.13) { _me.ft=0; _me.frame=(_me.frame+1)%3; }
-    } else {
-      _me.frame=0; _me.ft=0;
-    }
-    if (_me.invincible > 0) _me.invincible -= delta;
-    if (_laserOn) return;
-    if (!_me.heldCard) _checkPickupCard();
-    _checkCapsuleEntry();
-    _checkFragile(_me);
-  }
-
-  function _canMove(nx, ny, entity = null) {
-    if (nx < 0 || nx > WORLD_W || ny < 0 || ny > WORLD_H) return false;
-    if (entity && entity.isBot) {
-      if (entity.spectating || !entity.alive) return true;
-    } else {
-      const mePlayer = _getMyPlayer();
-      if (mePlayer && (mePlayer.spectating || !mePlayer.alive)) return true;
-    }
-    const laserX = _reversed ? GRID_END_COL*TILE : SAFE_ZONE_COLS*TILE;
-    if (_laserOn) {
-      if (!_reversed && nx > laserX - 10) return false;
-      if ( _reversed && nx < laserX + 10) return false;
-    }
-    for (const b of _blockers) {
-      if (!b.visible) continue;
-      if (nx > b.x && nx < b.x+b.w && ny > b.y && ny < b.y+b.h) return false;
+    for(const b of _blockers){
+      if(!b.visible)continue;
+      if(nx>b.x&&nx<b.x+b.w&&ny>b.y&&ny<b.y+b.h)return false;
     }
     return true;
   }
 
-  function _checkPickupCard() {
-    for (const c of _cards) {
-      if (c.taken) continue;
-      const dist = Utils.distance(_me.x, _me.y, c.x, c.y);
-      if (dist < 28) {
-        if (_actionCard === 'plus2' && _me.heldCard && !_me.heldCard2 && c.isSecond) {
-          c.taken       = true;
-          _me.heldCard2 = c;
-          UI.showToast('🃏 التقطت البطاقة الثانية!', 1000);
-        } else if (!_me.heldCard) {
-          c.taken      = true;
-          _me.heldCard = c;
+  // ─── Bots AI ───
+  function _updateBots(delta) {
+    for(const p of _players) {
+      if(!p.isBot||!p.alive||p.spectating||p.falling)continue;
+      _updateBot(p,delta);
+    }
+  }
+
+  function _updateBot(bot,delta) {
+    const spd=(bot.botLevel==='hard'?170:bot.botLevel==='medium'?130:90)*delta;
+
+    // تفادي العوائق بناءً على المستوى
+    const dodgeChance=bot.botLevel==='hard'?0.9:bot.botLevel==='medium'?0.5:0.2;
+
+    if(!bot.card) {
+      // اتجه نحو أقرب بطاقة
+      let nearest=null, nd=Infinity;
+      for(const c of _cards){
+        if(c.taken)continue;
+        const d=Utils.distance(bot.x,bot.y,c.x,c.y);
+        if(d<nd){nd=d;nearest=c;}
+      }
+      if(nearest) {
+        const dx=nearest.x-bot.x, dy=nearest.y-bot.y;
+        const dm=Math.sqrt(dx*dx+dy*dy);
+        if(dm>8){
+          const nx=bot.x+dx/dm*spd, ny=bot.y+dy/dm*spd;
+          // تفادي الجدران
+          let moved=false;
+          if(_canMove(nx,bot.y)){bot.x=Utils.clamp(nx,0,WORLD_W);moved=true;}
+          if(_canMove(bot.x,ny)){bot.y=Utils.clamp(ny,0,WORLD_H);moved=true;}
+          // تفادي البلاطات الهشة للمستوى الصعب
+          if(Math.random()<dodgeChance) _botAvoidFragiles(bot,delta,spd);
+          bot.moving=moved;
+          bot.ft+=delta;
+          if(bot.ft>=0.13){bot.ft=0;bot.frame=(bot.frame+1)%3;}
+        } else {
+          // التقاط
+          nearest.taken=true; bot.card=nearest;
+        }
+      }
+    } else {
+      // اتجه نحو الكبسولة الصحيحة
+      let target=null;
+      for(const cap of _capsules){
+        if(!cap.open)continue;
+        if(bot.card.color===cap.color||bot.card.number===_targetCard.number){
+          target=cap; break;
+        }
+      }
+      if(target){
+        const dx=target.x+target.w/2-bot.x, dy=target.y+target.h/2-bot.y;
+        const dm=Math.sqrt(dx*dx+dy*dy);
+        if(dm>12){
+          const nx=bot.x+dx/dm*spd, ny=bot.y+dy/dm*spd;
+          if(_canMove(nx,bot.y))bot.x=Utils.clamp(nx,0,WORLD_W);
+          if(_canMove(bot.x,ny))bot.y=Utils.clamp(ny,0,WORLD_H);
+        } else {
+          target.occupants.push(bot.id);
+        }
+      }
+    }
+  }
+
+  function _botAvoidFragiles(bot,delta,spd) {
+    for(const f of _fragiles){
+      if(f.state==='fallen')continue;
+      const near=Utils.distance(bot.x,bot.y,f.x+f.w/2,f.y+f.h/2)<TILE*1.2;
+      if(near){
+        // تجنّب عبر الانحراف
+        const avoidX=bot.x+(bot.y-f.y)*0.5;
+        if(_canMove(avoidX,bot.y))bot.x=Utils.clamp(avoidX,0,WORLD_W);
+        break;
+      }
+    }
+  }
+
+  // ─── Pickup ───
+  function _checkPickup() {
+    for(const c of _cards){
+      if(c.taken)continue;
+      if(Utils.distance(_me.x,_me.y,c.x,c.y)<28){
+        if(_actionCard==='plus2'&&_me.heldCard&&!_me.heldCard2&&c.isSecond){
+          c.taken=true; _me.heldCard2=c;
+          UI.showToast('🃏 بطاقة ثانية!',800);
+        } else if(!_me.heldCard&&!c.isSecond){
+          c.taken=true; _me.heldCard=c;
+          UI.showToast('🃏 التقطت بطاقة!',600);
         }
         break;
       }
     }
   }
 
-  function _checkCapsuleEntry() {
-    if (!_me.heldCard) return;
-    if (_actionCard === 'plus2' && !_me.heldCard2) return;
-    for (const cap of _capsules) {
-      if (!cap.open) continue;
-      const dist = Utils.distance(_me.x, _me.y, cap.x + cap.w/2, cap.y + cap.h/2);
-      if (dist > 36) continue;
-      const colorMatch  = _me.heldCard.color  === cap.color;
-      const numberMatch = _me.heldCard.number === _targetCard.number;
-      if (colorMatch || numberMatch) {
+  // ─── Capsule ───
+  function _checkCapsule() {
+    if(!_me.heldCard)return;
+    if(_actionCard==='plus2'&&!_me.heldCard2)return;
+    for(const cap of _capsules){
+      if(!cap.open)continue;
+      if(Utils.distance(_me.x,_me.y,cap.x+cap.w/2,cap.y+cap.h/2)>36)continue;
+      const colorOK=_me.heldCard.color===cap.color;
+      const numOK  =_me.heldCard.number===_targetCard.number;
+      if(colorOK||numOK){
         cap.occupants.push(_myId);
-        UI.showToast('✅ نجوت!', 1000);
+        UI.showToast('✅ نجوت!',800);
       } else {
-        UI.showToast('❌ بطاقة خاطئة!', 1000);
-        _me.heldCard = null;
+        UI.showToast('❌ بطاقة خاطئة!',800);
+        _me.heldCard=null;
       }
       break;
     }
   }
 
-  function _checkFragile(entity) {
-    if (entity.spectating || !entity.alive) return;
-    const entityId = entity.id || 'me';
-    for (const f of _fragiles) {
-      if (f.state === 'fallen') {
-        const onFallen = entity.x > f.x && entity.x < f.x+f.w && entity.y > f.y && entity.y < f.y+f.h;
-        if (onFallen && !f.steppedBy.includes(entityId)) {
-          f.steppedBy.push(entityId);
-          if (entity === _me) _loseHeart();
-          else if (entity.isBot) _loseHeartBot(entity);
-        }
-        continue;
-      }
-      const onTile = entity.x > f.x && entity.x < f.x+f.w &&
-                     entity.y > f.y && entity.y < f.y+f.h;
-      const wasOnTile = f.steppedBy.includes(entityId);
-      if (onTile && !wasOnTile) {
-        f.steppedBy.push(entityId);
-        if (f.state === 'normal') {
-          f.state = 'cracked';
-        } else if (f.state === 'cracked') {
-          f.state = 'fallen';
-          if (entity === _me) _loseHeart();
-          else if (entity.isBot) _loseHeartBot(entity);
-        }
-      } else if (!onTile && wasOnTile) {
-        f.steppedBy = f.steppedBy.filter(id => id !== entityId);
+  // ─── Fragile ───
+  function _checkFragileMe() {
+    for(const f of _fragiles){
+      if(f.state==='fallen')continue;
+      const on=_me.x>f.x&&_me.x<f.x+f.w&&_me.y>f.y&&_me.y<f.y+f.h;
+      if(!on)continue;
+      if(f.state==='normal'){f.state='cracked';f.crackT=1.2;}
+      else if(f.state==='cracked'){f.state='fallen';_me.falling=true;_me.fallT=0;}
+    }
+  }
+
+  function _onTileFallen(tile) {
+    for(const p of _players){
+      if(!p.alive||p.spectating)continue;
+      if(p.x>tile.x&&p.x<tile.x+tile.w&&p.y>tile.y&&p.y<tile.y+tile.h){
+        p.falling=true; p.fallT=0;
+        setTimeout(()=>{
+          p.falling=false; p.fallT=0;
+          _loseHeart(p.id);
+        },1000);
       }
     }
   }
 
-  function _loseHeart() {
-    const me = _getMyPlayer();
-    if (!me) return;
-    me.hearts--;
-    if (me.hearts <= 0) {
-      me.alive = false;
-      UI.showToast('💀 خرجت من الفعالية!', 2500);
+  // ─── Heart Loss ───
+  function _loseHeart(id) {
+    if(id===_myId){
+      const me=_getMyPlayer();
+      if(!me)return;
+      me.hearts--;
+      if(me.hearts<=0){me.alive=false;UI.showToast('💀 خرجت!',2500);}
+      else{me.spectating=true;UI.showToast(`💔 قلب! (${me.hearts}/3)`,1500);}
     } else {
-      me.spectating = true;
-      _me.x = _reversed ? WORLD_W - TILE : TILE/2;
-      _me.y = WORLD_H/2;
-      UI.showToast(`💔 خسرت قلباً! (${me.hearts}/3)`, 2000);
+      const p=_players.find(x=>x.id===id);
+      if(!p)return;
+      p.hearts--;
+      if(p.hearts<=0)p.alive=false;
+      else p.spectating=true;
     }
   }
 
+  // ─── End Round ───
   function _endRound() {
-    _roundActive = false;
-    _phase       = 'result';
-    _lightsOn    = true;
-    const me = _getMyPlayer();
-    if (me && me.alive && !me.spectating) {
-      const inCapsule = _capsules.some(c => c.occupants.includes(_myId));
-      if (!inCapsule) _loseHeart();
-    }
-    for (const p of _players) {
-      if (p.isBot && p.alive && !p.spectating) {
-         const inCapsule = _capsules.some(c => c.occupants.includes(p.id));
-         if (!inCapsule) _loseHeartBot(p);
+    _phase='result';
+    _lightsOn=true;
+
+    // من لم يدخل كبسولة
+    const me=_getMyPlayer();
+    const allInCapsule=_capsules.some(c=>c.occupants.includes(_myId));
+
+    // هل الجميع تعادلوا (لا أحد في كبسولة)؟
+    const anyInCapsule=_capsules.some(c=>c.occupants.length>0);
+    if(!anyInCapsule){
+      // تعادل — الجولة الأولى لا خسارة، الثانية فصاعداً ناقص قلب للجميع
+      if(_roundNum>1){
+        if(me&&me.alive) me.hearts=Math.max(0,me.hearts-1);
+        _players.forEach(p=>{if(p.alive)p.hearts=Math.max(0,p.hearts-1);});
+        UI.showToast('⚖️ تعادل! الجميع يخسر قلباً',2000);
+      } else {
+        UI.showToast('⚖️ تعادل في الجولة الأولى!',2000);
       }
+    } else {
+      if(me&&me.alive&&!me.spectating&&!allInCapsule) _loseHeart(_myId);
+      _players.forEach(p=>{
+        if(!p.alive||p.spectating)return;
+        const inCap=_capsules.some(c=>c.occupants.includes(p.id));
+        if(!inCap)_loseHeart(p.id);
+      });
     }
-    _players.forEach(p => { p.spectating = false; });
-    if (me && me.alive) me.spectating = false;
-    const alive = _getAlivePlayers();
-    if (alive.length <= 1) {
-      _phase = 'gameover';
-      const winner = alive[0];
-      UI.showToast(winner ? `🏆 الفائز: ${winner.name}!` : '🤝 تعادل!', 4000);
-      setTimeout(exit, 5000);
+
+    // أعِد المتفرجين للعب
+    if(me)me.spectating=false;
+    _players.forEach(p=>{p.spectating=false;});
+
+    // تحقق الفائز
+    const alive=_getAlivePlayers();
+    if(alive.length<=1){
+      _phase='gameover';
+      if(alive.length===0){
+        UI.showToast('🤝 مباراة نظيفة — لا فائز!',4000);
+      } else {
+        UI.showToast(`🏆 الفائز: ${alive[0].name}!`,4000);
+      }
+      setTimeout(exit,5000);
       return;
     }
-    setTimeout(_startRound, 3000);
+
+    setTimeout(_startRound,3000);
   }
 
-  function _updateResult(delta) {}
-
+  // ═══════════════════════════════
+  //  PUSH / STEAL / DODGE
+  // ═══════════════════════════════
   function push(dir) {
-    const mePlayer = _getMyPlayer();
-    if (!mePlayer || mePlayer.spectating || !mePlayer.alive) return;
-    if (_me.pushCharge < 1) return;
-    _me.pushCharge = 0;
-    const pushDist = TILE;
-    const offsets  = {
-      up   : { dx:  0, dy: -pushDist },
-      down : { dx:  0, dy:  pushDist },
-      left : { dx: -pushDist, dy: 0  },
-      right: { dx:  pushDist, dy: 0  },
-    };
-    const off = offsets[dir];
-    if (!off) return;
-    for (const p of _players) {
-      if (!p.alive || p.spectating) continue;
-      const dist = Utils.distance(_me.x, _me.y, p.x, p.y);
-      if (dist > TILE * 1.2) continue;
-      const nx = p.x + off.dx;
-      const ny = p.y + off.dy;
-      p.x = Utils.clamp(nx, 0, WORLD_W);
-      p.y = Utils.clamp(ny, 0, WORLD_H);
-      _checkFragile(p);
-      Network.sendPush(p.id, p.x, p.y);
-      UI.showToast(`💥 دفعت ${p.name}!`, 800);
+    if(_me.pushCharge<1)return;
+    _me.pushCharge=0;
+    const off={up:{dx:0,dy:-TILE},down:{dx:0,dy:TILE},left:{dx:-TILE,dy:0},right:{dx:TILE,dy:0}};
+    const o=off[dir]; if(!o)return;
+    for(const p of _players){
+      if(!p.alive||p.spectating)continue;
+      if(Utils.distance(_me.x,_me.y,p.x,p.y)>TILE*1.2)continue;
+      if(p.invincible>0)continue;
+      p.x=Utils.clamp(p.x+o.dx,0,WORLD_W);
+      p.y=Utils.clamp(p.y+o.dy,0,WORLD_H);
+      _checkFragilePlayer(p);
+      Network.sendPush(p.id,p.x,p.y);
+      UI.showToast(`💥 دفعت ${p.name}!`,600);
       break;
+    }
+  }
+
+  function steal() {
+    if(_me.pushCharge<1)return;
+    for(const p of _players){
+      if(!p.alive||!p.card)continue;
+      if(Utils.distance(_me.x,_me.y,p.x,p.y)>TILE*0.9)continue;
+      if(p.invincible>0)continue;
+      if(_me.invincible>0)continue;
+      // تفادي الضحية
+      if(Math.random()<DODGE_CHANCE&&p.isBot&&p.botLevel==='hard'){
+        UI.showToast(`${p.name} تفادى السرقة! 💨`,600); return;
+      }
+      _me.heldCard=p.card; p.card=null;
+      UI.showToast(`🃏 سرقت بطاقة ${p.name}!`,800);
+      return;
     }
   }
 
   function dodge() {
-    const mePlayer = _getMyPlayer();
-    if (!mePlayer || mePlayer.spectating || !mePlayer.alive) return;
-    if (_me.dodgeCharge < 1) return;
-    _me.dodgeCharge = 0;
-    const success = Math.random() < 0.6;
-    if (success) {
-      _me.invincible = 0.8;
-      UI.showToast('💨 تفاديت!', 700);
+    if(_me.dodgeCharge<1)return;
+    _me.dodgeCharge=0;
+    if(Math.random()<DODGE_CHANCE){
+      _me.invincible=0.9;
+      UI.showToast('💨 تفاديت!',600);
     } else {
-      UI.showToast('😵 فشل التفادي!', 700);
+      UI.showToast('😵 فشل التفادي!',600);
     }
   }
 
+  function _checkFragilePlayer(p) {
+    for(const f of _fragiles){
+      if(f.state==='fallen')continue;
+      const on=p.x>f.x&&p.x<f.x+f.w&&p.y>f.y&&p.y<f.y+f.h;
+      if(!on)continue;
+      if(f.state==='normal'){f.state='cracked';f.crackT=1.2;}
+      else if(f.state==='cracked'){
+        f.state='fallen';
+        p.falling=true;
+        setTimeout(()=>{p.falling=false;_loseHeart(p.id);},1000);
+      }
+    }
+  }
+
+  // ═══════════════════════════════
+  //  DRAW
+  // ═══════════════════════════════
   function draw(ctx) {
-    if (!_active) return;
-    const cw = window.innerWidth, ch = window.innerHeight;
+    if(!_active)return;
+    const cw=window.innerWidth, ch=window.innerHeight;
+
     ctx.save();
-    ctx.translate(-_camX, -_camY);
+    ctx.translate(-_camX,-_camY);
+
     _drawFloor(ctx);
     _drawFragiles(ctx);
     _drawBlockers(ctx);
@@ -624,383 +668,351 @@ const EventUno = (() => {
     _drawCards(ctx);
     _drawPlayers(ctx);
     _drawMe(ctx);
+
     ctx.restore();
-    if (!_lightsOn) _drawDarkness(ctx, cw, ch);
-    _drawHUD(ctx, cw, ch);
-    _drawActionCard(ctx, cw, ch);
+
+    if(!_lightsOn)_drawDarkness(ctx,cw,ch);
+    _drawHUD(ctx,cw,ch);
+
+    if(_phase==='countdown'&&_countdownT>0)_drawCountdown(ctx,cw,ch);
+    if(_phase==='camSweep')_drawTargetCardBig(ctx,cw,ch);
   }
 
+  // ─── Floor ───
   function _drawFloor(ctx) {
-    ctx.fillStyle = '#020008';
-    ctx.fillRect(0,0,WORLD_W,WORLD_H);
-    const t = Date.now()/1000;
-    ctx.fillStyle = '#fff';
-    for(let i=0; i<150; i++){
-        const sx = (Math.sin(i*123) * 5000 + t * (i%3+1)*20) % WORLD_W;
-        const sy = Math.cos(i*321) * WORLD_H;
-        const sz = Math.abs(Math.sin(t*2 + i));
-        ctx.globalAlpha = sz;
-        ctx.fillRect(Math.abs(sx), Math.abs(sy), i%2+1, i%2+1);
-    }
-    ctx.globalAlpha = 1;
-    for (let r=0; r<GRID_ROWS; r++) {
-      for (let c=0; c<GRID_COLS; c++) {
-        let color;
-        const isSafe = (c < SAFE_ZONE_COLS || c >= GRID_END_COL);
-        if (isSafe) {
-          color = (r+c)%2===0 ? '#150535' : '#100028';
-        } else {
-          color = (r+c)%2===0 ? '#220800' : '#180500';
-        }
-        const fill = _reversed ? (c >= GRID_COLS-SAFE_ZONE_COLS ? ((r+c)%2===0 ? '#150535' : '#100028') : color) : color;
-        ctx.fillStyle = fill;
-        ctx.fillRect(c*TILE, r*TILE, TILE, TILE);
-        ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(c*TILE + 1, r*TILE + 1, TILE - 2, TILE - 2);
-        ctx.strokeStyle = isSafe ? 'rgba(136,0,255,0.2)' : 'rgba(255,60,0,0.2)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(c*TILE + 2, r*TILE + 2, TILE - 4, TILE - 4);
+    for(let r=0;r<GRID_ROWS;r++){
+      for(let c=0;c<GRID_COLS;c++){
+        const inSafe=c<SAFE_COLS||c>=GRID_END;
+        ctx.fillStyle=inSafe
+          ?((r+c)%2===0?'#0d0025':'#0a001e')
+          :((r+c)%2===0?'#1a0a00':'#150800');
+        ctx.fillRect(c*TILE,r*TILE,TILE,TILE);
       }
     }
+    ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=0.5;
+    for(let x=0;x<=WORLD_W;x+=TILE){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,WORLD_H);ctx.stroke();}
+    for(let y=0;y<=WORLD_H;y+=TILE){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(WORLD_W,y);ctx.stroke();}
   }
 
+  // ─── Fragiles ───
   function _drawFragiles(ctx) {
-    for (const f of _fragiles) {
-      if (f.state === 'fallen') {
-        ctx.fillStyle = '#010003';
-        ctx.fillRect(f.x, f.y, f.w, f.h);
-        ctx.strokeStyle = '#220800';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(f.x+2, f.y+2, f.w-4, f.h-4);
+    for(const f of _fragiles){
+      if(f.state==='fallen'){
+        ctx.fillStyle='rgba(0,0,0,0.85)';
+        ctx.fillRect(f.x,f.y,f.w,f.h);
+        ctx.strokeStyle='#333';ctx.lineWidth=1;
+        ctx.strokeRect(f.x,f.y,f.w,f.h);
         continue;
       }
-      if (f.state === 'normal') {
-        ctx.fillStyle = 'rgba(255,140,0,0.18)';
-        ctx.fillRect(f.x, f.y, f.w, f.h);
-        ctx.strokeStyle = 'rgba(255,140,0,0.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(f.x+2, f.y+2, f.w-4, f.h-4);
-      } else if (f.state === 'cracked') {
-        ctx.fillStyle = 'rgba(255,60,0,0.4)';
-        ctx.fillRect(f.x, f.y, f.w, f.h);
-        ctx.strokeStyle = 'rgba(255,60,0,0.9)';
-        ctx.lineWidth = 2;
+      if(f.state==='normal'){
+        ctx.fillStyle='rgba(255,140,0,0.15)';
+        ctx.fillRect(f.x,f.y,f.w,f.h);
+        ctx.strokeStyle='rgba(255,140,0,0.4)';ctx.lineWidth=1;
+        ctx.strokeRect(f.x+2,f.y+2,f.w-4,f.h-4);
+      } else {
+        ctx.fillStyle='rgba(255,50,0,0.28)';
+        ctx.fillRect(f.x,f.y,f.w,f.h);
+        ctx.strokeStyle='rgba(255,50,0,0.7)';ctx.lineWidth=2;
         ctx.beginPath();
-        ctx.moveTo(f.x+f.w*0.3, f.y);
-        ctx.lineTo(f.x+f.w*0.5, f.y+f.h*0.5);
-        ctx.lineTo(f.x+f.w*0.8, f.y+f.h);
-        ctx.stroke();
+        ctx.moveTo(f.x+f.w*.3,f.y);ctx.lineTo(f.x+f.w*.5,f.y+f.h*.5);ctx.lineTo(f.x+f.w*.8,f.y+f.h);ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(f.x, f.y+f.h*0.4);
-        ctx.lineTo(f.x+f.w*0.5, f.y+f.h*0.5);
-        ctx.lineTo(f.x+f.w, f.y+f.h*0.7);
-        ctx.stroke();
+        ctx.moveTo(f.x,f.y+f.h*.4);ctx.lineTo(f.x+f.w*.5,f.y+f.h*.5);ctx.lineTo(f.x+f.w,f.y+f.h*.7);ctx.stroke();
       }
     }
   }
 
+  // ─── Blockers ───
   function _drawBlockers(ctx) {
-    for (const b of _blockers) {
-      if (!b.visible) continue;
-      ctx.fillStyle = '#3a0a6a';
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-      ctx.strokeStyle = '#8800ff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(b.x, b.y, b.w, b.h);
+    for(const b of _blockers){
+      if(!b.visible)continue;
+      ctx.fillStyle='#3a0a6a';
+      ctx.fillRect(b.x,b.y,b.w,b.h);
+      ctx.strokeStyle='#8800ff';ctx.lineWidth=2;
+      ctx.strokeRect(b.x,b.y,b.w,b.h);
     }
   }
 
+  // ─── Laser ───
   function _drawLaser(ctx) {
-    if (!_laserOn) return;
-    const lx = _reversed
-      ? (GRID_END_COL) * TILE
-      : SAFE_ZONE_COLS * TILE;
-    const t  = Date.now()/1000;
-    const alpha = 0.6 + Math.sin(t*8)*0.4;
-    ctx.fillStyle = `rgba(255,0,0,${alpha})`;
-    ctx.fillRect(lx-3, 0, 6, WORLD_H);
-    const gr = ctx.createLinearGradient(lx-20, 0, lx+20, 0);
+    if(!_laserOn)return;
+    const lx=_reversed?GRID_END*TILE:SAFE_COLS*TILE;
+    const t=Date.now()/1000;
+    const a=0.6+Math.sin(t*8)*0.4;
+    ctx.fillStyle=`rgba(255,0,0,${a})`;
+    ctx.fillRect(lx-3,0,6,WORLD_H);
+    const gr=ctx.createLinearGradient(lx-20,0,lx+20,0);
     gr.addColorStop(0,'rgba(255,0,0,0)');
-    gr.addColorStop(0.5,`rgba(255,0,0,${alpha*0.4})`);
+    gr.addColorStop(0.5,`rgba(255,0,0,${a*.4})`);
     gr.addColorStop(1,'rgba(255,0,0,0)');
-    ctx.fillStyle = gr;
-    ctx.fillRect(lx-20, 0, 40, WORLD_H);
+    ctx.fillStyle=gr;ctx.fillRect(lx-20,0,40,WORLD_H);
   }
 
+  // ─── Capsules ───
   function _drawCapsules(ctx) {
-    for (const cap of _capsules) {
-      const colorMap = {
-        red:'#cc1111', blue:'#1144cc',
-        green:'#118811', yellow:'#ccaa00'
-      };
-      const c = colorMap[cap.color] || '#444';
-      if (!cap.open) {
-        ctx.fillStyle = 'rgba(80,80,80,0.6)';
-        ctx.fillRect(cap.x, cap.y, cap.w, cap.h);
-        ctx.strokeStyle = '#555';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(cap.x, cap.y, cap.w, cap.h);
-        Utils.drawPixelText(ctx,'🔒', cap.x+cap.w/2, cap.y+cap.h/2,
-          {font:'14px serif', align:'center'});
+    const t=Date.now()/1000;
+    for(const cap of _capsules){
+      const c=COLOR_HEX[cap.color]||'#444';
+      if(!cap.open){
+        ctx.fillStyle='rgba(60,60,60,0.5)';
+        ctx.fillRect(cap.x,cap.y,cap.w,cap.h);
+        ctx.strokeStyle='#555';ctx.lineWidth=2;
+        ctx.strokeRect(cap.x,cap.y,cap.w,cap.h);
+        ctx.font='12px serif';ctx.textAlign='center';
+        ctx.fillText('🔒',cap.x+cap.w/2,cap.y+cap.h/2+4);
         continue;
       }
-      const t = Date.now()/1000;
-      const pulse = 0.6+Math.sin(t*3)*0.4;
-      ctx.fillStyle = c + '33';
-      ctx.fillRect(cap.x, cap.y, cap.w, cap.h);
-      ctx.strokeStyle = c;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(cap.x, cap.y, cap.w, cap.h);
-      const gr = ctx.createRadialGradient(
-        cap.x+cap.w/2, cap.y+cap.h/2, 0,
-        cap.x+cap.w/2, cap.y+cap.h/2, cap.w
-      );
-      gr.addColorStop(0, c + Math.floor(pulse*80).toString(16).padStart(2,'0'));
-      gr.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = gr;
-      ctx.fillRect(cap.x-10, cap.y-10, cap.w+20, cap.h+20);
-      ctx.font = '9px "Press Start 2P"';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#fff';
-      ctx.fillText(cap.color.toUpperCase(), cap.x+cap.w/2, cap.y+14);
+      const pulse=0.6+Math.sin(t*3)*0.4;
+      ctx.fillStyle=c+'22';ctx.fillRect(cap.x,cap.y,cap.w,cap.h);
+      ctx.strokeStyle=c;ctx.lineWidth=3;ctx.strokeRect(cap.x,cap.y,cap.w,cap.h);
+      const gr=ctx.createRadialGradient(cap.x+cap.w/2,cap.y+cap.h/2,0,cap.x+cap.w/2,cap.y+cap.h/2,cap.w);
+      gr.addColorStop(0,c+Math.floor(pulse*70).toString(16).padStart(2,'0'));
+      gr.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=gr;ctx.fillRect(cap.x-10,cap.y-10,cap.w+20,cap.h+20);
+      ctx.font='8px "Press Start 2P"';ctx.textAlign='center';ctx.fillStyle='#fff';
+      ctx.fillText(cap.color.toUpperCase(),cap.x+cap.w/2,cap.y+12);
     }
   }
 
+  // ─── Cards (UNO Style) ───
   function _drawCards(ctx) {
-    for (const c of _cards) {
-      if (c.taken) continue;
-      const colorMap = {
-        red:'#cc1111', blue:'#1144cc',
-        green:'#118811', yellow:'#ccaa00',
-      };
-      const bg = colorMap[c.color] || '#555';
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      Utils.drawPixelRect(ctx, c.x-14+2, c.y-20+2, 28, 40, 3);
-      Utils.drawPixelRect(ctx, c.x-14, c.y-20, 28, 40, 3, '#fff', '#111', 1);
-      Utils.drawPixelRect(ctx, c.x-11, c.y-17, 22, 34, 4, bg);
-      ctx.save();
-      ctx.translate(c.x, c.y);
-      ctx.rotate(-Math.PI / 6);
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 7, 13, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = bg;
-      ctx.font = 'bold 12px "Press Start 2P"';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(c.number.toString(), c.x, c.y+1);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 6px "Press Start 2P"';
-      ctx.fillText(c.number.toString(), c.x-7, c.y-12);
-      ctx.fillText(c.number.toString(), c.x+7, c.y+13);
+    for(const c of _cards){
+      if(c.taken)continue;
+      _drawUNOCard(ctx,c.x-16,c.y-24,32,46,c.color,c.number,c.real);
     }
   }
 
+  function _drawUNOCard(ctx,x,y,w,h,color,number,real) {
+    const bg=COLOR_HEX[color]||color;
+    // ظل
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+    ctx.fillRect(x+3,y+3,w,h);
+    // خلفية البطاقة
+    ctx.fillStyle=bg;
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,h,4);
+    ctx.fill();
+    // إطار أبيض داخلي
+    ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.roundRect(x+3,y+3,w-6,h-6,3);ctx.stroke();
+    // البيضة البيضاء في المنتصف
+    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(x+w/2,y+h/2,w*.35,h*.28,Math.PI/4,0,Math.PI*2);
+    ctx.fill();
+    // الرقم في المنتصف
+    ctx.font=`bold ${Math.floor(h*.36)}px "Press Start 2P"`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#fff';
+    ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=3;
+    ctx.fillText(number.toString(),x+w/2,y+h/2);
+    ctx.shadowBlur=0;
+    // أرقام الزوايا
+    ctx.font=`bold ${Math.floor(h*.16)}px "Press Start 2P"`;
+    ctx.fillText(number.toString(),x+5,y+7);
+    ctx.fillText(number.toString(),x+w-5,y+h-5);
+    // لو بطاقة خادعة — طبقة شفافة
+    if(!real){
+      ctx.fillStyle='rgba(0,0,0,0.2)';
+      ctx.beginPath();ctx.roundRect(x,y,w,h,4);ctx.fill();
+    }
+  }
+
+  // ─── Players ───
   function _drawPlayers(ctx) {
-    for (const p of _players) {
-      if (!p.alive && !p.spectating) continue;
-      const char = Player.getAllChars()[p.charId];
-      if (!char) continue;
+    for(const p of _players){
+      if(!p.alive&&!p.spectating)continue;
       ctx.save();
-      if (p.spectating) ctx.globalAlpha = 0.4;
-      char.draw(ctx, p.x-12, p.y-14, 'down', p.frame, p.moving);
-      Utils.drawPixelText(ctx, p.name, p.x, p.y-22,
-        { font:'5px "Press Start 2P"', color:'#f0c040', align:'center' });
-      let heartsStr = '';
-      for (let i=0; i<p.hearts; i++) heartsStr += '❤️';
-      ctx.font = '8px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(heartsStr, p.x, p.y-32);
-      if (p.hearts === 1) {
-        const pulse = 0.5+Math.sin(Date.now()/200)*0.5;
-        ctx.globalAlpha = pulse * (p.spectating ? 0.4 : 1);
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(p.x-14, p.y-14, 28, 36);
+      if(p.spectating)ctx.globalAlpha=0.35;
+      if(p.falling){
+        const s=1-p.fallT*0.8;
+        ctx.translate(p.x,p.y);ctx.scale(s,s);ctx.translate(-p.x,-p.y);
+        ctx.globalAlpha=(ctx.globalAlpha||1)*(1-p.fallT);
       }
-      if (p.card) {
-        const colorMap = {red:'#cc1111',blue:'#1144cc',green:'#118811',yellow:'#ccaa00'};
-        ctx.fillStyle = colorMap[p.card.color]||'#555';
-        ctx.fillRect(p.x+10, p.y-20, 14, 18);
-        ctx.fillStyle='#fff';
-        ctx.font='bold 7px monospace';
-        ctx.textAlign='center';
-        ctx.fillText(p.card.number.toString(), p.x+17, p.y-10);
+      const char=Player.getAllChars()[p.charId];
+      if(char)char.draw(ctx,p.x-12,p.y-14,'down',p.frame,p.moving);
+      // اسم
+      Utils.drawPixelText(ctx,p.name,p.x,p.y-24,
+        {font:'5px "Press Start 2P"',color:p.isBot?'#40c0f0':'#f0c040',align:'center'});
+      // قلوب
+      let h='';for(let i=0;i<p.hearts;i++)h+='❤️';
+      ctx.font='8px serif';ctx.textAlign='center';ctx.fillText(h,p.x,p.y-34);
+      // وسم الضعيف
+      if(p.hearts===1){
+        const pulse=0.5+Math.sin(Date.now()/200)*0.5;
+        ctx.globalAlpha=pulse;ctx.strokeStyle='#ff0000';ctx.lineWidth=2;
+        ctx.strokeRect(p.x-14,p.y-14,28,36);
+      }
+      // بطاقة محمولة صغيرة
+      if(p.card){
+        _drawUNOCard(ctx,p.x+10,p.y-22,16,22,p.card.color,p.card.number,true);
       }
       ctx.restore();
     }
   }
 
+  // ─── Me ───
   function _drawMe(ctx) {
-    const me = _getMyPlayer();
-    if (!me || (!me.alive && !me.spectating)) return;
+    const me=_getMyPlayer();
+    if(!me||(!me.alive&&!me.spectating))return;
     ctx.save();
-    if (me.spectating) ctx.globalAlpha = 0.4;
-    if (_me.invincible > 0) {
-      ctx.globalAlpha = 0.5 + Math.sin(Date.now()/80)*0.5;
+    if(me.spectating)ctx.globalAlpha=0.35;
+    if(_me.invincible>0)ctx.globalAlpha=0.5+Math.sin(Date.now()/80)*0.5;
+    if(_me.falling){
+      const s=1-_me.fallT*0.8;
+      ctx.translate(_me.x,_me.y);ctx.scale(s,s);ctx.translate(-_me.x,-_me.y);
+      ctx.globalAlpha=(ctx.globalAlpha||1)*(1-_me.fallT);
     }
-    const char = Player.getAllChars()[Player.getCharId()];
-    if (char) char.draw(ctx, _me.x-12, _me.y-14, 'down', _me.frame, _me.moving);
-    if (me.hearts === 1) {
-      const pulse = 0.5+Math.sin(Date.now()/200)*0.5;
-      ctx.globalAlpha = pulse;
-      ctx.strokeStyle = '#ff0000';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(_me.x-14, _me.y-14, 28, 36);
+    const char=Player.getAllChars()[Player.getCharId()];
+    if(char)char.draw(ctx,_me.x-12,_me.y-14,'down',_me.frame,_me.moving);
+    if(me.hearts===1){
+      const pulse=0.5+Math.sin(Date.now()/200)*0.5;
+      ctx.globalAlpha=pulse;ctx.strokeStyle='#ff0000';ctx.lineWidth=3;
+      ctx.strokeRect(_me.x-14,_me.y-14,28,36);
+    }
+    // بطاقة محمولة
+    if(_me.heldCard){
+      _drawUNOCard(ctx,_me.x+10,_me.y-22,16,22,_me.heldCard.color,_me.heldCard.number,true);
     }
     ctx.restore();
   }
 
-  function _drawDarkness(ctx, cw, ch) {
-    const gr = ctx.createRadialGradient(
-      _me.x-_camX, _me.y-_camY, TILE*0.5,
-      _me.x-_camX, _me.y-_camY, TILE*3
+  // ─── Darkness (Wild) ───
+  function _drawDarkness(ctx,cw,ch) {
+    const gr=ctx.createRadialGradient(
+      _me.x-_camX,_me.y-_camY,TILE*.4,
+      _me.x-_camX,_me.y-_camY,TILE*2.8
     );
     gr.addColorStop(0,'rgba(0,0,0,0)');
-    gr.addColorStop(1,'rgba(0,0,0,0.96)');
-    ctx.fillStyle = gr;
-    ctx.fillRect(0,0,cw,ch);
+    gr.addColorStop(1,'rgba(0,0,0,0.97)');
+    ctx.fillStyle=gr;ctx.fillRect(0,0,cw,ch);
   }
 
-  function _drawHUD(ctx, cw, ch) {
-    const me = _getMyPlayer();
-    const tx = cw/2, ty = 14;
-    ctx.fillStyle='rgba(0,0,0,0.85)';
-    ctx.fillRect(tx-60, ty, 40, 40);
-    ctx.strokeStyle='#f0c040';
-    ctx.lineWidth=2;
-    ctx.strokeRect(tx-60, ty, 40, 40);
-    if (_targetCard) {
-      const colorMap={red:'#cc1111',blue:'#1144cc',green:'#118811',yellow:'#ccaa00'};
-      const bg = colorMap[_targetCard.color]||'#fff';
-      Utils.drawPixelRect(ctx, tx-51, ty+6, 22, 28, 3, '#fff', '#111', 1);
-      Utils.drawPixelRect(ctx, tx-49, ty+8, 18, 24, 2, bg);
-      ctx.save();
-      ctx.translate(tx-40, ty+20);
-      ctx.rotate(-Math.PI / 6);
-      ctx.fillStyle='#fff';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 5, 9, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      ctx.fillStyle=bg;
-      ctx.font='bold 11px "Press Start 2P"';
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-      ctx.fillText(_targetCard.number.toString(), tx-40, ty+21);
+  // ─── HUD ───
+  function _drawHUD(ctx,cw,ch) {
+    const me=_getMyPlayer();
+
+    // بطاقة الهدف في المنتصف أعلى
+    if(_targetCard&&_phase!=='camSweep'){
+      ctx.fillStyle='rgba(0,0,0,0.85)';
+      ctx.fillRect(cw/2-50,8,100,56);
+      ctx.strokeStyle='#f0c040';ctx.lineWidth=2;
+      ctx.strokeRect(cw/2-50,8,100,56);
+      Utils.drawPixelText(ctx,'TARGET',cw/2,12,
+        {font:'5px "Press Start 2P"',color:'#aaa',align:'center'});
+      _drawUNOCard(ctx,cw/2-14,18,28,40,_targetCard.color,_targetCard.number,true);
     }
-    const timerColor = _roundTimer<4 ? '#ff0088' : '#f0c040';
-    const timerPulse = _roundTimer<4 ? 0.7+Math.sin(Date.now()/100)*0.3 : 1;
-    ctx.save();
-    ctx.globalAlpha = timerPulse;
-    Utils.drawPixelText(ctx, Math.ceil(_roundTimer)+'s', cw/2, 58,
-      {font:'10px "Press Start 2P"',color:timerColor,align:'center'});
-    ctx.restore();
-    if (me) {
-      let h='';
-      for(let i=0;i<me.hearts;i++) h+='❤️';
-      ctx.font='14px serif';
-      ctx.textAlign='left';
-      ctx.fillText(h, 14, 24);
-    }
-    if (_phase==='countdown' && _countdownT>0) {
-      const n = Math.ceil(_countdownT);
-      ctx.save();
-      const scale = 1+(_countdownT%1)*0.5;
-      ctx.translate(cw/2, ch/2);
-      ctx.scale(scale,scale);
-      ctx.font='bold 48px "Press Start 2P"';
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-      ctx.fillStyle='rgba(255,0,136,0.9)';
-      ctx.fillText(n===3?'3':n===2?'2':'GO!', 2, 2);
-      ctx.fillStyle='#fff';
-      ctx.fillText(n===3?'3':n===2?'2':'GO!', 0, 0);
+
+    // وقت
+    if(_phase==='running'){
+      const tc=_roundTimer<6?'#ff0088':'#f0c040';
+      const tp=_roundTimer<6?0.6+Math.sin(Date.now()/100)*.4:1;
+      ctx.save();ctx.globalAlpha=tp;
+      Utils.drawPixelText(ctx,Math.ceil(_roundTimer)+'s',cw/2,70,
+        {font:'10px "Press Start 2P"',color:tc,align:'center'});
       ctx.restore();
     }
-    _drawChargeBar(ctx, 14, ch-44, 80, 12, _me.pushCharge, '#ff4400', '👊');
-    _drawChargeBar(ctx, 14, ch-26, 80, 12, _me.dodgeCharge,'#00aaff', '💨');
-    if (_phase==='result') {
-      Utils.drawPixelText(ctx,'نهاية الجولة...', cw/2, ch/2-20,
-        {font:'8px "Press Start 2P"',color:'#f0c040',align:'center'});
+
+    // قلوب اللاعب
+    if(me){
+      let h='';for(let i=0;i<me.hearts;i++)h+='❤️';
+      ctx.font='14px serif';ctx.textAlign='left';ctx.fillText(h,14,24);
     }
-    Utils.drawPixelText(ctx,`R${_roundNum}`, 14, ch-60,
+
+    // رقم الجولة
+    Utils.drawPixelText(ctx,`R${_roundNum}`,14,ch-56,
       {font:'6px "Press Start 2P"',color:'#888',align:'left'});
+
+    // شريط الدفع
+    _drawBar(ctx,14,ch-40,80,12,_me.pushCharge,'#ff4400','👊');
+    _drawBar(ctx,14,ch-24,80,12,_me.dodgeCharge,'#00aaff','💨');
+
+    // بطاقة الأكشن
+    if(_actionCard){
+      const ac={skip:'⏭ SKIP',reverse:'🔄 REV',plus2:'+2 🃏',wild:'🌑 ×4'};
+      const cc={skip:'#ff8800',reverse:'#8800ff',plus2:'#0088ff',wild:'#111'};
+      ctx.fillStyle=cc[_actionCard]||'#333';
+      ctx.fillRect(cw-76,12,64,26);
+      ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.strokeRect(cw-76,12,64,26);
+      Utils.drawPixelText(ctx,ac[_actionCard]||_actionCard,cw-44,16,
+        {font:'5px "Press Start 2P"',color:'#fff',align:'center'});
+    }
   }
 
-  function _drawChargeBar(ctx, x, y, w, h, charge, color, icon) {
-    ctx.fillStyle='rgba(0,0,0,0.7)';
-    ctx.fillRect(x, y, w+20, h);
-    ctx.fillStyle=color;
-    ctx.fillRect(x, y, (w)*charge, h);
-    ctx.strokeStyle='rgba(255,255,255,0.3)';
-    ctx.lineWidth=1;
-    ctx.strokeRect(x, y, w+20, h);
-    ctx.font='9px serif';
-    ctx.textAlign='left';
-    ctx.fillText(icon, x+w+2, y+h-1);
+  function _drawBar(ctx,x,y,w,h,charge,color,icon){
+    ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(x,y,w+20,h);
+    ctx.fillStyle=color;ctx.fillRect(x,y,w*charge,h);
+    ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;ctx.strokeRect(x,y,w+20,h);
+    ctx.font='9px serif';ctx.textAlign='left';ctx.fillText(icon,x+w+2,y+h-1);
   }
 
-  function _drawActionCard(ctx, cw, ch) {
-    if (!_actionCard) return;
-    const labels={
-      reverse:'🔄 REVERSE', skip:'⏭ SKIP',
-      plus2:'+2 🃏', wild:'🌑 WILD'
-    };
-    const colors={
-      reverse:'#8800ff',skip:'#ff8800',
-      plus2:'#0088ff',wild:'#111'
-    };
-    ctx.fillStyle=colors[_actionCard]||'#333';
-    ctx.fillRect(cw-80, 14, 70, 28);
-    ctx.strokeStyle='#fff';
-    ctx.lineWidth=1;
-    ctx.strokeRect(cw-80, 14, 70, 28);
-    Utils.drawPixelText(ctx, labels[_actionCard]||_actionCard,
-      cw-45, 18,
-      {font:'5px "Press Start 2P"',color:'#fff',align:'center'});
+  // ─── Target Card Big (أثناء مسح الكاميرا) ───
+  function _drawTargetCardBig(ctx,cw,ch) {
+    if(!_targetCard)return;
+    const t=Date.now()/1000;
+    const pulse=0.85+Math.sin(t*3)*.15;
+    ctx.save();
+    ctx.globalAlpha=pulse;
+    const cw2=80,ch2=116;
+    _drawUNOCard(ctx,cw/2-cw2/2,ch/2-ch2/2,cw2,ch2,
+      _targetCard.color,_targetCard.number,true);
+    // نص "البطاقة المطلوبة"
+    Utils.drawPixelText(ctx,'ابحث عن هذه البطاقة!',cw/2,ch/2-ch2/2-14,
+      {font:'6px "Press Start 2P"',color:'#f0c040',align:'center'});
+    ctx.restore();
   }
 
+  // ─── Countdown ───
+  function _drawCountdown(ctx,cw,ch) {
+    const n=Math.ceil(_countdownT);
+    const scale=1+(_countdownT%1)*.6;
+    ctx.save();
+    ctx.translate(cw/2,ch/2);ctx.scale(scale,scale);
+    ctx.font='bold 52px "Press Start 2P"';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(255,0,136,.9)';
+    ctx.fillText(n===3?'3':n===2?'2':'GO!',2,2);
+    ctx.fillStyle='#fff';
+    ctx.fillText(n===3?'3':n===2?'2':'GO!',0,0);
+    ctx.restore();
+  }
+
+  // ═══════════════════════════════
+  //  BUILD UI BUTTONS
+  // ═══════════════════════════════
   function _buildUI() {
-    if (document.getElementById('uno-btns')) return;
-    const wrap = document.createElement('div');
-    wrap.id = 'uno-btns';
+    if(document.getElementById('uno-btns'))return;
+    const wrap=document.createElement('div');
+    wrap.id='uno-btns';
     wrap.style.cssText=[
-      'position:fixed','bottom:24px','right:24px',
-      'z-index:50','display:grid',
-      'grid-template-columns:44px 44px 44px',
-      'grid-template-rows:44px 44px 44px',
-      'gap:4px','pointer-events:auto',
+      'position:fixed','bottom:24px','right:24px','z-index:50',
+      'display:grid','grid-template-columns:48px 48px 48px',
+      'grid-template-rows:48px 48px 48px 48px','gap:4px',
     ].join(';');
-    const btnStyle=(bg)=>[
-      `background:${bg}`,'border:2px solid rgba(255,255,255,0.4)',
-      'color:#fff','font-size:16px','cursor:pointer',
-      'border-radius:6px','display:flex',
-      'align-items:center','justify-content:center',
-    ].join(';');
+
+    const s=(bg)=>`background:${bg};border:2px solid rgba(255,255,255,0.4);color:#fff;font-size:16px;cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;`;
+
     const btns=[
-      {id:'uno-up',   icon:'⬆', dir:'up',    col:2, row:1, bg:'#333'},
-      {id:'uno-left', icon:'⬅', dir:'left',  col:1, row:2, bg:'#333'},
-      {id:'uno-dodge',icon:'💨', dir:'dodge', col:2, row:2, bg:'#004488'},
-      {id:'uno-right',icon:'➡', dir:'right', col:3, row:2, bg:'#333'},
-      {id:'uno-down', icon:'⬇', dir:'down',  col:2, row:3, bg:'#333'},
+      {id:'uno-up',   icon:'⬆',dir:'up',   col:2,row:1,bg:'#333'},
+      {id:'uno-left', icon:'⬅',dir:'left', col:1,row:2,bg:'#333'},
+      {id:'uno-dodge',icon:'💨',dir:'dodge',col:2,row:2,bg:'#005588'},
+      {id:'uno-right',icon:'➡',dir:'right',col:3,row:2,bg:'#333'},
+      {id:'uno-down', icon:'⬇',dir:'down', col:2,row:3,bg:'#333'},
+      {id:'uno-steal',icon:'🃏',dir:'steal',col:3,row:3,bg:'#550000'},
     ];
-    for (const b of btns) {
+
+    for(const b of btns){
       const btn=document.createElement('button');
-      btn.id=b.id;
-      btn.innerHTML=b.icon;
-      btn.style.cssText=btnStyle(b.bg)+
-        `;grid-column:${b.col};grid-row:${b.row}`;
+      btn.id=b.id;btn.innerHTML=b.icon;
+      btn.style.cssText=s(b.bg)+`;grid-column:${b.col};grid-row:${b.row}`;
       btn.addEventListener('touchstart',e=>{
         e.preventDefault();
-        if(b.dir==='dodge') dodge();
+        if(b.dir==='dodge')dodge();
+        else if(b.dir==='steal')steal();
         else push(b.dir);
       },{passive:false});
       btn.addEventListener('mousedown',()=>{
-        if(b.dir==='dodge') dodge();
+        if(b.dir==='dodge')dodge();
+        else if(b.dir==='steal')steal();
         else push(b.dir);
       });
       wrap.appendChild(btn);
@@ -1008,36 +1020,37 @@ const EventUno = (() => {
     document.body.appendChild(wrap);
   }
 
-  function _removeUI() {
+  function _removeUI(){
     const el=document.getElementById('uno-btns');
-    if(el) el.remove();
+    if(el)el.remove();
   }
 
-  function _getMyPlayer() {
-    return _players.find(p=>p.id===_myId) || null;
-  }
-
-  function _getAlivePlayers() {
-    const list = _players.filter(p=>p.alive);
-    const me   = _getMyPlayer();
-    if (me && me.alive) list.push(me);
+  // ═══════════════════════════════
+  //  HELPERS
+  // ═══════════════════════════════
+  function _getMyPlayer(){return _players.find(p=>p.id===_myId)||null;}
+  function _getAlivePlayers(){
+    const list=_players.filter(p=>p.alive);
+    const me=_getMyPlayer();
+    if(me&&me.alive)list.push(me);
     return list;
   }
 
-  function exit() {
-    _active = false;
+  // ═══════════════════════════════
+  //  EXIT
+  // ═══════════════════════════════
+  function exit(){
+    _active=false;
     _removeUI();
-    if (typeof UI !== 'undefined' && UI.toggleWorldHUD) {
-      UI.toggleWorldHUD(true);
-    }
-    if (typeof EventManager !== 'undefined') {
-      EventManager.startTransitionOut(() => {
-        UI.showToast('عدت إلى العالم 🌍', 2000);
+    _showWorldUI();
+    if(typeof EventManager!=='undefined'){
+      EventManager.startTransitionOut(()=>{
+        UI.showToast('عدت إلى العالم 🌍',2000);
       });
     }
   }
 
-  function isActive() { return _active; }
+  function isActive(){return _active;}
 
-  return { enter, exit, update, draw, push, dodge, isActive };
+  return{enter,exit,update,draw,push,steal,dodge,isActive};
 })();

@@ -5,11 +5,13 @@ const MiniMap = (() => {
   let _ctx     = null;
   let _toggleBtn = null;
 
+  // حجم يتكيف مع الشاشة
   function _size() {
     return Math.round(Math.min(window.innerWidth, window.innerHeight) * 0.22);
   }
 
   function init() {
+    // Canvas الخريطة
     _canvas = document.createElement('canvas');
     _canvas.id = 'minimap-canvas';
     _canvas.style.cssText = [
@@ -25,6 +27,7 @@ const MiniMap = (() => {
     ].join(';');
     document.body.appendChild(_canvas);
 
+    // زر العين
     _toggleBtn = document.createElement('button');
     _toggleBtn.id = 'minimap-toggle';
     _toggleBtn.textContent = '👁';
@@ -59,32 +62,31 @@ const MiniMap = (() => {
     _toggleBtn.style.opacity = _visible ? '1' : '0.4';
   }
 
-  function show() {
-    if (_toggleBtn) _toggleBtn.style.display = 'flex';
-    if (_canvas) _canvas.style.display = _visible ? 'block' : 'none';
-  }
-
-  function hide() {
-    if (_toggleBtn) _toggleBtn.style.display = 'none';
-    if (_canvas) _canvas.style.display = 'none';
-  }
-
   function draw(playerX, playerY, playerAngle, otherPlayers) {
     if (!_visible || !_ctx) return;
+
     const sz  = _size();
     _canvas.width  = sz;
     _canvas.height = sz;
+
+    // موضع الزر تحت الخريطة مباشرة
     const canvasBottom = parseInt(_canvas.style.bottom) || 160;
     _toggleBtn.style.bottom = (canvasBottom - 20) + 'px';
     _toggleBtn.style.width  = sz + 'px';
+
     const ctx    = _ctx;
     const obs    = typeof Collision !== 'undefined' ? Collision.getObstacles() : [];
     const world  = typeof GameMap   !== 'undefined' ? GameMap.getWorldSize()   : { w: 2560, h: 1920 };
+
     const scaleX = sz / world.w;
     const scaleY = sz / world.h;
+
+    // خلفية شفافة
     ctx.clearRect(0, 0, sz, sz);
     ctx.fillStyle = 'rgba(5,5,20,0.78)';
     ctx.fillRect(0, 0, sz, sz);
+
+    // ── جدران ──
     for (const o of obs) {
       if (o.type !== 'wall') continue;
       ctx.fillStyle = 'rgba(100,50,180,0.85)';
@@ -95,6 +97,8 @@ const MiniMap = (() => {
         Math.max(1, o.h * scaleY)
       );
     }
+
+    // ── شبكة خفيفة ──
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     ctx.lineWidth   = 0.5;
     const step = 64;
@@ -110,13 +114,18 @@ const MiniMap = (() => {
       ctx.lineTo(sz, y * scaleY);
       ctx.stroke();
     }
+
+    // ── أيقونات الكائنات ──
     if (typeof GameMap !== 'undefined') {
       for (const dev of GameMap.getDevices()) {
         _drawIcon(ctx, dev.x + dev.w/2, dev.y + dev.h/2, scaleX, scaleY, '🖥', 7);
       }
     }
+
+    // نباتات من MAP مباشرة (type 3)
     if (typeof GameMap !== 'undefined') {
       const chairs = GameMap.getChairs();
+      // نرسم دوائر صغيرة خضراء بدل emoji للأداء
       ctx.fillStyle = 'rgba(40,160,40,0.8)';
       for (const ch of chairs) {
         ctx.beginPath();
@@ -124,6 +133,8 @@ const MiniMap = (() => {
         ctx.fill();
       }
     }
+
+    // ── باب الدخول ──
     if (typeof GameMap !== 'undefined') {
       const door = GameMap.getDoorRect();
       ctx.fillStyle = 'rgba(240,192,64,0.9)';
@@ -134,6 +145,8 @@ const MiniMap = (() => {
         Math.max(4, door.h * scaleY)
       );
     }
+
+    // ── اللاعبون الآخرون ──
     if (otherPlayers) {
       for (const p of otherPlayers.values()) {
         ctx.fillStyle = 'rgba(255,255,255,0.85)';
@@ -142,24 +155,32 @@ const MiniMap = (() => {
         ctx.fill();
       }
     }
+
+    // ── اللاعب الحالي (سهم أحمر) ──
     const px = playerX * scaleX;
     const py = playerY * scaleY;
     const arrowSize = Math.max(4, sz * 0.045);
+
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(playerAngle);
+
+    // السهم
     ctx.fillStyle   = '#ff2020';
     ctx.strokeStyle = '#fff';
     ctx.lineWidth   = 0.8;
     ctx.beginPath();
-    ctx.moveTo(0,           -arrowSize * 1.4);
+    ctx.moveTo(0,           -arrowSize * 1.4);  // رأس السهم
     ctx.lineTo( arrowSize * 0.7,  arrowSize * 0.8);
     ctx.lineTo(0,            arrowSize * 0.3);
     ctx.lineTo(-arrowSize * 0.7,  arrowSize * 0.8);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+
     ctx.restore();
+
+    // ── إطار خارجي ──
     ctx.strokeStyle = 'rgba(240,192,64,0.5)';
     ctx.lineWidth   = 1;
     ctx.strokeRect(0, 0, sz, sz);
@@ -172,5 +193,5 @@ const MiniMap = (() => {
     ctx.fillText(icon, wx * sx, wy * sy);
   }
 
-  return { init, draw, toggle, show, hide };
+  return { init, draw, toggle };
 })();

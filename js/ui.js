@@ -2,17 +2,18 @@
 const UI = (() => {
   let _sel=0,_onStart=null,_prevCvs=[],_raf=0,_pt=0;
 
+  /* ====== LOADING ====== */
   function showLoading(onDone){
     Utils.show('loading-screen');Utils.hide('character-select-screen');Utils.hide('game-container');
     const bar=Utils.$('loading-bar'),pct=Utils.$('loading-percent'),lbl=Utils.$('loading-label');
     let prog=0;
     const steps=[
-      {t:15,d:120,l:' ...'},
-      {t:35,d:200,l:' ...'},
-      {t:60,d:300,l:' ...'},
-      {t:80,d:200,l:' ...'},
-      {t:95,d:150,l:' ...'},
-      {t:100,d:100,l:'! '}
+      {t:15,d:120,l:'تحميل الأصوات...'},
+      {t:35,d:200,l:'بناء الخريطة...'},
+      {t:60,d:300,l:'رسم الشخصيات...'},
+      {t:80,d:200,l:'إعداد الأجهزة...'},
+      {t:95,d:150,l:'تهيئة العالم...'},
+      {t:100,d:100,l:'جاهز! 🎮'}
     ];
     let si=0;
     function next(){
@@ -29,6 +30,7 @@ const UI = (() => {
     next();
   }
 
+  /* ====== CHARACTER SELECT ====== */
   function showCharacterSelect(onStart){
     _onStart=onStart;
     Utils.show('character-select-screen');Utils.hide('loading-screen');Utils.hide('game-container');
@@ -64,14 +66,19 @@ const UI = (() => {
     Player.getAllChars().forEach((char,i)=>{
       const card=document.createElement('div');card.className='char-card';card.dataset.id=i;
       const cvs=document.createElement('canvas');
+      
+      // الأبعاد الداخلية المطابقة لفن البكسل
       cvs.width=56;
       cvs.height=64;
+      
+      // تفويض التكبير لمحرك الـ CSS لضمان عدم كسر الحاوية
       cvs.style.width='100%';
       cvs.style.height='auto';
       cvs.style.maxHeight='80%';
       cvs.style.objectFit='contain';
       cvs.style.imageRendering='pixelated'; 
       cvs.style.imageRendering='crisp-edges';
+      
       _prevCvs.push(cvs);
       const lbl=document.createElement('div');lbl.className='char-name';lbl.textContent=char.name;
       card.appendChild(cvs);card.appendChild(lbl);grid.appendChild(card);
@@ -96,12 +103,17 @@ const UI = (() => {
       _prevCvs.forEach((cvs,i)=>{
         const ctx=cvs.getContext('2d');
         ctx.imageSmoothingEnabled=false;
+        
+        // مسح الشاشة لدمجها مع خلفية البطاقة (CSS) بدلاً من تغطيتها برسم صلب
         ctx.clearRect(0,0,cvs.width,cvs.height);
+        
         ctx.fillStyle='rgba(0,0,0,0.3)';
         ctx.beginPath();
         ctx.ellipse(cvs.width/2, cvs.height-14, 12, 3, 0, 0, Math.PI*2);
         ctx.fill();
+        
         ctx.save();
+        // إحداثيات مركزية (الشخصية مقاسها تقريباً 24x28 بكسل)
         ctx.translate((cvs.width/2)-12, (cvs.height/2)-14);
         Player.getAllChars()[i].draw(ctx,0,0,'down',frame,true);
         ctx.restore();
@@ -113,12 +125,14 @@ const UI = (() => {
 
   function stopPreviewAnimation(){if(_raf){cancelAnimationFrame(_raf);_raf=0;}}
 
+  /* ====== HUD ====== */
   function showHUD(name){
     Utils.show('hud');
-    const el=Utils.$('hud-character-name');if(el)el.textContent=' '+name;
+    const el=Utils.$('hud-character-name');if(el)el.textContent='⚡ '+name;
   }
   function hideHUD(){Utils.hide('hud');}
 
+  /* ====== COINS DISPLAY ====== */
   function updateCoins(amount){
     let el=Utils.$('hud-coins');
     if(!el){
@@ -133,9 +147,10 @@ const UI = (() => {
       ].join(';');
       document.body.appendChild(el);
     }
-    el.textContent=' '+amount;
+    el.textContent='🪙 '+amount;
   }
 
+  /* ====== TOAST ====== */
   let _toast=null,_toastTimer=null;
   function showToast(msg,dur=2500){
     if(!_toast){
@@ -156,25 +171,5 @@ const UI = (() => {
   function showGame(){Utils.hide('loading-screen');Utils.hide('character-select-screen');Utils.show('game-container');}
   function getSelectedChar(){return _sel;}
 
-  function toggleWorldHUD(show) {
-    const interactBtn = Utils.$('interact-btn');
-    const chatBtn = Utils.$('chat-action-btn');
-    const reportBtn = Utils.$('report-btn');
-    
-    if (show) {
-      if (interactBtn) interactBtn.style.display = 'block';
-      if (chatBtn) chatBtn.style.display = 'block';
-      if (reportBtn) reportBtn.style.display = 'block';
-      if (typeof MiniMap !== 'undefined' && MiniMap.show) MiniMap.show();
-      if (typeof Joystick !== 'undefined' && Joystick.show) Joystick.show();
-    } else {
-      if (interactBtn) interactBtn.style.display = 'none';
-      if (chatBtn) chatBtn.style.display = 'none';
-      if (reportBtn) reportBtn.style.display = 'none';
-      if (typeof MiniMap !== 'undefined' && MiniMap.hide) MiniMap.hide();
-      // : Joystick.hide()        
-    }
-  }
-
-  return{showLoading,showCharacterSelect,stopPreviewAnimation,showHUD,hideHUD,showToast,showGame,getSelectedChar,updateCoins,toggleWorldHUD};
+  return{showLoading,showCharacterSelect,stopPreviewAnimation,showHUD,hideHUD,showToast,showGame,getSelectedChar,updateCoins};
 })();
