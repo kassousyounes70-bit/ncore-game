@@ -32,13 +32,15 @@ const EventLobby = (() => {
     _py = LOBBY_H/2;
     _frame = 0; _ft = 0; _moving = false;
 
+    // إرسال charId عند الانضمام
     fetch(`${SERVER}/api/event/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         eventId,
-        playerId: Network.getMyId(),
-        playerName: Network.getUsername()
+        playerId  : Network.getMyId(),
+        playerName: Network.getUsername(),
+        charId    : Player.getCharId(),
       })
     }).catch(() => {});
 
@@ -69,25 +71,27 @@ const EventLobby = (() => {
 
   function addBot() {
     if (!_active) return;
-    const currentBots = _players.filter(p => p.isBot).length;
-    if (currentBots >= 47) return; // أقصى حد
 
-    const levels   = ['easy','medium','hard'];
-    const level    = levels[Math.floor(Math.random()*levels.length)];
-    const botNum   = currentBots + 1;
-    const botId    = 'bot_' + Date.now();
+    // إرسال البوت للسيرفر بدل إضافته محلياً
+    const levels = ['easy','medium','hard'];
+    const level  = levels[Math.floor(Math.random()*levels.length)];
+    const botId  = 'bot_' + Date.now() + '_' + Math.random();
+    const botChar = Math.floor(Math.random() * 10);
 
-    _players.push({
-      id      : botId,
-      name    : `BOT-${botNum}`,
-      lobbyX  : Utils.randInt(60, LOBBY_W-60),
-      lobbyY  : Utils.randInt(60, LOBBY_H-60),
-      isBot   : true,
-      botLevel: level,
-      charId  : Math.floor(Math.random()*10),
-    });
-
-    UI.showToast(`🤖 +Bot`, 800);
+    fetch(`${SERVER}/api/event/join`, {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({
+        eventId   : _eventId,
+        playerId  : botId,
+        playerName: 'Bot',
+        charId    : botChar,
+        isBot     : true,
+        botLevel  : level,
+      })
+    }).then(() => {
+      UI.showToast(`🤖 +Bot`, 800);
+    }).catch(() => {});
   }
 
   // ═══════════════════════════════
@@ -99,20 +103,12 @@ const EventLobby = (() => {
       const data = await res.json();
       if (!_active) return;
 
-      // نحتفظ بالـ bots المحلية ونضيف اللاعبين الحقيقيين من السيرفر
-      const serverPlayers = data.players || [];
-      const localBots     = _players.filter(p => p.isBot);
-      _players     = [...serverPlayers, ...localBots];
-      _timer       = data.timer       || 0;
+      // كل البيانات تأتي من السيرفر مباشرة (لا نحتفظ ببوتات محلية)
+      _players     = data.players || [];
+      _timer       = data.timer   || 0;
       _timerActive = data.timerActive || false;
 
-      // العد التنازلي يبدأ لو اللاعبون الحقيقيون + البوتات >= MIN_PLAYERS
-      if (_players.length >= MIN_PLAYERS && !_timerActive) {
-        _timerActive = true;
-        _timer = 30;
-      }
-
-      if (data.started || (_players.length >= MIN_PLAYERS && _timer <= 0)) {
+      if (data.started) {
         clearInterval(_pollInterval);
         _startGame();
       }
@@ -161,8 +157,6 @@ const EventLobby = (() => {
     const cw = window.innerWidth, ch = window.innerHeight;
     const t  = Date.now() / 1000;
 
-    // تم حذف شرط chatModal الذي كان يمنع الرسم
-
     ctx.fillStyle = '#05000f';
     ctx.fillRect(0, 0, cw, ch);
 
@@ -201,31 +195,52 @@ const EventLobby = (() => {
 
     _drawCenteredGlitchTitle(ctx);
 
-    // رسم اللاعبين الآخرين (داخل الكاميرا)
+    // رسم اللاعبين الآخرين باستخدام charId من السيرفر
     for (const p of _players) {
       if (p.id === Network.getMyId()) continue;
       const px = p.lobbyX || LOBBY_W / 2;
       const py = p.lobbyY || LOBBY_H / 2;
-      ctx.fillStyle = 'rgba(0,255,136,0.8)';
-      ctx.beginPath();
-      ctx.arc(px, py, 8, 0, Math.PI * 2);
-      ctx.fill();
-      Utils.drawPixelText(ctx, p.name || 'لاعب', px, py - 16,
-        { font: '5px "Press Start 2P"', color: '#00ff88', align: 'center' });
+
+      try {
+        const allChars = Player.getAllChars();
+        const char     = allChars[p.charId || 0];
+        if (char && typeof char.draw === 'function') {
+          char.draw(ctx, px - 12, py - 14, 'down', 0, false);
+        } else {
+          ctx.fillStyle = p.isBot ? 'rgba(64,192,240,0.9)' : 'rgba(0,255,136,0.8)';
+          ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI*2); ctx.fill();
+        }
+      } catch(e) {
+        ctx.fillStyle = 'rgba(0,255,136,0.8)';
+        ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI*2); ctx.fill();
+      }
+
+      // اسم اللاعب
+      Utils.drawPixelText(ctx, p.name || 'لاعب', px, py - 24,
+        { font: '5px "Press Start 2P"',
+          color: p.isBot ? '#40c0f0' : '#00ff88',
+          align: 'center' });
     }
 
     ctx.restore(); // العودة للإحداثيات الطبيعية للشاشة
 
-    // رسم الشخصية الحالية خارج ترجمة الكاميرا (بإحداثيات الشاشة)
+    // رسم الشخصية الحالية (اللاعب المحلي)
     const screenX = _px - _camX;
     const screenY = _py - _camY;
 
-    if (window.Player && Player.getAllChars) {
-      const char = Player.getAllChars()[Player.getCharId()];
-      if (char) char.draw(ctx, screenX - 12, screenY - 14, 'down', _frame, _moving);
-    } else {
-      ctx.fillStyle = '#f0c040';
-      ctx.fillRect(screenX - 8, screenY - 12, 16, 24);
+    try {
+      const allChars = Player.getAllChars();
+      const charId   = Player.getCharId();
+      const char     = allChars[charId];
+      if (char && typeof char.draw === 'function') {
+        char.draw(ctx, screenX - 12, screenY - 14, 'down', _frame, _moving);
+      } else {
+        ctx.fillStyle = '#f04020';
+        ctx.fillRect(screenX - 8, screenY - 14, 16, 24);
+      }
+    } catch(e) {
+      ctx.fillStyle = '#f04020';
+      ctx.fillRect(screenX - 8, screenY - 14, 16, 24);
     }
 
     // HUD
