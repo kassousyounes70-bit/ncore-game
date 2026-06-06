@@ -68,20 +68,26 @@ const EventLobby = (() => {
   }
 
   function addBot() {
-    if(!_active) return;
-    const levels = ['easy','medium','hard'];
-    const level = levels[Math.floor(Math.random()*levels.length)];
-    const botId = 'bot_' + Date.now() + '_' + Math.random();
+    if (!_active) return;
+    const currentBots = _players.filter(p => p.isBot).length;
+    if (currentBots >= 47) return; // أقصى حد
+
+    const levels   = ['easy','medium','hard'];
+    const level    = levels[Math.floor(Math.random()*levels.length)];
+    const botNum   = currentBots + 1;
+    const botId    = 'bot_' + Date.now();
+
     _players.push({
-      id: botId,
-      name: 'BOT-' + _players.length,
-      lobbyX: Utils.randInt(60, LOBBY_W-60),
-      lobbyY: Utils.randInt(60, LOBBY_H-60),
-      isBot: true,
+      id      : botId,
+      name    : `BOT-${botNum}`,
+      lobbyX  : Utils.randInt(60, LOBBY_W-60),
+      lobbyY  : Utils.randInt(60, LOBBY_H-60),
+      isBot   : true,
       botLevel: level,
-      charId: Math.floor(Math.random() * 10),
+      charId  : Math.floor(Math.random()*10),
     });
-    UI.showToast(`🤖 Bot (${level}) انضم!`, 1200);
+
+    UI.showToast(`🤖 +Bot`, 800);
   }
 
   // ═══════════════════════════════
@@ -92,11 +98,21 @@ const EventLobby = (() => {
       const res  = await fetch(`${SERVER}/api/event/lobby?eventId=${_eventId}`);
       const data = await res.json();
       if (!_active) return;
-      _players     = data.players || [];
-      _timer       = data.timer   || 0;
+
+      // نحتفظ بالـ bots المحلية ونضيف اللاعبين الحقيقيين من السيرفر
+      const serverPlayers = data.players || [];
+      const localBots     = _players.filter(p => p.isBot);
+      _players     = [...serverPlayers, ...localBots];
+      _timer       = data.timer       || 0;
       _timerActive = data.timerActive || false;
 
-      if (data.started) {
+      // العد التنازلي يبدأ لو اللاعبون الحقيقيون + البوتات >= MIN_PLAYERS
+      if (_players.length >= MIN_PLAYERS && !_timerActive) {
+        _timerActive = true;
+        _timer = 30;
+      }
+
+      if (data.started || (_players.length >= MIN_PLAYERS && _timer <= 0)) {
         clearInterval(_pollInterval);
         _startGame();
       }
@@ -145,9 +161,7 @@ const EventLobby = (() => {
     const cw = window.innerWidth, ch = window.innerHeight;
     const t  = Date.now() / 1000;
 
-    // لا نرسم لو كانت نافذة الدردشة مفتوحة
-    const chatModal = document.getElementById('chat-modal');
-    if (chatModal && chatModal.style.display === 'flex') return;
+    // تم حذف شرط chatModal الذي كان يمنع الرسم
 
     ctx.fillStyle = '#05000f';
     ctx.fillRect(0, 0, cw, ch);

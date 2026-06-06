@@ -18,12 +18,14 @@ const Chat = (() => {
     if(chatBtn) {
       // Long Press لإضافة Bot في اللوبي
       let pressTimer = null;
+      let longPressHappened = false;
       
       const startLongPress = (e) => {
         e.preventDefault();
         pressTimer = setTimeout(() => {
           if (typeof EventLobby !== 'undefined' && EventLobby.isActive && EventLobby.isActive()) {
             if (typeof EventLobby.addBot === 'function') {
+              longPressHappened = true;
               EventLobby.addBot();
             }
           }
@@ -44,28 +46,22 @@ const Chat = (() => {
       chatBtn.addEventListener('mouseup', cancelLongPress);
       chatBtn.addEventListener('mouseleave', cancelLongPress);
       
-      // النقرة العادية (بعد 200ms أو إذا لم يكن ضغط طويل) - نفتح الدردشة
-      // نستخدم click العادي لأنه لن يتعارض مع long press (نحتاج لضمان عدم فتح الدردشة عند long press)
-      // نمنع الـ click الأصلي ونستخدم تأخير بسيط
+      // النقرة العادية - تفتح الدردشة فقط إذا لم يكن ضغط طويل ولا نحن في اللوبي
       chatBtn.onclick = (e) => {
-        // إذا كان هناك مؤقت طويل ولم يتم إلغاؤه فهذا معناه أنه لم يصل لـ 800ms بعد
-        // نفتح الدردشة فقط إذا لم يكن long press قد تم
-        if (pressTimer) {
-          // ننتظر قليلاً لئلا يفتح عند long press
-          setTimeout(() => {
-            if (!pressTimer) { // إذا كان المؤقت قد ألغي (أي لم يتم long press)
-              openChat();
-            }
-          }, 50);
-        } else {
-          openChat();
-        }
         e.preventDefault();
+        if (longPressHappened) {
+          longPressHappened = false;
+          return; // لا تفتح الدردشة بعد Long Press
+        }
+        // في اللوبي لا تفتح الدردشة
+        if (typeof EventLobby !== 'undefined' && EventLobby.isActive && EventLobby.isActive()) {
+          return;
+        }
+        openChat();
       };
       
       chatBtn.ontouchstart = (e) => {
         // منع الـ touchstart الافتراضي لأنه سيؤدي إلى click أيضاً
-        // لكننا بدأنا long press أعلاه
         e.preventDefault();
       };
       
