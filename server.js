@@ -219,10 +219,15 @@ io.on('connection', sock => {
     sock.broadcast.emit('event:pushed', { targetId, x, y });
   });
 
-  // ========== حدث الصوت (لـ Uno) ==========
+  // ========== أحداث الصوت (لـ Uno) ==========
+  // صوت لجميع اللاعبين
   sock.on('event:sound', ({ sound }) => {
-    // بث الصوت لجميع اللاعبين في نفس الوقت
     io.emit('event:sound', { sound });
+  });
+
+  // صوت لشخص محدد فقط
+  sock.on('event:sound:target', ({ targetId, sound }) => {
+    io.emit('event:sound:target', { targetId, sound });
   });
 
   sock.on('disconnect', () => {
