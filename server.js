@@ -219,6 +219,12 @@ io.on('connection', sock => {
     sock.broadcast.emit('event:pushed', { targetId, x, y });
   });
 
+  // ========== حدث الصوت (لـ Uno) ==========
+  sock.on('event:sound', ({ sound }) => {
+    // بث الصوت لجميع اللاعبين في نفس الوقت
+    io.emit('event:sound', { sound });
+  });
+
   sock.on('disconnect', () => {
     if (players.has(sock.id)) {
       players.delete(sock.id);
