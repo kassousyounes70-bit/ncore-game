@@ -32,6 +32,14 @@ const EventLobby = (() => {
     _py = LOBBY_H/2;
     _frame = 0; _ft = 0; _moving = false;
 
+    // ========== إيقاف موسيقى العالم وتشغيل موسيقى اللوبي ==========
+    if(window.AndroidApp && window.AndroidApp.pauseMusic){
+      try{ window.AndroidApp.pauseMusic(); } catch(e){}
+    }
+    if(window.UnoSound && window.UnoSound.playLobbyMusic){
+      window.UnoSound.playLobbyMusic();
+    }
+
     // إرسال charId عند الانضمام
     fetch(`${SERVER}/api/event/join`, {
       method: 'POST',
@@ -52,6 +60,14 @@ const EventLobby = (() => {
     if (!_active) return;
     clearInterval(_pollInterval);
     _active = false;
+
+    // ========== إيقاف موسيقى اللوبي واستعادة موسيقى العالم ==========
+    if(window.UnoSound && window.UnoSound.stopLobbyMusic){
+      window.UnoSound.stopLobbyMusic();
+    }
+    if(window.AndroidApp && window.AndroidApp.resumeMusic){
+      try{ window.AndroidApp.resumeMusic(); } catch(e){}
+    }
 
     Network.spendCoins(-1); // استرداد العملة
     fetch(`${SERVER}/api/event/leave`, {
@@ -117,6 +133,12 @@ const EventLobby = (() => {
 
   function _startGame() {
     _active = false;
+    
+    // إيقاف موسيقى اللوبي (اللعبة ستشغل مؤثراتها الخاصة)
+    if(window.UnoSound && window.UnoSound.stopLobbyMusic){
+      window.UnoSound.stopLobbyMusic();
+    }
+    
     if (_eventId === 'cursed_uno') {
       if (typeof EventManager !== 'undefined') {
         EventManager.startTransitionOut(() => {
