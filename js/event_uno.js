@@ -57,7 +57,7 @@ const EventUno = (() => {
   let _sweepT = 0, _sweepDir = 1;
   let _freeCam = { x:0, y:0, active:false };
 
-  // اللاعب الحالي — مع تعريف كامل للمتغيرات
+  // اللاعب الحالي — مع إضافة متغيرات الانزلاق
   const _me = {
     x: SAFE_COLS*TILE/2, y: WORLD_H/2,
     frame:0, ft:0, moving:false,
@@ -68,6 +68,9 @@ const EventUno = (() => {
     alive:true, hearts:3, spectating:false,
     _lostThisRound: false,
     _frozen: false,
+    // انزلاق
+    slideX:0, slideY:0, slideT:0,
+    slideFromX:0, slideFromY:0, slideTargetX:0, slideTargetY:0,
   };
 
   // ═══════════════════════════════
@@ -86,6 +89,7 @@ const EventUno = (() => {
     _me.invincible = 0;
     _me._lostThisRound = false;
     _me._frozen = false;
+    _me.slideT = 0;
 
     // ✅ فلترة اللاعب الحالي من القائمة — يُدار عبر _me فقط
     _players = players.filter(p => p.id !== _myId).map((p,i)=>({
@@ -99,6 +103,9 @@ const EventUno = (() => {
       _pauseT: 0,
       _lostThisRound: false,
       _frozen: false,
+      // انزلاق
+      slideX:0, slideY:0, slideT:0,
+      slideFromX:0, slideFromY:0, slideTargetX:0, slideTargetY:0,
     }));
 
     _buildUI();
@@ -135,6 +142,7 @@ const EventUno = (() => {
     _me.heldCard = null; _me.heldCard2 = null;
     _me._lostThisRound = false;
     _me._frozen = false;
+    _me.slideT = 0;
 
     _actionCard = null;
     _actionShown = false;
@@ -146,6 +154,7 @@ const EventUno = (() => {
     _players.forEach(p => {
       p._lostThisRound = false;
       p._frozen = false;
+      p.slideT = 0;
     });
 
     _targetCard = {
@@ -284,6 +293,7 @@ const EventUno = (() => {
     _me.x=sx; _me.y=WORLD_H/2;
     _me.heldCard=null; _me.heldCard2=null;
     _me.falling=false; _me.fallT=0;
+    _me.slideT=0;
 
     if(_me.hearts>0){
       _me.alive=true;
@@ -304,6 +314,7 @@ const EventUno = (() => {
       p.falling=false; p.fallT=0;
       p.alive=true; p.spectating=false;
       p._lostThisRound=false;
+      p.slideT=0;
     });
   }
 
@@ -372,6 +383,30 @@ const EventUno = (() => {
     }
   }
 
+  // دالة تحديث الانزلاق (للبوتات واللاعبين)
+  function _updateSlides(delta) {
+    const SLIDE_SPEED = 8; // سرعة الانزلاق
+    // تحديث انزلاق اللاعبين الآخرين
+    for(const p of _players) {
+      if(p.slideT && p.slideT > 0) {
+        p.slideT = Math.max(0, p.slideT - delta * SLIDE_SPEED);
+        const t = p.slideT;
+        p.x = Utils.lerp(p.slideTargetX, p.slideFromX, t);
+        p.y = Utils.lerp(p.slideTargetY, p.slideFromY, t);
+        p.moving = true;
+        p.ft += delta;
+        if(p.ft >= 0.08){ p.ft=0; p.frame=(p.frame+1)%3; }
+      }
+    }
+    // تحديث انزلاق _me (إذا احتجنا له لاحقاً، لكن ليس مستخدماً حالياً)
+    if(_me.slideT > 0) {
+      _me.slideT = Math.max(0, _me.slideT - delta * SLIDE_SPEED);
+      const t = _me.slideT;
+      _me.x = Utils.lerp(_me.slideTargetX, _me.slideFromX, t);
+      _me.y = Utils.lerp(_me.slideTargetY, _me.slideFromY, t);
+    }
+  }
+
   function _updateRunning(delta) {
     _roundTimer-=delta;
 
@@ -433,6 +468,7 @@ const EventUno = (() => {
       }
     }
 
+    _updateSlides(delta);   // تحديث الانزلاق قبل حركة البوتات
     _updateBots(delta);
     if(_roundTimer<=0) _endRound();
   }
@@ -473,6 +509,8 @@ const EventUno = (() => {
   function _updateBots(delta) {
     for(const p of _players){
       if(!p.isBot||!p.alive||p._frozen) continue;
+      // إذا كان البوت في حالة انزلاق، لا نتحكم بحركته
+      if(p.slideT && p.slideT > 0) continue;
 
       if(p.falling){
         p.fallT=(p.fallT||0)+delta;
@@ -694,7 +732,7 @@ const EventUno = (() => {
   }
 
   // ═══════════════════════════════
-  //  PUSH / STEAL / DODGE
+  //  PUSH / STEAL / DODGE (مع انزلاق)
   // ═══════════════════════════════
   function push(dir) {
     if(_me.pushCharge<1||_me.falling||!_me.alive||_me.spectating) return;
@@ -707,10 +745,20 @@ const EventUno = (() => {
     for(const p of _players){
       if(!p.alive||p.spectating||p.invincible>0||p.falling) continue;
       if(Utils.distance(_me.x,_me.y,p.x,p.y)>TILE*1.2) continue;
-      p.x=Utils.clamp(p.x+o.dx,0,WORLD_W);
-      p.y=Utils.clamp(p.y+o.dy,0,WORLD_H);
-      Network.sendPush(p.id,p.x,p.y);
-      UI.showToast(`💥 طردت ${p.name}!`,600);
+
+      const targetX=Utils.clamp(p.x+o.dx,0,WORLD_W);
+      const targetY=Utils.clamp(p.y+o.dy,0,WORLD_H);
+
+      // بدء انزلاق تدريجي
+      p.slideFromX = p.x;
+      p.slideFromY = p.y;
+      p.slideTargetX = targetX;
+      p.slideTargetY = targetY;
+      p.slideT = 1.0;  // مدة الانزلاق (تتناقص مع الوقت)
+
+      // إرسال الموضع النهائي للشبكة
+      Network.sendPush(p.id, targetX, targetY);
+      UI.showToast(`💥 دفعت ${p.name}!`,600);
       break;
     }
   }
@@ -723,7 +771,23 @@ const EventUno = (() => {
       if(Math.random()<DODGE_CHANCE&&p.isBot&&p.botLevel==='hard'){
         UI.showToast(`${p.name} تفادى السرقة!`,600); return;
       }
-      _me.heldCard=p.card; p.card=null;
+      // انزلاق للخلف (بعيداً عن السارق)
+      const backDir = {
+        x: p.x - _me.x,
+        y: p.y - _me.y,
+      };
+      const mag = Math.sqrt(backDir.x*backDir.x + backDir.y*backDir.y) || 1;
+      const targetX = Utils.clamp(p.x + (backDir.x/mag) * TILE, 0, WORLD_W);
+      const targetY = Utils.clamp(p.y + (backDir.y/mag) * TILE, 0, WORLD_H);
+
+      p.slideFromX = p.x;
+      p.slideFromY = p.y;
+      p.slideTargetX = targetX;
+      p.slideTargetY = targetY;
+      p.slideT = 0.8;
+
+      _me.heldCard = p.card;
+      p.card = null;
       UI.showToast(`🃏 سرقت من ${p.name}!`,800);
       return;
     }
@@ -1087,11 +1151,10 @@ const EventUno = (() => {
   function _buildUI() {
     if(document.getElementById('uno-btns')) return;
     const wrap=document.createElement('div'); wrap.id='uno-btns';
-    // زيادة عدد الصفوف إلى 5 صفوف (كان 4)
     wrap.style.cssText='position:fixed;bottom:24px;right:24px;z-index:50;display:grid;grid-template-columns:48px 48px 48px;grid-template-rows:48px 48px 48px 48px 48px;gap:4px;';
     const s=(bg)=>`background:${bg};border:2px solid rgba(255,255,255,0.4);color:#fff;font-size:16px;cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;`;
     const btns=[
-      {id:'uno-chat',  icon:'💬', dir:'chat', col:2, row:1, bg:'#1E90FF'}, // زر الدردشة في الأعلى
+      {id:'uno-chat',  icon:'💬', dir:'chat', col:2, row:1, bg:'#1E90FF'},
       {id:'uno-up',    icon:'⬆', dir:'up',   col:2, row:2, bg:'#333'},
       {id:'uno-left',  icon:'⬅', dir:'left', col:1, row:3, bg:'#333'},
       {id:'uno-dodge', icon:'💨', dir:'dodge',col:2, row:3, bg:'#005588'},
