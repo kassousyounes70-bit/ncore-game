@@ -65,7 +65,10 @@ const EventLobby = (() => {
     if(window.UnoSound && window.UnoSound.stopLobbyMusic){
       window.UnoSound.stopLobbyMusic();
     }
-    if(window.AndroidApp && window.AndroidApp.resumeMusic){
+    // استعادة موسيقى العالم (يدعم restoreMusic و resumeMusic للتوافق)
+    if(window.AndroidApp && window.AndroidApp.restoreMusic){
+      try{ window.AndroidApp.restoreMusic(); } catch(e){}
+    } else if(window.AndroidApp && window.AndroidApp.resumeMusic){
       try{ window.AndroidApp.resumeMusic(); } catch(e){}
     }
 
@@ -137,6 +140,13 @@ const EventLobby = (() => {
     // إيقاف موسيقى اللوبي (اللعبة ستشغل مؤثراتها الخاصة)
     if(window.UnoSound && window.UnoSound.stopLobbyMusic){
       window.UnoSound.stopLobbyMusic();
+    }
+    // استعادة موسيقى العالم (إن أردنا تشغيلها بعد اللعبة، لكن اللعبة ستدير موسيقاها)
+    // نضيف استعادة احتياطية لضمان عودة الصوت بعد الخروج من اللعبة
+    if(window.AndroidApp && window.AndroidApp.restoreMusic){
+      try{ window.AndroidApp.restoreMusic(); } catch(e){}
+    } else if(window.AndroidApp && window.AndroidApp.resumeMusic){
+      try{ window.AndroidApp.resumeMusic(); } catch(e){}
     }
     
     if (_eventId === 'cursed_uno') {
