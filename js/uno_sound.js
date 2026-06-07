@@ -10,7 +10,7 @@ const UnoSound = (() => {
 
   function play(name) {
     if(!name) return;
-    const audio = new Audio(BASE + name + '.wav');
+    const audio = new Audio(BASE + name + '.mp3');
     audio.volume = 0.85;
     audio.play().catch(()=>{});
   }
