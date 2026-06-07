@@ -1087,15 +1087,17 @@ const EventUno = (() => {
   function _buildUI() {
     if(document.getElementById('uno-btns')) return;
     const wrap=document.createElement('div'); wrap.id='uno-btns';
-    wrap.style.cssText='position:fixed;bottom:24px;right:24px;z-index:50;display:grid;grid-template-columns:48px 48px 48px;grid-template-rows:48px 48px 48px 48px;gap:4px;';
+    // زيادة عدد الصفوف إلى 5 صفوف (كان 4)
+    wrap.style.cssText='position:fixed;bottom:24px;right:24px;z-index:50;display:grid;grid-template-columns:48px 48px 48px;grid-template-rows:48px 48px 48px 48px 48px;gap:4px;';
     const s=(bg)=>`background:${bg};border:2px solid rgba(255,255,255,0.4);color:#fff;font-size:16px;cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;`;
     const btns=[
-      {id:'uno-up',   icon:'⬆',dir:'up',   col:2,row:1,bg:'#333'},
-      {id:'uno-left', icon:'⬅',dir:'left', col:1,row:2,bg:'#333'},
-      {id:'uno-dodge',icon:'💨',dir:'dodge',col:2,row:2,bg:'#005588'},
-      {id:'uno-right',icon:'➡',dir:'right',col:3,row:2,bg:'#333'},
-      {id:'uno-down', icon:'⬇',dir:'down', col:2,row:3,bg:'#333'},
-      {id:'uno-steal',icon:'🃏',dir:'steal',col:3,row:3,bg:'#550000'},
+      {id:'uno-chat',  icon:'💬', dir:'chat', col:2, row:1, bg:'#1E90FF'}, // زر الدردشة في الأعلى
+      {id:'uno-up',    icon:'⬆', dir:'up',   col:2, row:2, bg:'#333'},
+      {id:'uno-left',  icon:'⬅', dir:'left', col:1, row:3, bg:'#333'},
+      {id:'uno-dodge', icon:'💨', dir:'dodge',col:2, row:3, bg:'#005588'},
+      {id:'uno-right', icon:'➡', dir:'right',col:3, row:3, bg:'#333'},
+      {id:'uno-down',  icon:'⬇', dir:'down', col:2, row:4, bg:'#333'},
+      {id:'uno-steal', icon:'🃏', dir:'steal',col:3, row:4, bg:'#550000'},
     ];
     for(const b of btns){
       const btn=document.createElement('button');
@@ -1103,9 +1105,17 @@ const EventUno = (() => {
       btn.style.cssText=s(b.bg)+`;grid-column:${b.col};grid-row:${b.row}`;
       btn.addEventListener('touchstart',e=>{
         e.preventDefault();
+        if(b.dir==='chat') {
+          if(window.Chat && window.Chat.openChat) window.Chat.openChat();
+          return;
+        }
         b.dir==='dodge'?dodge():b.dir==='steal'?steal():push(b.dir);
       },{passive:false});
       btn.addEventListener('mousedown',()=>{
+        if(b.dir==='chat') {
+          if(window.Chat && window.Chat.openChat) window.Chat.openChat();
+          return;
+        }
         b.dir==='dodge'?dodge():b.dir==='steal'?steal():push(b.dir);
       });
       wrap.appendChild(btn);
