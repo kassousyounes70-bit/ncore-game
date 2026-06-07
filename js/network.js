@@ -95,6 +95,7 @@ const Network = (() => {
   }
 
   function _setupEventSounds() {
+    // صوت لجميع اللاعبين
     _sock.on('event:sound', ({ sound }) => {
       if (window.UnoSound && window.UnoSound.play) {
         window.UnoSound.play(sound);
@@ -103,6 +104,19 @@ const Network = (() => {
         const audio = new Audio('/Song/' + sound + '.mp3');
         audio.volume = 0.85;
         audio.play().catch(()=>{});
+      }
+    });
+    
+    // صوت لشخص محدد فقط
+    _sock.on('event:sound:target', ({ targetId, sound }) => {
+      if (targetId === _myId) {
+        if (window.UnoSound && window.UnoSound.play) {
+          window.UnoSound.play(sound);
+        } else {
+          const audio = new Audio('/Song/' + sound + '.mp3');
+          audio.volume = 0.85;
+          audio.play().catch(()=>{});
+        }
       }
     });
   }
@@ -190,7 +204,13 @@ const Network = (() => {
     _sock.emit('event:sound', { sound });
   }
 
+  // ========== دالة إرسال صوت لشخص محدد ==========
+  function sendEventSoundTarget(targetId, sound){
+    if(!_connected) return;
+    _sock.emit('event:sound:target', { targetId, sound });
+  }
+
   return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,
     getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins,
-    forceDisconnect, sendPush, sendEventSound};
+    forceDisconnect, sendPush, sendEventSound, sendEventSoundTarget};
 })();
