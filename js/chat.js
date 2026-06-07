@@ -16,16 +16,13 @@ const Chat = (() => {
     chatInput.addEventListener('keypress', e => { if(e.key==='Enter') sendChat(); });
 
     if(chatBtn) {
-      // متغيرات للضغط الطويل
       let pressTimer = null;
       let longPressHappened = false;
 
       const startLongPress = (e) => {
-        // لا نمنع الحدث هنا بشكل كامل، فقط نسجل بدء الضغط
         if (pressTimer) clearTimeout(pressTimer);
         longPressHappened = false;
         pressTimer = setTimeout(() => {
-          // ضغط طويل: إضافة بوت فقط إذا كنا في اللوبي
           if (typeof EventLobby !== 'undefined' && EventLobby.isActive && EventLobby.isActive()) {
             if (typeof EventLobby.addBot === 'function') {
               longPressHappened = true;
@@ -40,44 +37,30 @@ const Chat = (() => {
           clearTimeout(pressTimer);
           pressTimer = null;
         }
-        // لا نعيد تعيين longPressHappened هنا لأننا سنستخدمه في onclick
       };
 
-      // أحداث اللمس
       chatBtn.addEventListener('touchstart', startLongPress, { passive: true });
       chatBtn.addEventListener('touchend', (e) => {
         cancelLongPress();
-        // إذا لم يحدث ضغط طويل ولم نكن في اللوبي → نفتح الدردشة
         if (!longPressHappened) {
-          // تحقق مما إذا كنا في اللوبي
-          const isInLobby = (typeof EventLobby !== 'undefined' && EventLobby.isActive && EventLobby.isActive());
-          if (!isInLobby) {
-            e.preventDefault();
-            openChat();
-          }
+          e.preventDefault();
+          openChat(); // تفتح الدردشة في جميع الحالات
         }
-        // إعادة تعيين العلم بعد الاستخدام
         longPressHappened = false;
       });
       chatBtn.addEventListener('touchcancel', cancelLongPress);
 
-      // أحداث الفأرة
       chatBtn.addEventListener('mousedown', startLongPress);
       chatBtn.addEventListener('mouseup', (e) => {
         cancelLongPress();
         if (!longPressHappened) {
-          const isInLobby = (typeof EventLobby !== 'undefined' && EventLobby.isActive && EventLobby.isActive());
-          if (!isInLobby) {
-            openChat();
-          }
+          openChat(); // تفتح الدردشة في جميع الحالات
         }
         longPressHappened = false;
       });
       chatBtn.addEventListener('mouseleave', cancelLongPress);
 
-      // إزالة onclick القديم لتجنب التداخل
       chatBtn.onclick = null;
-      // نمنع أي معالج touchstart آخر قد يتعارض
       chatBtn.ontouchstart = null;
 
       chatBtn.classList.remove('hidden'); 
@@ -249,7 +232,7 @@ const Chat = (() => {
     activeBubbles.set(playerId, { text, timer: duration });
   }
 
-  const exported = { init, update, drawBubbles, addBubble, hasBubble };
+  const exported = { init, update, drawBubbles, addBubble, hasBubble, openChat, closeChat };
   if (typeof window !== 'undefined') window.Chat = exported;
   return exported;
 })();
