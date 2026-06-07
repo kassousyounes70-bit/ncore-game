@@ -66,8 +66,8 @@ const EventUno = (() => {
     invincible:0, falling:false, fallT:0,
     jdx:0, jdy:0,
     alive:true, hearts:3, spectating:false,
-    _lostThisRound: false, // منع خسارة قلب مزدوج
-    _frozen: false,        // للتجميد في REVERSE
+    _lostThisRound: false,
+    _frozen: false,
   };
 
   // ═══════════════════════════════
@@ -87,7 +87,8 @@ const EventUno = (() => {
     _me._lostThisRound = false;
     _me._frozen = false;
 
-    _players = players.map((p,i)=>({
+    // ✅ فلترة اللاعب الحالي من القائمة — يُدار عبر _me فقط
+    _players = players.filter(p => p.id !== _myId).map((p,i)=>({
       id: p.id, name: p.name||'لاعب',
       x: SAFE_COLS*TILE/2, y: (1+i%(GRID_ROWS-2))*TILE,
       hearts: 3, card: null, card2: null,
@@ -135,7 +136,6 @@ const EventUno = (() => {
     _me._lostThisRound = false;
     _me._frozen = false;
 
-    // إعادة تعيين متغيرات الأكشن
     _actionCard = null;
     _actionShown = false;
     _actionDisplayT = 0;
@@ -143,7 +143,6 @@ const EventUno = (() => {
       ? ACTIONS[Math.floor(Math.random()*ACTIONS.length)] : null;
     _actionTimer = _pendingAction ? Utils.randFloat(5, 20) : 0;
 
-    // إعادة تعيين علامات الخسارة والتجميد للاعبين الآخرين
     _players.forEach(p => {
       p._lostThisRound = false;
       p._frozen = false;
@@ -167,8 +166,7 @@ const EventUno = (() => {
   function _buildCards() {
     _cards = [];
     const alive = _getAlivePlayers().length;
-    // منطقة محرمة: البطاقات تظهر فقط في النصف الأيمن
-    const deadZone  = SAFE_COLS * TILE + TILE * 4; // مسافة أمان من نقطة البداية
+    const deadZone  = SAFE_COLS * TILE + TILE * 4;
     const zoneStartX = deadZone;
     const zoneEndX   = GRID_END * TILE - TILE;
 
@@ -215,7 +213,7 @@ const EventUno = (() => {
   }
 
   // ═══════════════════════════════
-  //  BUILD CAPSULES — كبسولات فيزيائية احترافية
+  //  BUILD CAPSULES
   // ═══════════════════════════════
   function _buildCapsules() {
     _capsules = [];
@@ -279,7 +277,7 @@ const EventUno = (() => {
   }
 
   // ═══════════════════════════════
-  //  RESET POSITIONS — المعدل
+  //  RESET POSITIONS
   // ═══════════════════════════════
   function _resetPositions() {
     const sx = _reversed ? WORLD_W-SAFE_COLS*TILE/2 : SAFE_COLS*TILE/2;
@@ -287,7 +285,6 @@ const EventUno = (() => {
     _me.heldCard=null; _me.heldCard2=null;
     _me.falling=false; _me.fallT=0;
 
-    // إعادة اللاعب للعب إذا لديه قلوب
     if(_me.hearts>0){
       _me.alive=true;
       _me.spectating=false;
@@ -299,7 +296,6 @@ const EventUno = (() => {
     }
 
     _players.forEach((p,i)=>{
-      // لو قلوبه صفر — لا تُعِده للعب أبداً
       if(p.hearts<=0){
         p.alive=false; p.spectating=true; return;
       }
@@ -322,7 +318,6 @@ const EventUno = (() => {
       case 'running'  : _updateRunning(delta);   break;
     }
 
-    // كاميرا
     if((_phase==='running'||_phase==='result') && !_freeCam.active){
       _camX=Utils.clamp(_me.x-window.innerWidth/2,  0,Math.max(0,WORLD_W-window.innerWidth));
       _camY=Utils.clamp(_me.y-window.innerHeight/2, 0,Math.max(0,WORLD_H-window.innerHeight));
@@ -346,38 +341,30 @@ const EventUno = (() => {
     if(_countdownT<=0){ _phase='running'; _laserOn=false; }
   }
 
-  // دالة تطبيق بطاقة الأكشن الجديدة
   function _applyActionCard(action) {
     switch(action){
       case 'skip':
         _roundTimer = Math.max(0, _roundTimer - 5);
         UI.showToast('⏭ SKIP! الوقت -5 ثوانٍ!', 2500);
         break;
-
       case 'reverse':
-        // تجميد اللاعبين لجزء من الثانية
         _me._frozen = true;
         _players.forEach(p=>{ p._frozen=true; });
         setTimeout(()=>{
-          // عكس الخريطة
           _reversed = !_reversed;
-          // نقل المواضع للجهة المعاكسة
           const mirrorX = (x) => WORLD_W - x;
           _me.x = mirrorX(_me.x);
           _players.forEach(p=>{ p.x = mirrorX(p.x); });
           _cards.forEach(c=>{ c.x = mirrorX(c.x); });
           _capsules.forEach(c=>{ c.x = mirrorX(c.x); });
-          // إلغاء التجميد
           _me._frozen = false;
           _players.forEach(p=>{ p._frozen=false; });
           UI.showToast('🔄 REVERSE! الخريطة انقلبت!', 2500);
-        }, 600); // 0.6 ثانية تجميد
+        }, 600);
         break;
-
       case 'plus2':
         UI.showToast('+2 🃏 التقط بطاقتين!', 2500);
         break;
-
       case 'wild':
         _lightsOn = false;
         UI.showToast('🌑 WILD! انطفأت الأنوار!', 2500);
@@ -388,17 +375,15 @@ const EventUno = (() => {
   function _updateRunning(delta) {
     _roundTimer-=delta;
 
-    // ظهور بطاقة الأكشن أثناء الجولة
     if(_pendingAction && !_actionShown){
       _actionTimer -= delta;
       if(_actionTimer <= 0){
         _actionShown = true;
         _actionCard  = _pendingAction;
-        _actionDisplayT = 3.0; // تظهر على الشاشة 3 ثوانٍ
+        _actionDisplayT = 3.0;
         _applyActionCard(_actionCard);
       }
     }
-    // عداد عرض البطاقة
     if(_actionDisplayT > 0) _actionDisplayT -= delta;
 
     if(_actionCard==='skip' && !_skipApplied && _roundTimer<=15){
@@ -420,11 +405,9 @@ const EventUno = (() => {
       }
     }
 
-    // تحديث نبض الكبسولات
     const dt=delta;
     for(const cap of _capsules) cap.pulseT=(cap.pulseT||0)+dt*3;
 
-    // كاميرا المتفرج
     if(_freeCam.active){
       const jx=Joystick.getDx(), jy=Joystick.getDy();
       _freeCam.x=Utils.clamp(_freeCam.x+jx*500*delta,0,Math.max(0,WORLD_W-window.innerWidth));
@@ -455,7 +438,7 @@ const EventUno = (() => {
   }
 
   function _updateMeMovement(delta) {
-    if(_me._frozen) return; // تجميد Reverse
+    if(_me._frozen) return;
     const jx=_me.jdx||Joystick.getDx();
     const jy=_me.jdy||Joystick.getDy();
     const mag=Math.sqrt(jx*jx+jy*jy);
@@ -489,9 +472,8 @@ const EventUno = (() => {
   // ═══════════════════════════════
   function _updateBots(delta) {
     for(const p of _players){
-      if(!p.isBot||!p.alive||p._frozen) continue; // تجميد البوتات أثناء REVERSE
+      if(!p.isBot||!p.alive||p._frozen) continue;
 
-      // سقوط البوت
       if(p.falling){
         p.fallT=(p.fallT||0)+delta;
         if(p.fallT>1.0){
@@ -507,7 +489,6 @@ const EventUno = (() => {
       const spd=baseSpd*delta;
       const wander=(Math.random()-0.5)*(p.botLevel==='easy'?30:p.botLevel==='medium'?15:5);
 
-      // توقف مؤقت للبوت الضعيف
       if(p.botLevel==='easy'&&Math.random()<0.01) p._pauseT=0.5;
       if(p._pauseT>0){ p._pauseT-=delta; p.moving=false; continue; }
 
@@ -515,7 +496,6 @@ const EventUno = (() => {
         let nearest=null, nd=Infinity;
         for(const c of _cards){
           if(c.taken) continue;
-          // البوت الذكي يتجنب البطاقات فوق أرضيات هشة
           if(p.botLevel==='hard'){
             const onFrag=_fragiles.some(f=>
               f.state!=='fallen'&&c.x>f.x&&c.x<f.x+f.w&&c.y>f.y&&c.y<f.y+f.h
@@ -540,7 +520,6 @@ const EventUno = (() => {
             nearest.taken=true; p.card=nearest;
           }
         }
-        // البوت الذكي يسرق بطاقتك
         if(p.botLevel==='hard'&&_me.heldCard&&_me.alive&&!_me.spectating){
           if(Utils.distance(p.x,p.y,_me.x,_me.y)<TILE*0.9&&Math.random()<0.008){
             p.card=_me.heldCard; _me.heldCard=null;
@@ -568,7 +547,6 @@ const EventUno = (() => {
             p.ft+=delta;
             if(p.ft>=0.13){p.ft=0;p.frame=(p.frame+1)%3;}
           } else {
-            // البوت الذكي يدفعك من الكبسولة
             if(p.botLevel==='hard'&&_me.alive&&!_me.spectating){
               if(Utils.distance(p.x,p.y,_me.x,_me.y)<TILE&&Math.random()<0.006){
                 _me.x=Utils.clamp(_me.x+(Math.random()-0.5)*TILE*2,0,WORLD_W);
@@ -633,11 +611,10 @@ const EventUno = (() => {
   }
 
   // ═══════════════════════════════
-  //  HEART LOSS — المعدل (منع الخصم المزدوج)
+  //  HEART LOSS
   // ═══════════════════════════════
   function _loseHeart(id) {
     if(id===_myId){
-      // منع الخصم المزدوج
       if(_me._lostThisRound) return;
       _me._lostThisRound=true;
       _me.hearts=Math.max(0,(_me.hearts||3)-1);
@@ -656,7 +633,7 @@ const EventUno = (() => {
       if(me){ me.hearts=_me.hearts; me.alive=_me.alive; }
     } else {
       const p=_players.find(x=>x.id===id);
-      if(!p||p._lostThisRound) return; // منع الخصم المزدوج للبوتات
+      if(!p||p._lostThisRound) return;
       p._lostThisRound=true;
       p.hearts=Math.max(0,p.hearts-1);
       if(p.hearts<=0){ p.alive=false; p.spectating=true; }
@@ -664,22 +641,18 @@ const EventUno = (() => {
   }
 
   // ═══════════════════════════════
-  //  END ROUND — المعدل
+  //  END ROUND
   // ═══════════════════════════════
   function _endRound() {
     _phase='result'; _lightsOn=true;
     _capsules.forEach(c=>c.occupantsCount=0);
 
-    // نسخ آمنة من _players
     const allEntities=[..._players];
-    // أضف اللاعب الحالي فقط لو لم يخسر قلباً بالفعل في هذه الجولة
     if(_me.alive && !_me._lostThisRound){
       allEntities.push({..._me, id:_myId, card:_me.heldCard});
     }
 
-    // محكمة نهاية الجولة الموحدة
     for(const p of allEntities){
-      // تجاهل: ميت نهائياً، سقط في هذه الجولة، أو قلوبه صفر
       if(!p.alive || p._lostThisRound || p.hearts<=0) continue;
       const card=p.id===_myId?_me.heldCard:p.card;
       if(!card){ _loseHeart(p.id); continue; }
@@ -702,7 +675,6 @@ const EventUno = (() => {
       }
     }
 
-    // تحقق من الفائز بعد تطبيق الخسائر
     const alive=_getAlivePlayers();
     const realAlive=alive.filter(p=>p.hearts>0);
 
@@ -791,7 +763,6 @@ const EventUno = (() => {
     if(_phase==='camSweep') _drawTargetCardBig(ctx,cw,ch);
   }
 
-  // ─── Floor ───
   function _drawFloor(ctx) {
     for(let r=0;r<GRID_ROWS;r++){
       for(let c=0;c<GRID_COLS;c++){
@@ -807,12 +778,10 @@ const EventUno = (() => {
     for(let y=0;y<=WORLD_H;y+=TILE){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(WORLD_W,y);ctx.stroke();}
   }
 
-  // ─── Fragiles ───
   function _drawFragiles(ctx) {
     for(const f of _fragiles){
       if(f.state==='fallen'){
         ctx.fillStyle='rgba(0,0,0,0.9)'; ctx.fillRect(f.x,f.y,f.w,f.h);
-        // حفرة
         ctx.strokeStyle='#222'; ctx.lineWidth=1; ctx.strokeRect(f.x,f.y,f.w,f.h);
         const gr=ctx.createRadialGradient(f.x+f.w/2,f.y+f.h/2,2,f.x+f.w/2,f.y+f.h/2,f.w/2);
         gr.addColorStop(0,'rgba(0,0,0,0.95)'); gr.addColorStop(1,'rgba(20,5,0,0.4)');
@@ -836,20 +805,17 @@ const EventUno = (() => {
     }
   }
 
-  // ─── Blockers ───
   function _drawBlockers(ctx) {
     for(const b of _blockers){
       if(!b.visible) continue;
       ctx.fillStyle='#3a0a6a'; ctx.fillRect(b.x,b.y,b.w,b.h);
       ctx.strokeStyle='#8800ff'; ctx.lineWidth=2; ctx.strokeRect(b.x,b.y,b.w,b.h);
-      // توهج
       const gr=ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
       gr.addColorStop(0,'rgba(136,0,255,0.3)'); gr.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=gr; ctx.fillRect(b.x,b.y,b.w,b.h);
     }
   }
 
-  // ─── Laser ───
   function _drawLaser(ctx) {
     if(!_laserOn) return;
     const lx=_reversed?GRID_END*TILE:SAFE_COLS*TILE;
@@ -862,54 +828,45 @@ const EventUno = (() => {
     ctx.fillStyle=gr; ctx.fillRect(lx-20,0,40,WORLD_H);
   }
 
-  // ─── Capsules — كبسولات فيزيائية احترافية ───
   function _drawCapsules(ctx) {
     for(const cap of _capsules){
       const cColor=cap.type==='color'?(COLOR_HEX[cap.value]||'#888'):'#4488cc';
       const pulse=0.5+Math.sin(cap.pulseT||0)*0.5;
       const x=cap.x, y=cap.y, w=cap.w, h=cap.h;
 
-      // ── القاعدة المعدنية ──
       const baseH=h*0.18;
       const baseGr=ctx.createLinearGradient(x,y+h-baseH,x,y+h);
       baseGr.addColorStop(0,'#3a3a4a'); baseGr.addColorStop(1,'#1a1a2a');
       ctx.fillStyle=baseGr; ctx.fillRect(x,y+h-baseH,w,baseH);
       ctx.strokeStyle='#5a5a7a'; ctx.lineWidth=1;
       ctx.strokeRect(x,y+h-baseH,w,baseH);
-      // تفاصيل القاعدة
       ctx.fillStyle='rgba(255,255,255,0.08)';
       ctx.fillRect(x+4,y+h-baseH+2,w-8,2);
       ctx.fillRect(x+4,y+h-baseH+5,w-8,1);
 
-      // ── الأسطوانة الزجاجية ──
       const cylY=y+h*0.18, cylH=h*0.64;
-      // خلفية الأسطوانة
       const cylGr=ctx.createLinearGradient(x,cylY,x+w,cylY);
       cylGr.addColorStop(0,cColor+'55');
       cylGr.addColorStop(0.5,cColor+'22');
       cylGr.addColorStop(1,cColor+'55');
       ctx.fillStyle=cylGr; ctx.fillRect(x,cylY,w,cylH);
 
-      // إطار الأسطوانة مع توهج
       const glowAlpha=0.4+pulse*0.5;
       ctx.strokeStyle=cColor; ctx.lineWidth=2;
       ctx.shadowColor=cColor; ctx.shadowBlur=8*pulse;
       ctx.strokeRect(x,cylY,w,cylH);
       ctx.shadowBlur=0;
 
-      // انعكاس زجاجي
       ctx.fillStyle='rgba(255,255,255,0.06)';
       ctx.fillRect(x+2,cylY+2,w*0.3,cylH-4);
       ctx.fillStyle='rgba(255,255,255,0.03)';
       ctx.fillRect(x+w*0.7,cylY+2,w*0.25,cylH-4);
 
-      // خطوط أفقية رفيعة (مظهر أسطواني)
       ctx.strokeStyle=`rgba(255,255,255,0.06)`; ctx.lineWidth=0.5;
       for(let ly=cylY+8;ly<cylY+cylH;ly+=8){
         ctx.beginPath(); ctx.moveTo(x,ly); ctx.lineTo(x+w,ly); ctx.stroke();
       }
 
-      // ── الشاشة الهولوغرافية العلوية ──
       const screenH=h*0.22;
       const screenGr=ctx.createLinearGradient(x,y,x,y+screenH);
       screenGr.addColorStop(0,'#0a0a1a');
@@ -920,21 +877,17 @@ const EventUno = (() => {
       ctx.strokeRect(x,y,w,screenH);
       ctx.shadowBlur=0;
 
-      // محتوى الشاشة
       ctx.save();
       ctx.textAlign='center'; ctx.textBaseline='middle';
       if(cap.type==='color'){
-        // دائرة اللون
         ctx.fillStyle=cColor;
         ctx.beginPath(); ctx.arc(x+w/2,y+screenH/2,screenH*0.35,0,Math.PI*2); ctx.fill();
         ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1;
         ctx.stroke();
-        // تسمية اللون أسفل الشاشة
         ctx.font=`bold ${Math.floor(w*0.18)}px "Press Start 2P"`;
         ctx.fillStyle='rgba(255,255,255,0.7)';
         ctx.fillText(cap.value.toUpperCase().slice(0,3),x+w/2,y+screenH*0.78);
       } else {
-        // رقم UNO
         ctx.font=`bold ${Math.floor(screenH*0.6)}px "Press Start 2P"`;
         ctx.fillStyle=cColor;
         ctx.shadowColor=cColor; ctx.shadowBlur=6*pulse;
@@ -943,13 +896,11 @@ const EventUno = (() => {
       }
       ctx.restore();
 
-      // ── ضوء النبض ──
       const glowGr=ctx.createRadialGradient(x+w/2,y+h/2,0,x+w/2,y+h/2,w);
       glowGr.addColorStop(0,cColor+(Math.floor(pulse*40).toString(16).padStart(2,'0')));
       glowGr.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=glowGr; ctx.fillRect(x-8,y-8,w+16,h+16);
 
-      // ── عدد المحتلين ──
       if(cap.occupantsCount>0){
         ctx.font='7px "Press Start 2P"';
         ctx.fillStyle='rgba(0,255,0,0.9)';
@@ -957,7 +908,6 @@ const EventUno = (() => {
         ctx.fillText(`${cap.occupantsCount}/5`,x+w/2,y+h-baseH/2);
       }
 
-      // ── قفل إذا امتلأت ──
       if(cap.occupantsCount>=5){
         ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(x,cylY,w,cylH);
         ctx.font='16px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -966,7 +916,6 @@ const EventUno = (() => {
     }
   }
 
-  // ─── Cards UNO ───
   function _drawCards(ctx) {
     for(const c of _cards){
       if(c.taken) continue;
@@ -994,7 +943,6 @@ const EventUno = (() => {
     }
   }
 
-  // ─── Players ───
   function _drawPlayers(ctx) {
     for(const p of _players){
       if(!p.alive&&!p.spectating&&!p.falling) continue;
@@ -1021,7 +969,6 @@ const EventUno = (() => {
     }
   }
 
-  // ─── Me ───
   function _drawMe(ctx) {
     if(!_me.alive&&!_me.spectating&&!_me.falling) return;
     ctx.save();
@@ -1043,7 +990,6 @@ const EventUno = (() => {
     ctx.restore();
   }
 
-  // ─── Darkness Wild ───
   function _drawDarkness(ctx,cw,ch) {
     const fx=_freeCam.active?cw/2:_me.x-_camX;
     const fy=_freeCam.active?ch/2:_me.y-_camY;
@@ -1052,7 +998,6 @@ const EventUno = (() => {
     ctx.fillStyle=gr; ctx.fillRect(0,0,cw,ch);
   }
 
-  // ─── HUD ───
   function _drawHUD(ctx,cw,ch) {
     const me=_getMyPlayer();
     if(_targetCard&&_phase!=='camSweep'){
@@ -1080,7 +1025,6 @@ const EventUno = (() => {
       Utils.drawPixelText(ctx,'SPECTATOR',14,ch-30,{font:'5px "Press Start 2P"',color:'#00aaff',align:'left'});
     }
 
-    // عرض بطاقة الأكشن في المنتصف عند ظهورها (الجديد)
     if(_actionCard && _actionDisplayT > 0){
       const alpha = Math.min(1, _actionDisplayT);
       const ac={skip:'⏭ SKIP',reverse:'🔄 REVERSE',plus2:'+2 🃏',wild:'🌑 WILD ×4'};
@@ -1089,7 +1033,6 @@ const EventUno = (() => {
       ctx.save();
       ctx.globalAlpha = alpha;
 
-      // بطاقة كبيرة في المنتصف
       const bw=160, bh=60;
       const bx=cw/2-bw/2, by=ch/2-bh/2-40;
       ctx.fillStyle=cc[_actionCard]||'#333';
@@ -1097,14 +1040,12 @@ const EventUno = (() => {
       ctx.strokeStyle='#fff'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,8); ctx.stroke();
 
-      // توهج
       ctx.shadowColor=cc[_actionCard]; ctx.shadowBlur=20*alpha;
       Utils.drawPixelText(ctx,ac[_actionCard]||_actionCard,cw/2,by+12,
         {font:'7px "Press Start 2P"',color:'#fff',align:'center'});
       ctx.shadowBlur=0;
       ctx.restore();
     }
-    // أيقونة صغيرة دائمة بعد الظهور
     else if(_actionCard){
       const ac={skip:'⏭',reverse:'🔄',plus2:'+2',wild:'🌑'};
       const cc={skip:'#ff8800',reverse:'#8800ff',plus2:'#0088ff',wild:'#333'};
@@ -1176,7 +1117,6 @@ const EventUno = (() => {
   
   function _getMyPlayer(){ return _players.find(p=>p.id===_myId)||null; }
   
-  // المعدلة: تشترط وجود قلوب
   function _getAlivePlayers(){
     const list=_players.filter(p=>p.alive && p.hearts>0);
     if(_me.alive && _me.hearts>0) list.push({..._me, id:_myId});
