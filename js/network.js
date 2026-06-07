@@ -89,6 +89,22 @@ const Network = (() => {
     _sock.on('police:update', ({ targetId, stars }) => {
         if (window.PoliceSystem) PoliceSystem.updateStars(targetId, stars);
     });
+
+    // ========== أحداث الصوت لـ Uno ==========
+    _setupEventSounds();
+  }
+
+  function _setupEventSounds() {
+    _sock.on('event:sound', ({ sound }) => {
+      if (window.UnoSound && window.UnoSound.play) {
+        window.UnoSound.play(sound);
+      } else {
+        // تشغيل مباشر كبديل
+        const audio = new Audio('/Song/' + sound + '.mp3');
+        audio.volume = 0.85;
+        audio.play().catch(()=>{});
+      }
+    });
   }
 
   function _mk(d){
@@ -168,7 +184,13 @@ const Network = (() => {
     _sock.emit('event:push', { targetId, x: nx, y: ny });
   }
 
+  // ========== دالة إرسال حدث الصوت (لـ Uno) ==========
+  function sendEventSound(sound){
+    if(!_connected) return;
+    _sock.emit('event:sound', { sound });
+  }
+
   return{connect,sendPosition,drawOtherPlayers,getPlayerCount,isConnected,
     getMyId,sendChat,getPlayers,getCoins,getUsername,spendCoins,
-    forceDisconnect, sendPush};
+    forceDisconnect, sendPush, sendEventSound};
 })();
