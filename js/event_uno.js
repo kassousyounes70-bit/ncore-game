@@ -53,6 +53,9 @@ const EventUno = (() => {
   let _actionShown   = false;
   let _actionDisplayT= 0;
 
+  // متغير لمنع تكرار صوت العد التنازلي
+  let _countdownSoundPlayed = false;
+
   let _camX = 0, _camY = 0;
   let _sweepT = 0, _sweepDir = 1;
   let _freeCam = { x:0, y:0, active:false };
@@ -143,6 +146,7 @@ const EventUno = (() => {
     _me._lostThisRound = false;
     _me._frozen = false;
     _me.slideT = 0;
+    _countdownSoundPlayed = false; // إعادة تعيين علم العد التنازلي
 
     _actionCard = null;
     _actionShown = false;
@@ -162,14 +166,17 @@ const EventUno = (() => {
       number: NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
     };
 
-    // ========== صوت البطاقة المستهدفة (يُبث للجميع) ==========
+    // ========== إعلان البطاقة المستهدفة (تسلسل محلي + بث للجميع) ==========
     setTimeout(() => {
-      if(_active && _targetCard && Network.sendEventSound) {
-        Network.sendEventSound(_targetCard.color);
-        setTimeout(() => {
-          const numNames = ['zero','one','two','three','four','five','six','seven','eight','nine'];
-          Network.sendEventSound(numNames[_targetCard.number] || 'zero');
-        }, 900);
+      if(_active && _targetCard) {
+        // تشغيل التسلسل محلياً (لون ثم رقم)
+        if(window.UnoSound && window.UnoSound.announceCard) {
+          window.UnoSound.announceCard(_targetCard.color, _targetCard.number);
+        }
+        // بث اللون فقط للسيرفر (حتى لا يتداخل التسلسل مع الآخرين)
+        if(Network.sendEventSound) {
+          Network.sendEventSound(_targetCard.color);
+        }
       }
     }, 800);
 
@@ -358,25 +365,35 @@ const EventUno = (() => {
     _camY=Utils.clamp(WORLD_H/2-window.innerHeight/2,0,Math.max(0,WORLD_H-window.innerHeight));
   }
 
+  // العد التنازلي مع تسلسل الأصوات (مرة واحدة فقط)
   function _updateCountdown(delta) {
-    const prevCeil = Math.ceil(_countdownT);
-    _countdownT -= delta;
-    const newCeil = Math.ceil(_countdownT);
-    
-    // تشغيل صوت العد التنازلي عند تغير الثانية (3,2,1)
-    if(prevCeil !== newCeil && newCeil >= 1 && newCeil <= 3) {
-      if(Network.sendEventSound) Network.sendEventSound(`cont_${newCeil}`);
+    // تشغيل التسلسل الصوتي في أول إطار للعد التنازلي
+    if(!_countdownSoundPlayed && _phase === 'countdown') {
+      _countdownSoundPlayed = true;
+      if(window.UnoSound && window.UnoSound.announceCountdown) {
+        window.UnoSound.announceCountdown(() => {
+          // بعد انتهاء GO، يمكن تنفيذ أي إجراء إضافي
+        });
+      }
+      // إرسال إشارة بدء العد للجميع (اختياري، يمكن إرسال cont_3 فقط)
+      if(Network.sendEventSound) Network.sendEventSound('cont_3');
     }
-    
+
+    _countdownT -= delta;
     if(_countdownT <= 0){
       _phase='running'; _laserOn=false;
-      if(Network.sendEventSound) Network.sendEventSound('GO');
+      // تأكيد GO إذا لم يتم عبر التسلسل (لكن التسلسل يشمل GO)
     }
   }
 
   function _applyActionCard(action) {
-    // بث صوت الأكشن للجميع
-    if(Network.sendEventSound) Network.sendEventSound(action);
+    // تشغيل الصوت محلياً (مع ducking) + بثه للجميع
+    if(window.UnoSound && window.UnoSound.announceAction) {
+      window.UnoSound.announceAction(action);
+    }
+    if(Network.sendEventSound) {
+      Network.sendEventSound(action);
+    }
     
     switch(action){
       case 'skip':
@@ -682,9 +699,11 @@ const EventUno = (() => {
       _me._lostThisRound=true;
       _me.hearts=Math.max(0,(_me.hearts||3)-1);
       
-      // صوت خسارة قلب (محلي فقط)
-      if(window.UnoSound && window.UnoSound.loseHeart) {
-        window.UnoSound.loseHeart();
+      // إرسال صوت خسارة القلب للشخص المتأثر فقط (عبر السيرفر)
+      if(Network.sendEventSoundTarget) {
+        Network.sendEventSoundTarget(_myId, 'oh_no');
+      } else if(window.UnoSound && window.UnoSound.loseHeart) {
+        window.UnoSound.loseHeart(); // احتياطي محلي
       }
       
       if(_me.hearts<=0){
@@ -1232,6 +1251,17 @@ const EventUno = (() => {
   // ═══════════════════════════════
   function exit(){
     _active=false; _removeUI(); _showWorldUI();
+    
+    // إيقاف أي موسيقى خلفية واستعادة موسيقى العالم
+    if(window.UnoSound && window.UnoSound.stopLobbyMusic) {
+      window.UnoSound.stopLobbyMusic();
+    }
+    if(window.AndroidApp && window.AndroidApp.restoreMusic) {
+      try{ window.AndroidApp.restoreMusic(); } catch(e){}
+    } else if(window.AndroidApp && window.AndroidApp.resumeMusic) {
+      try{ window.AndroidApp.resumeMusic(); } catch(e){}
+    }
+    
     if(typeof EventManager!=='undefined'){
       EventManager.startTransitionOut(()=>{ UI.showToast('عدت إلى العالم 🌍',2000); });
     }
