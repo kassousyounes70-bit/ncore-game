@@ -162,6 +162,17 @@ const EventUno = (() => {
       number: NUMBERS[Math.floor(Math.random()*NUMBERS.length)],
     };
 
+    // ========== صوت البطاقة المستهدفة (يُبث للجميع) ==========
+    setTimeout(() => {
+      if(_active && _targetCard && Network.sendEventSound) {
+        Network.sendEventSound(_targetCard.color);
+        setTimeout(() => {
+          const numNames = ['zero','one','two','three','four','five','six','seven','eight','nine'];
+          Network.sendEventSound(numNames[_targetCard.number] || 'zero');
+        }, 900);
+      }
+    }, 800);
+
     _buildCards();
     _buildCapsules();
     _buildFragiles();
@@ -348,11 +359,25 @@ const EventUno = (() => {
   }
 
   function _updateCountdown(delta) {
-    _countdownT-=delta;
-    if(_countdownT<=0){ _phase='running'; _laserOn=false; }
+    const prevCeil = Math.ceil(_countdownT);
+    _countdownT -= delta;
+    const newCeil = Math.ceil(_countdownT);
+    
+    // تشغيل صوت العد التنازلي عند تغير الثانية (3,2,1)
+    if(prevCeil !== newCeil && newCeil >= 1 && newCeil <= 3) {
+      if(Network.sendEventSound) Network.sendEventSound(`cont_${newCeil}`);
+    }
+    
+    if(_countdownT <= 0){
+      _phase='running'; _laserOn=false;
+      if(Network.sendEventSound) Network.sendEventSound('GO');
+    }
   }
 
   function _applyActionCard(action) {
+    // بث صوت الأكشن للجميع
+    if(Network.sendEventSound) Network.sendEventSound(action);
+    
     switch(action){
       case 'skip':
         _roundTimer = Math.max(0, _roundTimer - 5);
@@ -656,6 +681,12 @@ const EventUno = (() => {
       if(_me._lostThisRound) return;
       _me._lostThisRound=true;
       _me.hearts=Math.max(0,(_me.hearts||3)-1);
+      
+      // صوت خسارة قلب (محلي فقط)
+      if(window.UnoSound && window.UnoSound.loseHeart) {
+        window.UnoSound.loseHeart();
+      }
+      
       if(_me.hearts<=0){
         _me.alive=false; _me.spectating=true;
         _freeCam.active=true;
